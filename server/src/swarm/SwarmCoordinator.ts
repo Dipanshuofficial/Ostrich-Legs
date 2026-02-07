@@ -2,17 +2,13 @@ import { Server as SocketIOServer } from "socket.io";
 import { DeviceRegistry } from "./DeviceRegistry";
 import { WorkStealingScheduler } from "./WorkStealingScheduler";
 import { JoinCodeManager } from "./JoinCodeManager";
-import { 
-  DeviceInfo, 
-  DeviceStatus, 
-  DeviceCapabilities, 
-  DeviceType,
-  JobChunk, 
-  WorkerResult,
-  DeviceHealth,
-  SwarmStats,
-  SwarmEvent
-} from "../../shared/types";
+import {
+  type DeviceInfo,
+  type JobChunk,
+  type WorkerResult,
+  type DeviceHealth,
+  type SwarmStats,
+} from "../../../shared/types";
 import { EventEmitter } from "events";
 
 interface SwarmOptions {
@@ -38,7 +34,7 @@ export class SwarmCoordinator extends EventEmitter {
       enableWorkStealing: true,
       enableHealthChecks: true,
       autoRebalance: true,
-      ...options
+      ...options,
     };
 
     this.setupEventHandlers();
@@ -46,11 +42,16 @@ export class SwarmCoordinator extends EventEmitter {
   }
 
   // Device Management
-  registerDevice(socketId: string, deviceInfo: Partial<DeviceInfo>): DeviceInfo {
+  registerDevice(
+    socketId: string,
+    deviceInfo: Partial<DeviceInfo>,
+  ): DeviceInfo {
     const device: DeviceInfo = {
       id: deviceInfo.id || this.generateDeviceId(),
       socketId,
-      name: deviceInfo.name || `Device-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+      name:
+        deviceInfo.name ||
+        `Device-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
       type: deviceInfo.type || "DESKTOP",
       status: "ONLINE",
       capabilities: deviceInfo.capabilities || {
@@ -58,7 +59,7 @@ export class SwarmCoordinator extends EventEmitter {
         memoryGB: 4,
         gpuAvailable: false,
         maxConcurrency: navigator.hardwareConcurrency || 2,
-        supportedJobs: ["MATH_STRESS", "MAT_MUL"]
+        supportedJobs: ["MATH_STRESS", "MAT_MUL"],
       },
       opsScore: deviceInfo.opsScore || 0,
       currentLoad: 0,
@@ -68,15 +69,17 @@ export class SwarmCoordinator extends EventEmitter {
       lastHeartbeat: Date.now(),
       throttleLevel: 1.0,
       isThrottled: false,
-      ...deviceInfo
+      ...deviceInfo,
     };
 
     this.registry.register(device);
-    console.log(`[Swarm] Device registered: ${device.name} (${device.type}) - ${device.capabilities.cpuCores} cores`);
-    
+    console.log(
+      `[Swarm] Device registered: ${device.name} (${device.type}) - ${device.capabilities.cpuCores} cores`,
+    );
+
     this.emit("deviceJoined", device);
     this.broadcastStats();
-    
+
     return device;
   }
 
@@ -85,12 +88,12 @@ export class SwarmCoordinator extends EventEmitter {
     if (device) {
       // Reassign any pending jobs from this device
       const jobs = this.scheduler.getWorkForDevice(deviceId);
-      jobs.forEach(job => {
+      jobs.forEach((job) => {
         job.status = "PENDING";
         job.assignedTo = undefined;
         job.assignedAt = undefined;
       });
-      
+
       console.log(`[Swarm] Device left: ${device.name}`);
       this.emit("deviceLeft", deviceId);
       this.broadcastStats();
@@ -114,13 +117,16 @@ export class SwarmCoordinator extends EventEmitter {
       return null;
     }
 
-    const job = this.scheduler.getNextJob(deviceId, device.capabilities.supportedJobs);
-    
+    const job = this.scheduler.getNextJob(
+      deviceId,
+      device.capabilities.supportedJobs,
+    );
+
     if (job) {
       this.registry.updateLoad(deviceId, device.currentLoad + 1);
       this.emit("jobAssigned", job, deviceId);
     }
-    
+
     return job;
   }
 
@@ -130,32 +136,39 @@ export class SwarmCoordinator extends EventEmitter {
       return [];
     }
 
-    const jobs = this.scheduler.getBatch(deviceId, count, device.capabilities.supportedJobs);
-    
+    const jobs = this.scheduler.getBatch(
+      deviceId,
+      count,
+      device.capabilities.supportedJobs,
+    );
+
     if (jobs.length > 0) {
       this.registry.updateLoad(deviceId, device.currentLoad + jobs.length);
       this.emit("batchAssigned", jobs, deviceId);
     }
-    
+
     return jobs;
   }
 
   completeJob(result: WorkerResult): void {
     const success = this.scheduler.completeJob(result);
-    
+
     if (success && result.deviceId) {
       const device = this.registry.get(result.deviceId);
       if (device) {
         device.totalJobsCompleted++;
         device.avgJobDuration = result.durationMs || device.avgJobDuration;
-        this.registry.updateLoad(result.deviceId, Math.max(0, device.currentLoad - 1));
+        this.registry.updateLoad(
+          result.deviceId,
+          Math.max(0, device.currentLoad - 1),
+        );
         this.registry.updateStats(result.deviceId, {
           totalJobsCompleted: device.totalJobsCompleted,
-          avgJobDuration: device.avgJobDuration
+          avgJobDuration: device.avgJobDuration,
         });
       }
     }
-    
+
     this.tryAssignPendingJobs();
     this.broadcastStats();
   }
@@ -165,16 +178,16 @@ export class SwarmCoordinator extends EventEmitter {
     if (!this.options.enableWorkStealing) return [];
 
     const stolen = this.scheduler.stealWork(thiefId);
-    
+
     if (stolen.length > 0) {
       const thief = this.registry.get(thiefId);
       if (thief) {
         this.registry.updateLoad(thiefId, thief.currentLoad + stolen.length);
       }
-      
+
       this.emit("workStolen", stolen, thiefId);
     }
-    
+
     return stolen;
   }
 
@@ -187,8 +200,9 @@ export class SwarmCoordinator extends EventEmitter {
     }
 
     // Find best target for offloading
-    const available = this.registry.getAvailable()
-      .filter(d => d.id !== deviceId)
+    const available = this.registry
+      .getAvailable()
+      .filter((d) => d.id !== deviceId)
       .sort((a, b) => b.opsScore - a.opsScore)[0];
 
     if (available) {
@@ -201,7 +215,7 @@ export class SwarmCoordinator extends EventEmitter {
   // Health & Monitoring
   recordHeartbeat(deviceId: string, health: DeviceHealth): void {
     this.registry.recordHeartbeat(deviceId, health);
-    
+
     // Update device stats based on health
     if (health.cpuUsage > 90) {
       const device = this.registry.get(deviceId);
@@ -218,7 +232,9 @@ export class SwarmCoordinator extends EventEmitter {
   }
 
   // Join Codes
-  generateJoinCode(options?: Parameters<JoinCodeManager["generateCode"]>[0]): string {
+  generateJoinCode(
+    options?: Parameters<JoinCodeManager["generateCode"]>[0],
+  ): string {
     return this.joinCodeManager.generateCode(options);
   }
 
@@ -247,7 +263,7 @@ export class SwarmCoordinator extends EventEmitter {
       failedJobs: this.scheduler.getFailedCount(),
       globalVelocity: this.calculateGlobalVelocity(),
       avgLatency: this.calculateAvgLatency(),
-      devicesByType: deviceStats.devicesByType
+      devicesByType: deviceStats.devicesByType,
     };
   }
 
@@ -279,18 +295,22 @@ export class SwarmCoordinator extends EventEmitter {
     if (pendingCount === 0) return;
 
     const available = this.registry.getAvailable();
-    
+
     for (const device of available) {
       const capacity = device.capabilities.maxConcurrency - device.currentLoad;
       if (capacity <= 0) continue;
 
       // Request batch of jobs based on capacity
-      const jobs = this.scheduler.getBatch(device.id, capacity, device.capabilities.supportedJobs);
-      
+      const jobs = this.scheduler.getBatch(
+        device.id,
+        capacity,
+        device.capabilities.supportedJobs,
+      );
+
       if (jobs.length > 0) {
         this.registry.updateLoad(device.id, device.currentLoad + jobs.length);
         this.emit("batchAssigned", jobs, device.id);
-        
+
         // Send jobs to device
         const socket = this.io.sockets.sockets.get(device.socketId);
         if (socket) {
@@ -305,20 +325,26 @@ export class SwarmCoordinator extends EventEmitter {
 
     setInterval(() => {
       const pairs = this.registry.getLoadBalancingPairs();
-      
+
       for (const { overloaded, underloaded } of pairs) {
         const stolen = this.scheduler.stealWork(underloaded.id, 3);
-        
+
         if (stolen.length > 0) {
-          this.registry.updateLoad(overloaded.id, Math.max(0, overloaded.currentLoad - stolen.length));
-          this.registry.updateLoad(underloaded.id, underloaded.currentLoad + stolen.length);
-          
+          this.registry.updateLoad(
+            overloaded.id,
+            Math.max(0, overloaded.currentLoad - stolen.length),
+          );
+          this.registry.updateLoad(
+            underloaded.id,
+            underloaded.currentLoad + stolen.length,
+          );
+
           // Send stolen jobs to underloaded device
           const socket = this.io.sockets.sockets.get(underloaded.socketId);
           if (socket) {
             socket.emit("BATCH_DISPATCH", stolen);
           }
-          
+
           this.emit("workStolen", stolen, overloaded.id, underloaded.id);
         }
       }
@@ -333,7 +359,7 @@ export class SwarmCoordinator extends EventEmitter {
   private calculateGlobalVelocity(): number {
     const devices = this.registry.getOnline();
     if (devices.length === 0) return 0;
-    
+
     const totalJobsLastMinute = devices.reduce((sum, d) => {
       // Estimate based on avg duration
       if (d.avgJobDuration > 0) {
@@ -341,7 +367,7 @@ export class SwarmCoordinator extends EventEmitter {
       }
       return sum;
     }, 0);
-    
+
     return Math.round(totalJobsLastMinute / 60); // Jobs per second
   }
 

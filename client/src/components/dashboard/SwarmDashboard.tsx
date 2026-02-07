@@ -1,17 +1,21 @@
-import { useEffect, useState } from "react";
 import { Card } from "../ui/Card";
-import { 
-  Smartphone, 
-  Laptop, 
-  Server, 
-  Cpu, 
-  Activity, 
+import {
+  Smartphone,
+  Laptop,
+  Server,
+  Cpu,
+  Activity,
   Zap,
   Wifi,
   WifiOff,
-  AlertCircle
+  AlertCircle,
 } from "lucide-react";
-import type { DeviceInfo, DeviceType, DeviceStatus, SwarmStats } from "../../../shared/types";
+import type {
+  DeviceInfo,
+  DeviceType,
+  DeviceStatus,
+  SwarmStats,
+} from "../../../../shared/types";
 
 interface SwarmDashboardProps {
   devices: DeviceInfo[];
@@ -21,31 +25,46 @@ interface SwarmDashboardProps {
 export function SwarmDashboard({ devices, stats }: SwarmDashboardProps) {
   const getDeviceIcon = (type: DeviceType) => {
     switch (type) {
-      case "MOBILE": return Smartphone;
-      case "TABLET": return Smartphone;
-      case "COLAB": return Server;
-      case "SERVER": return Server;
-      default: return Laptop;
+      case "MOBILE":
+        return Smartphone;
+      case "TABLET":
+        return Smartphone;
+      case "COLAB":
+        return Server;
+      case "SERVER":
+        return Server;
+      default:
+        return Laptop;
     }
   };
 
   const getStatusColor = (status: DeviceStatus) => {
     switch (status) {
-      case "ONLINE": return "#10b981";
-      case "BUSY": return "#f59e0b";
-      case "ERROR": return "#f43f5e";
-      case "OFFLINE": return "#6b7280";
-      default: return "#6b7280";
+      case "ONLINE":
+        return "#10b981";
+      case "BUSY":
+        return "#f59e0b";
+      case "ERROR":
+        return "#f43f5e";
+      case "OFFLINE":
+        return "#6b7280";
+      default:
+        return "#6b7280";
     }
   };
 
   const getStatusIcon = (status: DeviceStatus) => {
     switch (status) {
-      case "ONLINE": return Wifi;
-      case "BUSY": return Activity;
-      case "ERROR": return AlertCircle;
-      case "OFFLINE": return WifiOff;
-      default: return Wifi;
+      case "ONLINE":
+        return Wifi;
+      case "BUSY":
+        return Activity;
+      case "ERROR":
+        return AlertCircle;
+      case "OFFLINE":
+        return WifiOff;
+      default:
+        return Wifi;
     }
   };
 
@@ -53,7 +72,7 @@ export function SwarmDashboard({ devices, stats }: SwarmDashboardProps) {
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
-    
+
     if (hours > 0) return `${hours}h ${minutes % 60}m`;
     if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
     return `${seconds}s`;
@@ -69,16 +88,20 @@ export function SwarmDashboard({ devices, stats }: SwarmDashboardProps) {
               <Zap className="text-emerald-500" size={20} />
             </div>
             <div>
-              <h3 className="text-lg font-medium text-arc-text">Swarm Overview</h3>
+              <h3 className="text-lg font-medium text-arc-text">
+                Swarm Overview
+              </h3>
               <p className="text-sm text-arc-muted">
                 {stats.onlineDevices} of {stats.totalDevices} devices online
               </p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-2xl font-bold text-arc-text">{stats.globalVelocity}</p>
+              <p className="text-2xl font-bold text-arc-text">
+                {stats.globalVelocity}
+              </p>
               <p className="text-xs text-arc-muted">jobs/sec</p>
             </div>
           </div>
@@ -128,7 +151,9 @@ export function SwarmDashboard({ devices, stats }: SwarmDashboardProps) {
                   return <Icon size={14} className="text-arc-muted" />;
                 })()}
                 <span className="text-xs text-arc-text">{type}</span>
-                <span className="text-xs font-bold text-indigo-500">{count}</span>
+                <span className="text-xs font-bold text-indigo-500">
+                  {count}
+                </span>
               </div>
             ))}
           </div>
@@ -139,21 +164,21 @@ export function SwarmDashboard({ devices, stats }: SwarmDashboardProps) {
           <p className="text-xs font-medium text-arc-muted uppercase tracking-wider mb-3">
             Connected Devices ({devices.length})
           </p>
-          
+
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {devices.map((device) => {
               const Icon = getDeviceIcon(device.type);
               const StatusIcon = getStatusIcon(device.status);
               const statusColor = getStatusColor(device.status);
               const connectedDuration = Date.now() - device.connectedAt;
-              
+
               return (
                 <div
                   key={device.id}
                   className="flex items-center gap-3 p-3 rounded-xl bg-arc-bg border border-arc-border hover:border-indigo-500/30 transition-all"
                 >
                   {/* Device Icon */}
-                  <div 
+                  <div
                     className="w-10 h-10 rounded-lg flex items-center justify-center"
                     style={{ backgroundColor: `${statusColor}15` }}
                   >
@@ -192,7 +217,7 @@ export function SwarmDashboard({ devices, stats }: SwarmDashboardProps) {
                         className="h-full rounded-full transition-all"
                         style={{
                           width: `${(device.currentLoad / device.capabilities.maxConcurrency) * 100}%`,
-                          backgroundColor: statusColor
+                          backgroundColor: statusColor,
                         }}
                       />
                     </div>

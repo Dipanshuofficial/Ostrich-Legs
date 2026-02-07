@@ -6,9 +6,9 @@ import { GpuStatusMonitor } from "./components/dashboard/GpuStatusMonitor";
 import { DeviceHealth } from "./components/dashboard/DeviceHealth";
 import { ThrottleControl } from "./components/dashboard/ThrottleControl";
 import { LiveTerminal } from "./components/dashboard/LiveTerminal";
-import { ConnectionModal } from "./components/dashboard/ConnectionModal";
-import { ThemeToggle } from "./components/ui/ThemeToggle";
 import { DeviceConnector } from "./components/dashboard/DeviceConnector";
+import { ThemeToggle } from "./components/ui/ThemeToggle";
+
 import { SwarmDashboard } from "./components/dashboard/SwarmDashboard";
 import type { DeviceInfo, SwarmStats } from "../../shared/types";
 
@@ -27,7 +27,7 @@ function App() {
   const [throttle, setThrottle] = useState(30);
   const [showQR, setShowQR] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
-  
+
   // Swarm state
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [swarmStats, setSwarmStats] = useState<SwarmStats>({
@@ -42,7 +42,13 @@ function App() {
     failedJobs: 0,
     globalVelocity: 0,
     avgLatency: 0,
-    devicesByType: {}
+    devicesByType: {
+      DESKTOP: 0,
+      MOBILE: 0,
+      COLAB: 0,
+      SERVER: 0,
+      TABLET: 0,
+    },
   });
   const [joinCode, setJoinCode] = useState("LOADING...");
 
@@ -62,23 +68,23 @@ function App() {
     });
 
     socket.on("DEVICE_JOINED", (device: DeviceInfo) => {
-      setDevices(prev => [...prev.filter(d => d.id !== device.id), device]);
-      setLogs(prev => [
+      setDevices((prev) => [...prev.filter((d) => d.id !== device.id), device]);
+      setLogs((prev) => [
         ...prev.slice(-8),
-        `> [${new Date().toLocaleTimeString()}] Device joined: ${device.name} (${device.type})`
+        `> [${new Date().toLocaleTimeString()}] Device joined: ${device.name} (${device.type})`,
       ]);
     });
 
     socket.on("DEVICE_LEFT", (data: { deviceId: string }) => {
-      setDevices(prev => {
-        const device = prev.find(d => d.id === data.deviceId);
+      setDevices((prev) => {
+        const device = prev.find((d) => d.id === data.deviceId);
         if (device) {
-          setLogs(logs => [
+          setLogs((logs) => [
             ...logs.slice(-8),
-            `> [${new Date().toLocaleTimeString()}] Device left: ${device.name}`
+            `> [${new Date().toLocaleTimeString()}] Device left: ${device.name}`,
           ]);
         }
-        return prev.filter(d => d.id !== data.deviceId);
+        return prev.filter((d) => d.id !== data.deviceId);
       });
     });
 
@@ -118,7 +124,6 @@ function App() {
     }
   }, [completedCount, status]);
 
-  const shareUrl = window.location.href;
   const serverUrl = `${window.location.protocol}//${window.location.host}`;
 
   return (
@@ -174,7 +179,7 @@ function App() {
           currentThrottle={currentThrottle}
         />
         <DeviceHealth status={status} opsScore={opsScore} workerId={workerId} />
-        
+
         {/* Control Row */}
         <ThrottleControl
           throttle={throttle}
@@ -182,26 +187,26 @@ function App() {
           updateThrottle={updateThrottle}
           activeThreads={activeThreads}
         />
-        <DeviceConnector 
-          serverUrl={serverUrl}
-          joinCode={joinCode}
-        />
-        
-        {/* Swarm Overview */}
-        <SwarmDashboard 
-          devices={devices}
-          stats={swarmStats}
-        />
-        
-        {/* Logs */}
         <LiveTerminal logs={logs} status={status} />
-      </div>
+        {/* <DeviceConnector serverUrl={serverUrl} joinCode={joinCode} /> */}
 
-      <ConnectionModal
+        {/* Swarm Overview */}
+        <SwarmDashboard devices={devices} stats={swarmStats} />
+
+        {/* Logs */}
+      </div>
+      <DeviceConnector
+        isOpen={showQR}
+        joinCode={joinCode}
+        serverUrl={serverUrl}
+        onClose={() => setShowQR(false)}
+      />
+      {/* <ConnectionModal
         isOpen={showQR}
         onClose={() => setShowQR(false)}
-        shareUrl={shareUrl}
-      />
+        joinCode={joinCode}
+        serverUrl={serverUrl}
+      /> */}
     </div>
   );
 }

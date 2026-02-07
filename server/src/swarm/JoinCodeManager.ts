@@ -1,4 +1,4 @@
-import { JoinCode } from "../../shared/types";
+import { type JoinCode } from "../../../shared/types";
 import { randomBytes } from "crypto";
 
 export class JoinCodeManager {

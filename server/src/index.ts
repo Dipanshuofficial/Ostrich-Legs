@@ -6,11 +6,11 @@ import { Server } from "socket.io";
 import cors from "cors";
 import { SwarmCoordinator } from "./swarm";
 import {
-  JobChunk,
-  WorkerResult,
-  DeviceInfo,
-  DeviceType,
-  DeviceCapabilities,
+  type JobChunk,
+  type WorkerResult,
+  type DeviceInfo,
+  type DeviceType,
+  type DeviceCapabilities,
 } from "../../shared/types";
 
 const app = express();

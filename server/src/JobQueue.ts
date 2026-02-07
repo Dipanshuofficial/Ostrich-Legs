@@ -1,4 +1,4 @@
-import { JobChunk, WorkerResult } from "../../shared/types";
+import { type JobChunk, type WorkerResult } from "../../shared/types";
 
 export class JobQueue {
   public queue: JobChunk[];
@@ -37,22 +37,30 @@ export class JobQueue {
    * A 300x300 Matrix * 300 vectors = 300 Jobs.
    */
   private generateMatrixBatch(count: number) {
-    const size = 300; 
-    
+    const size = 300;
+
     // The "Weights" Matrix (Constant for this batch)
-    const matrixB = Array(size).fill(0).map(() => 
-      Array(size).fill(0).map(() => Math.random())
-    );
+    const matrixB = Array(size)
+      .fill(0)
+      .map(() =>
+        Array(size)
+          .fill(0)
+          .map(() => Math.random()),
+      );
 
     for (let i = 0; i < count; i++) {
-      const rowA = Array(size).fill(0).map(() => Math.random());
+      const rowA = Array(size)
+        .fill(0)
+        .map(() => Math.random());
 
       this.queue.push({
         id: `mx_${Date.now()}_${i}`,
-        type: "MAT_MUL", 
+
+        createdAt: Date.now(),
+        type: "MAT_MUL",
         data: {
           row: rowA,
-          matrixB: matrixB 
+          matrixB: matrixB,
         },
         status: "PENDING",
       });
@@ -66,6 +74,7 @@ export class JobQueue {
     for (let i = 0; i < count; i++) {
       this.queue.push({
         id: `stress_${Date.now()}_${i}`,
+        createdAt: Date.now(),
         type: "MATH_STRESS",
         data: [4000000], // 4 Million iterations
         status: "PENDING",
