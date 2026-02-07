@@ -11,8 +11,6 @@ export const useComputeSwarm = () => {
   const [status, setStatus] = useState<"IDLE" | "WORKING">("IDLE");
   const [completedCount, setCompletedCount] = useState(0);
   const completedCountRef = useRef(0);
-  const [realLogs, setRealLogs] = useState<string[]>([]); // <--- NEW
-
   const [workerId, setWorkerId] = useState<string>("");
   const [opsScore, setOpsScore] = useState<number>(0);
 
@@ -64,7 +62,7 @@ export const useComputeSwarm = () => {
 
     if (currentSupply < desiredBuffer) {
       const deficit = desiredBuffer - currentSupply;
-      
+
       // Use batch requesting for large deficits (5+ jobs)
       if (deficit >= 5) {
         inFlightRequests.current += 1;
@@ -94,10 +92,34 @@ export const useComputeSwarm = () => {
 
     workerRef.current.postMessage({ type: "BENCHMARK" });
 
+    let deviceId: string | null = null;
+
     socketRef.current.on("connect", () => {
       setWorkerId(socketRef.current?.id || "Unknown ID");
+
+      // Register device with swarm coordinator
+      socketRef.current?.emit("REGISTER_DEVICE", {
+        name: identity?.name || "Unknown Device",
+        type: "DESKTOP",
+        capabilities: {
+          cpuCores: navigator.hardwareConcurrency || 2,
+          memoryGB: 4, // Estimated
+          gpuAvailable: false,
+          maxConcurrency: navigator.hardwareConcurrency || 2,
+          supportedJobs: ["MATH_STRESS", "MAT_MUL"],
+        },
+      });
+
       processQueue();
     });
+
+    socketRef.current.on(
+      "REGISTERED",
+      (data: { deviceId: string; swarmStats: any }) => {
+        deviceId = data.deviceId;
+        console.log("[Swarm] Registered as device:", deviceId);
+      },
+    );
 
     socketRef.current.on("JOB_DISPATCH", (job: JobChunk) => {
       inFlightRequests.current = Math.max(0, inFlightRequests.current - 1);
@@ -109,7 +131,7 @@ export const useComputeSwarm = () => {
       // Decrement in-flight counter for the batch request
       inFlightRequests.current = Math.max(0, inFlightRequests.current - 1);
       // Add all jobs to buffer
-      jobs.forEach(job => jobBuffer.current.push(job));
+      jobs.forEach((job) => jobBuffer.current.push(job));
       processQueue();
     });
 
@@ -127,18 +149,23 @@ export const useComputeSwarm = () => {
       processQueue();
     }, 50);
 
+    // HEARTBEAT: Report health every 10 seconds
+    const heartbeatInterval = setInterval(() => {
+      if (deviceId && socketRef.current) {
+        socketRef.current.emit("HEARTBEAT", {
+          cpuUsage: 50, // Placeholder - would come from performance API
+          memoryUsage: 30, // Placeholder
+          networkLatency: 0,
+          currentLoad: activeJobs.current,
+        });
+      }
+    }, 10000);
+
     if (workerRef.current) {
       workerRef.current.onmessage = (e: MessageEvent) => {
         const message = e.data;
 
-        // --- NEW: LOG HANDLING ---
-        if (message.type === "WORKER_LOG") {
-          setRealLogs((prev) => {
-            const newLogs = [...prev, `> ${message.message}`];
-            if (newLogs.length > 20) newLogs.shift();
-            return newLogs;
-          });
-        } else if (message.type === "BENCHMARK_COMPLETE") {
+        if (message.type === "BENCHMARK_COMPLETE") {
           setOpsScore(message.score);
         } else if (message.type === "JOB_COMPLETE") {
           activeJobs.current = Math.max(0, activeJobs.current - 1);
@@ -147,6 +174,7 @@ export const useComputeSwarm = () => {
             workerId: workerId,
             result: message.result,
             durationMs: message.durationMs,
+            timestamp: message.timestamp,
           };
           socketRef.current?.emit("JOB_COMPLETE", resultPayload);
           completedCountRef.current += 1;
@@ -162,6 +190,7 @@ export const useComputeSwarm = () => {
             workerId: workerId,
             error: message.error,
             details: message.details,
+            timestamp: message.timestamp,
           };
           socketRef.current?.emit("JOB_COMPLETE", errorPayload);
           processQueue();
@@ -176,6 +205,7 @@ export const useComputeSwarm = () => {
 
     return () => {
       clearInterval(pumpInterval);
+      clearInterval(heartbeatInterval);
       socketRef.current?.disconnect();
       workerRef.current?.terminate();
     };
@@ -206,6 +236,6 @@ export const useComputeSwarm = () => {
     activeThreads,
     runBenchmark,
     currentThrottle,
-    realLogs, // <--- Exported
+    socket: socketRef.current,
   };
 };

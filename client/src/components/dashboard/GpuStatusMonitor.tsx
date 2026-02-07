@@ -15,9 +15,9 @@ export function GpuStatusMonitor({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dataRef = useRef<number[]>(new Array(30).fill(0));
   const countRef = useRef(completedCount);
+  const prevCountRef = useRef(completedCount);
   const lastUpdateRef = useRef<number>(0);
-  const velocityRef = useRef(0);
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number>(0);
 
   // Update count ref without triggering re-renders
   useEffect(() => {
@@ -30,7 +30,7 @@ export function GpuStatusMonitor({
     if (lastUpdateRef.current === 0) {
       lastUpdateRef.current = Date.now();
     }
-    
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -49,15 +49,16 @@ export function GpuStatusMonitor({
       const width = rect.width;
       const height = rect.height;
 
-      // Update data every 2 seconds (not every frame)
-      if (now - lastUpdateRef.current > 2000) {
-        const delta = countRef.current - (countRef.current - velocityRef.current);
-        velocityRef.current = countRef.current - (countRef.current - delta);
-        
+      // Update data every 1 second (not every frame)
+      if (now - lastUpdateRef.current > 1000) {
+        // Calculate actual delta since last update
+        const delta = countRef.current - prevCountRef.current;
+        prevCountRef.current = countRef.current;
+
         // Shift data and add new point
         dataRef.current.shift();
         dataRef.current.push(delta);
-        
+
         lastUpdateRef.current = now;
       }
 
@@ -66,7 +67,8 @@ export function GpuStatusMonitor({
 
       // Calculate current velocity (average of last 3 points)
       const recentData = dataRef.current.slice(-3);
-      const currentVelocity = recentData.reduce((a, b) => a + b, 0) / recentData.length;
+      const currentVelocity =
+        recentData.reduce((a, b) => a + b, 0) / recentData.length;
 
       // Draw grid lines (subtle)
       ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
@@ -94,17 +96,18 @@ export function GpuStatusMonitor({
       // Draw area under the curve
       ctx.beginPath();
       ctx.moveTo(0, height);
-      
+
       dataRef.current.forEach((val, i) => {
         const x = (i / (dataRef.current.length - 1)) * width;
         const y = height - (val / maxVal) * (height * 0.8);
-        
+
         if (i === 0) {
           ctx.lineTo(x, y);
         } else {
           // Bezier curve for smoothness
           const prevX = ((i - 1) / (dataRef.current.length - 1)) * width;
-          const prevY = height - (dataRef.current[i - 1] / maxVal) * (height * 0.8);
+          const prevY =
+            height - (dataRef.current[i - 1] / maxVal) * (height * 0.8);
           const cpX = (prevX + x) / 2;
           ctx.quadraticCurveTo(prevX, prevY, cpX, (prevY + y) / 2);
         }
@@ -125,7 +128,7 @@ export function GpuStatusMonitor({
       dataRef.current.forEach((val, i) => {
         const x = (i / (dataRef.current.length - 1)) * width;
         const y = height - (val / maxVal) * (height * 0.8);
-        
+
         if (i === 0) {
           ctx.moveTo(x, y);
         } else {
@@ -172,7 +175,7 @@ export function GpuStatusMonitor({
     <Card
       className="md:col-span-8 h-90 flex flex-col justify-between gpu-isolated"
       noPadding
-      style={{ contain: "paint layout" } as React.CSSProperties}
+      // style={{ contain: "paint layout" } as React.CSSProperties}
     >
       <div className="p-8 pb-0 z-20">
         <div className="flex items-center gap-3 mb-2">

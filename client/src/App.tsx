@@ -8,6 +8,9 @@ import { ThrottleControl } from "./components/dashboard/ThrottleControl";
 import { LiveTerminal } from "./components/dashboard/LiveTerminal";
 import { ConnectionModal } from "./components/dashboard/ConnectionModal";
 import { ThemeToggle } from "./components/ui/ThemeToggle";
+import { DeviceConnector } from "./components/dashboard/DeviceConnector";
+import { SwarmDashboard } from "./components/dashboard/SwarmDashboard";
+import type { DeviceInfo, SwarmStats } from "../../shared/types";
 
 function App() {
   const {
@@ -18,24 +21,84 @@ function App() {
     updateThrottle,
     activeThreads,
     currentThrottle,
+    socket,
   } = useComputeSwarm();
 
   const [throttle, setThrottle] = useState(30);
   const [showQR, setShowQR] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
+  
+  // Swarm state
+  const [devices, setDevices] = useState<DeviceInfo[]>([]);
+  const [swarmStats, setSwarmStats] = useState<SwarmStats>({
+    totalDevices: 0,
+    onlineDevices: 0,
+    busyDevices: 0,
+    totalCores: 0,
+    totalMemoryGB: 0,
+    pendingJobs: 0,
+    activeJobs: 0,
+    completedJobs: 0,
+    failedJobs: 0,
+    globalVelocity: 0,
+    avgLatency: 0,
+    devicesByType: {}
+  });
+  const [joinCode, setJoinCode] = useState("LOADING...");
+
+  // Listen for swarm updates
+  useEffect(() => {
+    if (!socket) return;
+
+    // Request initial join code
+    socket.emit("REQUEST_JOIN_CODE");
+
+    socket.on("JOIN_CODE", (data: { code: string }) => {
+      setJoinCode(data.code);
+    });
+
+    socket.on("SWARM_STATS", (stats: SwarmStats) => {
+      setSwarmStats(stats);
+    });
+
+    socket.on("DEVICE_JOINED", (device: DeviceInfo) => {
+      setDevices(prev => [...prev.filter(d => d.id !== device.id), device]);
+      setLogs(prev => [
+        ...prev.slice(-8),
+        `> [${new Date().toLocaleTimeString()}] Device joined: ${device.name} (${device.type})`
+      ]);
+    });
+
+    socket.on("DEVICE_LEFT", (data: { deviceId: string }) => {
+      setDevices(prev => {
+        const device = prev.find(d => d.id === data.deviceId);
+        if (device) {
+          setLogs(logs => [
+            ...logs.slice(-8),
+            `> [${new Date().toLocaleTimeString()}] Device left: ${device.name}`
+          ]);
+        }
+        return prev.filter(d => d.id !== data.deviceId);
+      });
+    });
+
+    return () => {
+      socket.off("JOIN_CODE");
+      socket.off("SWARM_STATS");
+      socket.off("DEVICE_JOINED");
+      socket.off("DEVICE_LEFT");
+    };
+  }, [socket]);
 
   // ------------------------------------------------------------
-  // 4. LOGIC 2: LOGS (Throttled)
+  // LOGS (Throttled)
   // ------------------------------------------------------------
   const lastLogCountRef = useRef(completedCount);
 
   useEffect(() => {
-    // Only log if status is working
     if (status === "WORKING" && completedCount !== lastLogCountRef.current) {
       lastLogCountRef.current = completedCount;
 
-      // PERFORMANCE FIX: Only add a log line every 10 chunks.
-      // This prevents the UI from freezing when velocity is high (e.g. 50 chunks/sec)
       if (completedCount % 10 === 0) {
         const msgs = [
           "Allocating Buffer...",
@@ -48,7 +111,7 @@ function App() {
         const randomMsg = msgs[Math.floor(Math.random() * msgs.length)];
 
         setLogs((prev) => [
-          ...prev.slice(-8), // Keep only last 8 lines
+          ...prev.slice(-8),
           `> [${new Date().toLocaleTimeString()}] ${randomMsg}`,
         ]);
       }
@@ -56,6 +119,7 @@ function App() {
   }, [completedCount, status]);
 
   const shareUrl = window.location.href;
+  const serverUrl = `${window.location.protocol}//${window.location.host}`;
 
   return (
     <div className="min-h-screen relative bg-grain p-6 md:p-12 transition-colors duration-500">
@@ -103,18 +167,33 @@ function App() {
 
       {/* DASHBOARD GRID */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-7xl mx-auto relative z-10">
+        {/* Main Row */}
         <GpuStatusMonitor
           completedCount={completedCount}
           throttle={throttle}
           currentThrottle={currentThrottle}
         />
         <DeviceHealth status={status} opsScore={opsScore} workerId={workerId} />
+        
+        {/* Control Row */}
         <ThrottleControl
           throttle={throttle}
           setThrottle={setThrottle}
           updateThrottle={updateThrottle}
           activeThreads={activeThreads}
         />
+        <DeviceConnector 
+          serverUrl={serverUrl}
+          joinCode={joinCode}
+        />
+        
+        {/* Swarm Overview */}
+        <SwarmDashboard 
+          devices={devices}
+          stats={swarmStats}
+        />
+        
+        {/* Logs */}
         <LiveTerminal logs={logs} status={status} />
       </div>
 

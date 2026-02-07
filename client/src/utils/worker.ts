@@ -6,13 +6,19 @@ const TOTAL_RAM_BYTES = (navigator as any).deviceMemory
   ? (navigator as any).deviceMemory * 1e9
   : 4e9;
 
-// State
-let activeThreads: Worker[] = [];
-let threadPoolParams: {
-  [key: number]: { busy: boolean; currentChunkId: string | null };
-} = {};
+// State - Use Map for better tracking
+const threadPool = new Map<
+  number,
+  {
+    worker: Worker;
+    busy: boolean;
+    currentChunkId: string | null;
+  }
+>();
+
 let currentRamUsage = 0;
 let throttleLimit = 0.3; // Default 30%
+let nextWorkerId = 0;
 
 // --- KERNEL 1: Math Stress (Legacy) ---
 const runStressTest = (iterations: number) => {
@@ -37,7 +43,7 @@ const runMatrixMul = (rowA: number[], matrixB: number[][]) => {
 };
 
 // --- SUB-WORKER FACTORY ---
-const createSubWorker = () => {
+const createSubWorker = (workerId: number) => {
   const blob = new Blob(
     [
       `
@@ -68,7 +74,12 @@ const createSubWorker = () => {
     ],
     { type: "application/javascript" },
   );
-  return new Worker(URL.createObjectURL(blob));
+  const worker = new Worker(URL.createObjectURL(blob));
+
+  // Store workerId on the worker object for tracking
+  (worker as any).workerId = workerId;
+
+  return worker;
 };
 
 const calculateBenchmark = (): number => {
@@ -81,6 +92,16 @@ const calculateBenchmark = (): number => {
     }
   }
   return Math.round((sum / (performance.now() - start)) * 100);
+};
+
+// Find first available worker
+const findAvailableWorker = (): { id: number; worker: Worker } | null => {
+  for (const [id, thread] of threadPool.entries()) {
+    if (!thread.busy) {
+      return { id, worker: thread.worker };
+    }
+  }
+  return null;
 };
 
 // --- MAIN CONTROLLER ---
@@ -104,23 +125,38 @@ self.onmessage = async (e: MessageEvent) => {
       Math.floor(LOGICAL_CORES * throttleLimit),
     );
 
+    const currentCount = threadPool.size;
+
     // Scale Up
-    while (activeThreads.length < targetThreadCount) {
-      activeThreads.push(createSubWorker());
-      threadPoolParams[activeThreads.length - 1] = {
-        busy: false,
-        currentChunkId: null,
-      };
+    if (targetThreadCount > currentCount) {
+      for (let i = currentCount; i < targetThreadCount; i++) {
+        const workerId = nextWorkerId++;
+        const worker = createSubWorker(workerId);
+        threadPool.set(workerId, {
+          worker,
+          busy: false,
+          currentChunkId: null,
+        });
+      }
     }
-    // Scale Down
-    while (activeThreads.length > targetThreadCount) {
-      activeThreads.pop()?.terminate();
-      delete threadPoolParams[activeThreads.length];
+
+    // Scale Down - Only remove idle workers
+    if (targetThreadCount < currentCount) {
+      const toRemove = currentCount - targetThreadCount;
+      let removed = 0;
+
+      for (const [id, thread] of threadPool.entries()) {
+        if (!thread.busy && removed < toRemove) {
+          thread.worker.terminate();
+          threadPool.delete(id);
+          removed++;
+        }
+      }
     }
 
     self.postMessage({
       type: "CONFIG_APPLIED",
-      threads: activeThreads.length,
+      threads: threadPool.size,
       limit: throttleLimit,
       score: calculateBenchmark(),
     });
@@ -130,25 +166,19 @@ self.onmessage = async (e: MessageEvent) => {
   // EXECUTION: JOB HANDLING
   if (type === "JOB_CHUNK") {
     // 1. RAM CHECK
-    const estimatedSize = 50000; // Simplified estimate
+    const estimatedSize = 50000;
     if (currentRamUsage + estimatedSize > TOTAL_RAM_BYTES * throttleLimit) {
       self.postMessage({
         type: "JOB_ERROR",
         chunkId: chunk.id,
         error: "OOM_PREVENTED",
       });
-      self.postMessage({
-        type: "WORKER_LOG",
-        message: `[Err] OOM Prevented (${chunk.type})`,
-      });
       return;
     }
 
-    // 2. FIND THREAD
-    const workerIndex = activeThreads.findIndex(
-      (_, i) => !threadPoolParams[i]?.busy,
-    );
-    if (workerIndex === -1) {
+    // 2. FIND AVAILABLE WORKER
+    const available = findAvailableWorker();
+    if (!available) {
       self.postMessage({
         type: "JOB_ERROR",
         chunkId: chunk.id,
@@ -158,39 +188,36 @@ self.onmessage = async (e: MessageEvent) => {
     }
 
     // 3. RUN
-    const worker = activeThreads[workerIndex];
+    const { id: threadId, worker } = available;
     const start = performance.now();
 
     currentRamUsage += estimatedSize;
-    threadPoolParams[workerIndex] = { busy: true, currentChunkId: chunk.id };
+    const thread = threadPool.get(threadId)!;
+    thread.busy = true;
+    thread.currentChunkId = chunk.id;
 
     worker.onmessage = (ev) => {
       currentRamUsage -= estimatedSize;
-      threadPoolParams[workerIndex].busy = false;
+
+      // Only update if thread still exists (might have been scaled down)
+      const currentThread = threadPool.get(threadId);
+      if (currentThread) {
+        currentThread.busy = false;
+        currentThread.currentChunkId = null;
+      }
+
       const duration = Math.round(performance.now() - start);
 
       if (ev.data.success) {
-        // --- REAL LOGGING FOR UI ---
-        let logMsg = "";
-        if (chunk.type === "MATRIX_MUL") {
-          logMsg = `[Succ] Matrix_Mul • ${duration}ms • ${chunk.data.row.length} dim`;
-        } else {
-          logMsg = `[Succ] Stress_Test • ${duration}ms • ${chunk.data[0]} iter`;
-        }
-        self.postMessage({ type: "WORKER_LOG", message: logMsg });
-
         self.postMessage({
           type: "JOB_COMPLETE",
           chunkId: chunk.id,
           result: ev.data.result,
           workerId: workerId,
           durationMs: duration,
+          timestamp: performance.now(),
         });
       } else {
-        self.postMessage({
-          type: "WORKER_LOG",
-          message: `[Err] ${ev.data.error}`,
-        });
         self.postMessage({
           type: "JOB_ERROR",
           chunkId: chunk.id,
