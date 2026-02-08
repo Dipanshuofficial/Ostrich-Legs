@@ -99,6 +99,10 @@ io.on("connection", (socket) => {
   let deviceId: string | null = null;
 
   // Send join code on request
+  socket.on("REQUEST_JOIN_CODE", () => {
+    socket.emit("JOIN_CODE", { code: initialJoinCode });
+  });
+
   socket.on(
     "REGISTER_DEVICE",
     (data: {
@@ -198,6 +202,22 @@ io.on("connection", (socket) => {
       socket.emit("WORK_OFFLOADED", jobs);
     }
   });
+  // NEW: Handle Device Toggling
+  socket.on("TOGGLE_DEVICE", (data: { deviceId: string; enabled: boolean }) => {
+    const device = swarm.getDevice(data.deviceId);
+    if (device) {
+      // @ts-ignore - Accessing registry directly for speed, or add method to SwarmCoordinator
+      swarm["registry"].toggleDevice(data.deviceId, data.enabled);
+
+      // Broadcast update to everyone immediately
+      io.emit("DEVICE_UPDATED", device);
+      io.emit("CURRENT_DEVICES", swarm.getDevices()); // Refresh lists
+
+      console.log(
+        `[Swarm] Device ${device.name} ${data.enabled ? "ENABLED" : "DISABLED"}`,
+      );
+    }
+  });
 
   // Health & Monitoring
   socket.on(
@@ -277,27 +297,20 @@ function generateSampleJobs(count: number = 50): void {
     const isMatrix = Math.random() > 0.5;
 
     if (isMatrix) {
-      // Matrix multiplication job
-      const size = 200 + Math.floor(Math.random() * 100);
+      // FIX: Generate a proper Matrix Multiplication Job (Row x Matrix)
+      // The worker expects 'row' (1D array) and 'matrixB' (2D array)
+      const size = 100; // Keep size manageable for demo
+      const matrixB = Array(size)
+        .fill(0)
+        .map(() => Array(size).fill(Math.random()));
+      const row = Array(size).fill(Math.random());
+
       jobs.push({
         id: `mat-${Date.now()}-${i}`,
         type: "MAT_MUL",
         data: {
-          size,
-          matrixA: Array(size)
-            .fill(0)
-            .map(() =>
-              Array(size)
-                .fill(0)
-                .map(() => Math.random()),
-            ),
-          matrixB: Array(size)
-            .fill(0)
-            .map(() =>
-              Array(size)
-                .fill(0)
-                .map(() => Math.random()),
-            ),
+          row: row, // <--- Passed correctly as a single row
+          matrixB: matrixB,
         },
         status: "PENDING",
         createdAt: Date.now(),
@@ -308,7 +321,8 @@ function generateSampleJobs(count: number = 50): void {
         id: `stress-${Date.now()}-${i}`,
         type: "MATH_STRESS",
         data: {
-          iterations: 2000000 + Math.floor(Math.random() * 1000000),
+          // Keep iterations lower to prevent browser lockup during stress test
+          iterations: 1000000 + Math.floor(Math.random() * 500000),
         },
         status: "PENDING",
         createdAt: Date.now(),
@@ -333,12 +347,12 @@ setInterval(() => {
 
 // Start server
 try {
-  const PORT = process.env.PORT || 3000;
-  httpServer.listen(PORT, () => {
+  const PORT = Number(process.env.PORT) || 3000;
+
+  // CHANGE: Added "0.0.0.0" as the second argument
+  httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`[Server] Ostrich Swarm Coordinator running on port: ${PORT}`);
-    console.log(
-      `[Server] Join URL: http://localhost:${PORT}/join/${initialJoinCode}`,
-    );
+    console.log(`[Server] Local: http://localhost:${PORT}`);
   });
 } catch (e) {
   console.error("[Server] Failed to start:", e);

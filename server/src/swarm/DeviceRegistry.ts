@@ -21,6 +21,7 @@ export class DeviceRegistry extends EventEmitter {
   }
 
   register(device: DeviceInfo): void {
+    if (device.isEnabled === undefined) device.isEnabled = true;
     this.devices.set(device.id, device);
     this.socketToDevice.set(device.socketId, device.id);
     this.emit("deviceJoined", device);
@@ -59,10 +60,22 @@ export class DeviceRegistry extends EventEmitter {
   getAvailable(): DeviceInfo[] {
     return this.getOnline().filter(
       (d) =>
-        d.status === "ONLINE" && d.currentLoad < d.capabilities.maxConcurrency,
+        d.isEnabled &&
+        d.status !== "DISABLED" &&
+        d.currentLoad < d.capabilities.maxConcurrency,
     );
   }
-
+  // NEW: Toggle Enable/Disable
+  toggleDevice(deviceId: string, enabled: boolean): DeviceInfo | undefined {
+    const device = this.devices.get(deviceId);
+    if (device) {
+      device.isEnabled = enabled;
+      device.status = enabled ? "ONLINE" : "DISABLED";
+      this.emit("deviceUpdated", device); // Notify Coordinator
+      return device;
+    }
+    return undefined;
+  }
   getByType(type: DeviceType): DeviceInfo[] {
     return this.getAll().filter((d) => d.type === type);
   }

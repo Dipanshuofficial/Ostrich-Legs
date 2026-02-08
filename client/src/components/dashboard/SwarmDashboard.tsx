@@ -9,7 +9,9 @@ import {
   Wifi,
   WifiOff,
   AlertCircle,
+  Unplug,
 } from "lucide-react";
+
 import type {
   DeviceInfo,
   DeviceType,
@@ -20,9 +22,14 @@ import type {
 interface SwarmDashboardProps {
   devices: DeviceInfo[];
   stats: SwarmStats;
+  onToggleDevice?: (id: string, state: boolean) => void;
 }
 
-export function SwarmDashboard({ devices, stats }: SwarmDashboardProps) {
+export function SwarmDashboard({
+  devices,
+  stats,
+  onToggleDevice,
+}: SwarmDashboardProps) {
   const getDeviceIcon = (type: DeviceType) => {
     switch (type) {
       case "MOBILE":
@@ -48,6 +55,8 @@ export function SwarmDashboard({ devices, stats }: SwarmDashboardProps) {
         return "#f43f5e";
       case "OFFLINE":
         return "#6b7280";
+      case "DISABLED":
+        return "#52525b";
       default:
         return "#6b7280";
     }
@@ -63,6 +72,8 @@ export function SwarmDashboard({ devices, stats }: SwarmDashboardProps) {
         return AlertCircle;
       case "OFFLINE":
         return WifiOff;
+      case "DISABLED":
+        return Unplug;
       default:
         return Wifi;
     }
@@ -170,12 +181,13 @@ export function SwarmDashboard({ devices, stats }: SwarmDashboardProps) {
               const Icon = getDeviceIcon(device.type);
               const StatusIcon = getStatusIcon(device.status);
               const statusColor = getStatusColor(device.status);
+              // eslint-disable-next-line react-hooks/purity
               const connectedDuration = Date.now() - device.connectedAt;
-
+              const isEnabled = device.isEnabled !== false;
               return (
                 <div
                   key={device.id}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-arc-bg border border-arc-border hover:border-indigo-500/30 transition-all"
+                  className={`flex items-center gap-3 p-3 rounded-xl bg-arc-bg border border-arc-border hover:border-indigo-500/30 transition-all ${isEnabled ? "bg-arc-bg border-arc-border hover:border-indigo-500/30" : "bg-arc-bg/50 border-arc-border/50 opacity-60"}`}
                 >
                   {/* Device Icon */}
                   <div
@@ -191,16 +203,36 @@ export function SwarmDashboard({ devices, stats }: SwarmDashboardProps) {
                       <span className="text-sm font-medium text-arc-text truncate">
                         {device.name}
                       </span>
+                      {device.status === "DISABLED" && (
+                        <span className="text-[10px] bg-zinc-500/10 text-zinc-500 px-1.5 py-0.5 rounded font-bold">
+                          PAUSED
+                        </span>
+                      )}
                       <StatusIcon size={12} style={{ color: statusColor }} />
                     </div>
                     <div className="flex items-center gap-2 text-xs text-arc-muted">
-                      <span>{device.capabilities.cpuCores} cores</span>
+                      <span>{device.capabilities?.cpuCores || 0} cores</span>
                       <span>•</span>
-                      <span>{device.capabilities.memoryGB}GB</span>
+                      <span>{device.capabilities?.memoryGB || 0}GB</span>
                       <span>•</span>
                       <span>{formatDuration(connectedDuration)}</span>
                     </div>
                   </div>
+                  {/* TOGGLE SWITCH */}
+                  <button
+                    onClick={() => onToggleDevice?.(device.id, !isEnabled)}
+                    className={`
+                        w-12 h-6 rounded-full p-1 transition-colors relative
+                        ${isEnabled ? "bg-emerald-500/20" : "bg-zinc-500/20"}
+                    `}
+                  >
+                    <div
+                      className={`
+                            w-4 h-4 rounded-full shadow-sm transition-all duration-300
+                            ${isEnabled ? "translate-x-6 bg-emerald-500" : "translate-x-0 bg-zinc-400"}
+                        `}
+                    />
+                  </button>
 
                   {/* Performance */}
                   <div className="text-right">
@@ -216,7 +248,7 @@ export function SwarmDashboard({ devices, stats }: SwarmDashboardProps) {
                       <div
                         className="h-full rounded-full transition-all"
                         style={{
-                          width: `${(device.currentLoad / device.capabilities.maxConcurrency) * 100}%`,
+                          width: `${((device.currentLoad || 0) / (device.capabilities?.maxConcurrency || 1)) * 100}%`,
                           backgroundColor: statusColor,
                         }}
                       />

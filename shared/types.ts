@@ -1,6 +1,6 @@
 export type ChunkStatus = "PENDING" | "ASSIGNED" | "COMPLETED";
 export type DeviceType = "DESKTOP" | "MOBILE" | "COLAB" | "SERVER" | "TABLET";
-export type DeviceStatus = "ONLINE" | "OFFLINE" | "BUSY" | "ERROR";
+export type DeviceStatus = "ONLINE" | "OFFLINE" | "BUSY" | "ERROR" | "DISABLED";
 
 export type JobErrorType =
   | "OOM_PREVENTED"
@@ -72,6 +72,9 @@ export interface DeviceInfo {
   // Throttling
   throttleLevel: number;
   isThrottled: boolean;
+
+  //Flags
+  isEnabled: boolean;
 }
 
 export interface SwarmStats {

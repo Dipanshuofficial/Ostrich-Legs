@@ -66,274 +66,6 @@ shared/types.ts
 
 # Files
 
-## File: client/src/components/dashboard/SwarmControls.tsx
-```typescript
-import { Play, Pause, Square, Power } from "lucide-react";
-import { Card } from "../ui/Card";
-
-interface SwarmControlsProps {
-  isRunning: boolean;
-  status: string;
-  onStart: () => void;
-  onPause: () => void;
-  onStop: () => void;
-}
-
-export function SwarmControls({
-  isRunning,
-  status,
-  onStart,
-  onPause,
-  onStop,
-}: SwarmControlsProps) {
-  return (
-    <Card
-      className="w-24 h-full flex flex-col justify-between relative overflow-hidden shrink-0"
-      noPadding
-    >
-      <div
-        className={`absolute inset-0 transition-opacity duration-1000 opacity-20 pointer-events-none
-          ${status === "WORKING" ? "bg-emerald-500/10" : ""}
-          ${status === "PAUSED" ? "bg-amber-500/10" : ""}
-          ${status === "STOPPED" ? "bg-rose-500/5" : ""}
-        `}
-      />
-
-      <div className="relative z-10 flex flex-col h-full p-2">
-        {/* Status Indicator */}
-        <div className="flex justify-center pt-2 mb-4">
-          <div
-            className={`p-2 rounded-full border transition-all duration-500 shadow-lg ${
-              status === "WORKING"
-                ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-500 shadow-emerald-500/20"
-                : "bg-arc-bg border-arc-border text-arc-muted"
-            }`}
-          >
-            <Power size={18} />
-          </div>
-        </div>
-
-        {/* Controls */}
-        <div className="flex-1 flex flex-col justify-end gap-2">
-          {/* START */}
-          <button
-            onClick={onStart}
-            disabled={isRunning}
-            className={`
-              group flex flex-col items-center justify-center py-3 rounded-xl border transition-all duration-200 active:scale-95
-              ${
-                isRunning
-                  ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]"
-                  : "bg-arc-bg border-arc-border hover:border-emerald-500/50 hover:text-emerald-500"
-              }
-            `}
-          >
-            <Play
-              size={18}
-              className={isRunning ? "fill-emerald-400" : "fill-current"}
-            />
-            <span className="text-[9px] font-bold tracking-widest mt-1">
-              RUN
-            </span>
-          </button>
-
-          {/* PAUSE */}
-          <button
-            onClick={onPause}
-            disabled={!isRunning}
-            className={`
-              group flex flex-col items-center justify-center py-3 rounded-xl border transition-all duration-200 active:scale-95
-              ${
-                status === "PAUSED"
-                  ? "bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]"
-                  : !isRunning
-                    ? "opacity-50 cursor-not-allowed border-arc-border"
-                    : "bg-arc-bg border-arc-border hover:border-amber-500/50 hover:text-amber-500"
-              }
-            `}
-          >
-            <Pause
-              size={18}
-              className={
-                status === "PAUSED" ? "fill-amber-400" : "fill-current"
-              }
-            />
-            <span className="text-[9px] font-bold tracking-widest mt-1">
-              PAUSE
-            </span>
-          </button>
-
-          {/* STOP */}
-          <button
-            onClick={onStop}
-            className="group flex flex-col items-center justify-center py-3 rounded-xl border border-arc-border bg-arc-bg hover:border-rose-500/50 hover:bg-rose-500/10 hover:text-rose-500 transition-all duration-200 active:scale-95 active:bg-rose-500/20"
-          >
-            <Square size={18} className="fill-current" />
-            <span className="text-[9px] font-bold tracking-widest mt-1">
-              END
-            </span>
-          </button>
-        </div>
-      </div>
-    </Card>
-  );
-}
-```
-
-## File: client/src/App.css
-```css
-@import "tailwindcss";
-@import "tailwindcss";
-@import "tailwindcss";
-
-/* 1. DEFINE YOUR THEME (The "DNA") 🧬 */
-@theme {
-  --color-arc-bg: var(--arc-bg);
-  --color-arc-card: var(--arc-card);
-  --color-arc-border: var(--arc-border);
-  --color-arc-text: var(--arc-text);
-  --color-arc-muted: var(--arc-muted);
-
-  --animate-gradient-x: gradient-x 15s ease infinite;
-
-  @keyframes gradient-x {
-    0%,
-    100% {
-      background-size: 200% 200%;
-      background-position: left center;
-    }
-    50% {
-      background-size: 200% 200%;
-      background-position: right center;
-    }
-  }
-}
-
-/* 2. BASE VARIABLES (The "Fuel") ⛽ */
-:root {
-  --arc-bg: #f0f2f5;
-  --arc-card: #ffffff;
-  --arc-border: rgba(0, 0, 0, 0.06);
-  --arc-text: #1a1a1a;
-  --arc-muted: #8e8e93;
-  --grain-opacity: 0.03;
-}
-
-.dark {
-  --arc-bg: #09090b;
-  --arc-card: rgba(255, 255, 255, 0.03);
-  --arc-border: rgba(255, 255, 255, 0.08);
-  --arc-text: #ececec;
-  --arc-muted: #71717a;
-  --grain-opacity: 0.04;
-}
-
-/* 3. CUSTOM COMPONENTS (The "Body") 🏎️ */
-@layer components {
-  body {
-    @apply bg-arc-bg text-arc-text transition-colors duration-500;
-    font-family: "Inter", sans-serif;
-  }
-
-  .arc-card {
-    @apply bg-arc-card border border-arc-border backdrop-blur-xl rounded-3xl transition-all duration-400 ease-[cubic-bezier(0.2,0.8,0.2,1)];
-  }
-
-  /* Shadow logic for Light Mode */
-  :not(.dark) .arc-card {
-    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
-  }
-
-  .dark .arc-card:hover {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.15);
-  }
-}
-
-/* 4. UTILITIES (The "Gadgets") 🔧 */
-@layer utilities {
-  .bg-grain::before {
-    content: "";
-    @apply absolute inset-0 pointer-events-none z-0 mix-blend-overlay;
-    background-image: url("https://upload.wikimedia.org/wikipedia/commons/7/76/Noise.png");
-    opacity: var(--grain-opacity);
-  }
-}
-```
-
-## File: client/src/components/dashboard/DeviceHealth.tsx
-```typescript
-import { Cpu, RotateCw } from "lucide-react";
-import { Card } from "../ui/Card";
-import { Badge } from "../ui/Badge";
-import { useComputeSwarm } from "../../hooks/useComputeSwarm";
-
-// Add className prop to allow parent to control dimensions
-export function DeviceHealth({
-  status,
-  opsScore,
-  workerId,
-  className = "",
-}: {
-  status: string;
-  opsScore: number;
-  workerId: string;
-  className?: string;
-}) {
-  const { runBenchmark } = useComputeSwarm();
-
-  return (
-    // Changed: Removed "h-75" and "md:col-span-4". Added {className}.
-    <Card className={`flex flex-col justify-between ${className}`}>
-      <div>
-        <div className="flex justify-between items-start mb-4">
-          <div className="p-2 bg-arc-bg rounded-xl border border-arc-border">
-            <Cpu size={20} className="text-indigo-500" />
-          </div>
-          <Badge active={status === "WORKING"} text={status} />
-        </div>
-        <h3 className="text-base font-medium text-arc-text">Device Health</h3>
-        <p className="text-xs text-arc-muted mt-0.5">Allocation & Benchmarks</p>
-      </div>
-
-      <div className="space-y-2 mt-2">
-        {/* BENCHMARK ROW */}
-        <div className="p-3 rounded-2xl bg-arc-bg border border-arc-border flex justify-between items-center group">
-          <div className="flex flex-col">
-            <span className="text-[10px] text-arc-muted font-bold tracking-wider mb-0.5">
-              BENCHMARK
-            </span>
-            <span className="text-base font-mono text-indigo-500 font-bold">
-              {opsScore > 0 ? opsScore.toLocaleString() : "---"}
-              <span className="text-[10px] text-arc-muted font-normal ml-1">
-                OPS
-              </span>
-            </span>
-          </div>
-
-          <button
-            onClick={runBenchmark}
-            className={`p-2 rounded-full hover:bg-indigo-500/10 transition-colors ${opsScore === 0 ? "animate-pulse text-indigo-500" : "text-arc-muted opacity-0 group-hover:opacity-100"}`}
-            title="Re-run Benchmark"
-          >
-            <RotateCw size={14} />
-          </button>
-        </div>
-
-        <div className="p-3 rounded-2xl bg-arc-bg border border-arc-border flex justify-between items-center">
-          <span className="text-[10px] text-arc-muted font-bold tracking-wider">
-            ID
-          </span>
-          <span className="text-[10px] font-mono text-arc-muted truncate max-w-20">
-            {workerId || "Connecting..."}
-          </span>
-        </div>
-      </div>
-    </Card>
-  );
-}
-```
-
 ## File: client/src/components/dashboard/LiveTerminal.tsx
 ```typescript
 import { useEffect, useRef } from "react";
@@ -528,71 +260,196 @@ export function StatusMonitor({
 }
 ```
 
+## File: client/src/components/dashboard/SwarmControls.tsx
+```typescript
+import { Play, Pause, Square, Power } from "lucide-react";
+import { Card } from "../ui/Card";
+
+interface SwarmControlsProps {
+  isRunning: boolean;
+  status: string;
+  onStart: () => void;
+  onPause: () => void;
+  onStop: () => void;
+}
+
+export function SwarmControls({
+  isRunning,
+  status,
+  onStart,
+  onPause,
+  onStop,
+}: SwarmControlsProps) {
+  return (
+    <Card
+      className="w-24 h-full flex flex-col justify-between relative overflow-hidden shrink-0"
+      noPadding
+    >
+      <div
+        className={`absolute inset-0 transition-opacity duration-1000 opacity-20 pointer-events-none
+          ${status === "WORKING" ? "bg-emerald-500/10" : ""}
+          ${status === "PAUSED" ? "bg-amber-500/10" : ""}
+          ${status === "STOPPED" ? "bg-rose-500/5" : ""}
+        `}
+      />
+
+      <div className="relative z-10 flex flex-col h-full p-2">
+        {/* Status Indicator */}
+        <div className="flex justify-center pt-2 mb-4">
+          <div
+            className={`p-2 rounded-full border transition-all duration-500 shadow-lg ${
+              status === "WORKING"
+                ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-500 shadow-emerald-500/20"
+                : "bg-arc-bg border-arc-border text-arc-muted"
+            }`}
+          >
+            <Power size={18} />
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="flex-1 flex flex-col justify-end gap-2">
+          {/* START */}
+          <button
+            onClick={onStart}
+            disabled={isRunning}
+            className={`
+              group flex flex-col items-center justify-center py-3 rounded-xl border transition-all duration-200 active:scale-95
+              ${
+                isRunning
+                  ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]"
+                  : "bg-arc-bg border-arc-border hover:border-emerald-500/50 hover:text-emerald-500"
+              }
+            `}
+          >
+            <Play
+              size={18}
+              className={isRunning ? "fill-emerald-400" : "fill-current"}
+            />
+            <span className="text-[9px] font-bold tracking-widest mt-1">
+              RUN
+            </span>
+          </button>
+
+          {/* PAUSE */}
+          <button
+            onClick={onPause}
+            disabled={!isRunning}
+            className={`
+              group flex flex-col items-center justify-center py-3 rounded-xl border transition-all duration-200 active:scale-95
+              ${
+                status === "PAUSED"
+                  ? "bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]"
+                  : !isRunning
+                    ? "opacity-50 cursor-not-allowed border-arc-border"
+                    : "bg-arc-bg border-arc-border hover:border-amber-500/50 hover:text-amber-500"
+              }
+            `}
+          >
+            <Pause
+              size={18}
+              className={
+                status === "PAUSED" ? "fill-amber-400" : "fill-current"
+              }
+            />
+            <span className="text-[9px] font-bold tracking-widest mt-1">
+              PAUSE
+            </span>
+          </button>
+
+          {/* STOP */}
+          <button
+            onClick={onStop}
+            className="group flex flex-col items-center justify-center py-3 rounded-xl border border-arc-border bg-arc-bg hover:border-rose-500/50 hover:bg-rose-500/10 hover:text-rose-500 transition-all duration-200 active:scale-95 active:bg-rose-500/20"
+          >
+            <Square size={18} className="fill-current" />
+            <span className="text-[9px] font-bold tracking-widest mt-1">
+              END
+            </span>
+          </button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+```
+
 ## File: client/src/components/dashboard/ThrottleControl.tsx
 ```typescript
 import { Card } from "../ui/Card";
-import { Zap, Cpu } from "lucide-react";
+import { Zap, Cpu, Lock } from "lucide-react"; // Added Lock icon
 
 interface ThrottleControlProps {
   throttle: number;
   setThrottle: (val: number) => void;
-  updateThrottle: (val: number) => void;
-  activeThreads: number; // <--- NEW PROP
+  activeThreads: number;
+  isSystemEnabled?: boolean; // <--- NEW PROP (Is this device enabled?)
 }
 
 export function ThrottleControl({
   throttle,
   setThrottle,
-  updateThrottle,
   activeThreads,
+  isSystemEnabled = true,
 }: ThrottleControlProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseInt(e.target.value);
-    setThrottle(val);
-    updateThrottle(val / 100);
+    if (!isSystemEnabled) return; // Prevent change if disabled
+    setThrottle(parseInt(e.target.value));
   };
 
   return (
-    <Card className="md:col-span-6 h-60 flex flex-col justify-center relative overflow-hidden">
-      {/* Background feedback: Glow gets more intense with throttle */}
+    <Card
+      className={`md:col-span-6 h-60 flex flex-col justify-center relative overflow-hidden ${!isSystemEnabled ? "opacity-70 grayscale" : ""}`}
+    >
+      {/* Background feedback */}
       <div
         className="absolute right-0 top-0 w-32 h-32 bg-indigo-500/20 blur-[80px] transition-opacity duration-500 pointer-events-none"
-        style={{ opacity: throttle / 100 }}
+        style={{ opacity: isSystemEnabled ? throttle / 100 : 0 }}
       />
 
       <div className="flex justify-between items-start mb-8 relative z-10">
         <div>
           <h3 className="text-lg font-medium text-arc-text">Resources</h3>
-          <p className="text-sm text-arc-muted">CPU Allocation Limit</p>
+          <p className="text-sm text-arc-muted">
+            {isSystemEnabled
+              ? "CPU Allocation Limit"
+              : "Device Paused by Admin"}
+          </p>
         </div>
 
         {/* PHYSICAL FEEDBACK INDICATOR */}
         <div className="flex flex-col items-end gap-1">
           <div className="bg-arc-bg px-4 py-2 rounded-full border border-arc-border flex items-center gap-2">
-            <span className="text-xl font-bold text-arc-text">{throttle}%</span>
+            <span className="text-xl font-bold text-arc-text">
+              {isSystemEnabled ? `${throttle}%` : "OFF"}
+            </span>
           </div>
           <div className="flex items-center gap-1.5 px-2">
             <Cpu
               size={10}
               className={
-                activeThreads > 1 ? "text-emerald-500" : "text-arc-muted"
+                activeThreads > 0 && isSystemEnabled
+                  ? "text-emerald-500"
+                  : "text-arc-muted"
               }
             />
             <span className="text-[10px] font-mono text-arc-muted uppercase tracking-wider">
-              {activeThreads} Cores Active
+              {isSystemEnabled ? activeThreads : 0} Cores Active
             </span>
           </div>
         </div>
       </div>
 
-      {/* SLIDER (Keep existing code) */}
+      {/* SLIDER */}
       <div className="relative w-full h-12 flex items-center z-10">
         <div className="absolute w-full h-4 bg-arc-bg rounded-full overflow-hidden border border-arc-border">
+          {/* Gray out bar if disabled */}
           <div
-            className="h-full bg-linear-to-r from-indigo-400 to-indigo-600 transition-all duration-200"
+            className={`h-full transition-all duration-200 ${isSystemEnabled ? "bg-linear-to-r from-indigo-400 to-indigo-600" : "bg-zinc-600"}`}
             style={{ width: `${throttle}%` }}
           />
         </div>
+
         <input
           type="range"
           min="10"
@@ -600,16 +457,22 @@ export function ThrottleControl({
           step="10"
           value={throttle}
           onChange={handleChange}
-          className="absolute w-full h-full opacity-0 cursor-pointer"
+          disabled={!isSystemEnabled}
+          className={`absolute w-full h-full opacity-0 ${isSystemEnabled ? "cursor-pointer" : "cursor-not-allowed"}`}
         />
+
         <div
           className="absolute h-8 w-8 bg-white dark:bg-zinc-800 rounded-full border border-black/10 dark:border-white/10 shadow-lg pointer-events-none transition-all duration-200 flex items-center justify-center"
           style={{ left: `calc(${throttle}% - 16px)` }}
         >
-          <Zap
-            size={14}
-            className={`fill-indigo-500 transition-colors ${throttle > 50 ? "text-indigo-500" : "text-zinc-400"}`}
-          />
+          {isSystemEnabled ? (
+            <Zap
+              size={14}
+              className={`fill-indigo-500 transition-colors ${throttle > 50 ? "text-indigo-500" : "text-zinc-400"}`}
+            />
+          ) : (
+            <Lock size={12} className="text-zinc-500" />
+          )}
         </div>
       </div>
 
@@ -714,139 +577,32 @@ export function ThemeToggle() {
 }
 ```
 
-## File: client/src/hooks/usePersistentIdentity.ts
+## File: client/src/main.tsx
 ```typescript
-import { useState } from "react";
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.tsx'
 
-// Helper to guess device name from User Agent
-function getFriendlyDeviceName() {
-  const ua = navigator.userAgent;
-  let os = "Node";
-
-  if (ua.includes("Mac")) os = "Mac";
-  if (ua.includes("Win")) os = "Windows";
-  if (ua.includes("Linux")) os = "Linux";
-  if (ua.includes("Android")) os = "Android";
-  if (ua.includes("iPhone") || ua.includes("iPad")) os = "iOS";
-
-  let browser = "Web";
-  if (ua.includes("Chrome")) browser = "Chrome";
-  if (ua.includes("Firefox")) browser = "Firefox";
-  if (ua.includes("Safari") && !ua.includes("Chrome")) browser = "Safari";
-  if (ua.includes("Edg")) browser = "Edge";
-
-  return `${os} (${browser})`;
-}
-
-export const usePersistentIdentity = () => {
-  // Initialize Synchronously from LocalStorage
-  const [identity] = useState<{ id: string; name: string }>(() => {
-    // 1. Try to get existing
-    let storedId = localStorage.getItem("ostrich_worker_id");
-    let storedName = localStorage.getItem("ostrich_device_name");
-
-    // 2. Create if missing
-    if (!storedId) {
-      storedId = crypto.randomUUID();
-      localStorage.setItem("ostrich_worker_id", storedId);
-    }
-
-    // 3. Fix name if missing or old format
-    const isOldName = storedName?.startsWith("Node-");
-    if (!storedName || isOldName) {
-      const friendlyName = getFriendlyDeviceName();
-      const shortHash = storedId.slice(0, 4).toUpperCase();
-      storedName = `${friendlyName} - ${shortHash}`;
-      localStorage.setItem("ostrich_device_name", storedName);
-    }
-
-    return { id: storedId, name: storedName! };
-  });
-
-  return identity;
-};
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
 ```
 
-## File: client/src/index.css
+## File: server/src/swarm/index.ts
+```typescript
+export { SwarmCoordinator } from "./SwarmCoordinator";
+export { DeviceRegistry } from "./DeviceRegistry";
+export { WorkStealingScheduler } from "./WorkStealingScheduler";
+export { JoinCodeManager } from "./JoinCodeManager";
+```
+
+## File: client/src/App.css
 ```css
 @import "tailwindcss";
-:root {
-  --arc-bg: #0f0f11;
-  --arc-card: rgba(255, 255, 255, 0.03);
-  --arc-border: rgba(255, 255, 255, 0.08);
-  --grain-url: url("https://upload.wikimedia.org/wikipedia/commons/7/76/Noise.png"); /* Standard noise texture */
-}
-
-body {
-  background-color: var(--arc-bg);
-  color: #ececec;
-  font-family:
-    "Inter",
-    -apple-system,
-    sans-serif;
-  overflow-x: hidden;
-}
-
-/* THE ARC "GRAIN" EFFECT */
-.bg-grain {
-  position: relative;
-}
-.bg-grain::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: var(--grain-url);
-  opacity: 0.04;
-  pointer-events: none;
-  z-index: 0;
-  mix-blend-mode: overlay;
-}
-
-/* AURORA GRADIENTS */
-.aurora-gradient {
-  background:
-    radial-gradient(
-      circle at 0% 0%,
-      rgba(255, 180, 180, 0.15),
-      transparent 40%
-    ),
-    radial-gradient(
-      circle at 100% 0%,
-      rgba(180, 200, 255, 0.15),
-      transparent 40%
-    ),
-    radial-gradient(
-      circle at 100% 100%,
-      rgba(180, 255, 200, 0.1),
-      transparent 40%
-    );
-  filter: blur(60px);
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-}
-
-/* SQUIRCLE CARDS (Arc Style) */
-.arc-card {
-  background: var(--arc-card);
-  border: 1px solid var(--arc-border);
-  backdrop-filter: blur(20px);
-  border-radius: 24px; /* Soft rounding */
-  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.arc-card:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.15);
-  transform: translateY(-2px);
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3);
-}
-
-/* SCROLLBAR HIDE */
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-
+@import "tailwindcss";
 @import "tailwindcss";
 
 /* 1. DEFINE YOUR THEME (The "DNA") 🧬 */
@@ -922,28 +678,6 @@ body {
     opacity: var(--grain-opacity);
   }
 }
-```
-
-## File: client/src/main.tsx
-```typescript
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.tsx'
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
-```
-
-## File: server/src/swarm/index.ts
-```typescript
-export { SwarmCoordinator } from "./SwarmCoordinator";
-export { DeviceRegistry } from "./DeviceRegistry";
-export { WorkStealingScheduler } from "./WorkStealingScheduler";
-export { JoinCodeManager } from "./JoinCodeManager";
 ```
 
 ## File: client/src/components/dashboard/DeviceConnector.tsx
@@ -1223,6 +957,79 @@ export function DeviceConnector({
 }
 ```
 
+## File: client/src/components/dashboard/DeviceHealth.tsx
+```typescript
+import { Cpu, RotateCw } from "lucide-react";
+import { Card } from "../ui/Card";
+import { Badge } from "../ui/Badge";
+import { useComputeSwarm } from "../../hooks/useComputeSwarm";
+
+// Add className prop to allow parent to control dimensions
+export function DeviceHealth({
+  status,
+  opsScore,
+  workerId,
+  className = "",
+}: {
+  status: string;
+  opsScore: number;
+  workerId: string;
+  className?: string;
+}) {
+  const { runBenchmark } = useComputeSwarm();
+
+  return (
+    // Changed: Removed "h-75" and "md:col-span-4". Added {className}.
+    <Card className={`flex flex-col justify-between ${className}`}>
+      <div>
+        <div className="flex justify-between items-start mb-4">
+          <div className="p-2 bg-arc-bg rounded-xl border border-arc-border">
+            <Cpu size={20} className="text-indigo-500" />
+          </div>
+          <Badge active={status === "WORKING"} text={status} />
+        </div>
+        <h3 className="text-base font-medium text-arc-text">Device Health</h3>
+        <p className="text-xs text-arc-muted mt-0.5">Allocation & Benchmarks</p>
+      </div>
+
+      <div className="space-y-2 mt-2">
+        {/* BENCHMARK ROW */}
+        <div className="p-3 rounded-2xl bg-arc-bg border border-arc-border flex justify-between items-center group">
+          <div className="flex flex-col">
+            <span className="text-[10px] text-arc-muted font-bold tracking-wider mb-0.5">
+              BENCHMARK
+            </span>
+            <span className="text-base font-mono text-indigo-500 font-bold">
+              {opsScore > 0 ? opsScore.toLocaleString() : "---"}
+              <span className="text-[10px] text-arc-muted font-normal ml-1">
+                OPS
+              </span>
+            </span>
+          </div>
+
+          <button
+            onClick={runBenchmark}
+            className={`p-2 rounded-full hover:bg-indigo-500/10 transition-colors ${opsScore === 0 ? "animate-pulse text-indigo-500" : "text-arc-muted opacity-0 group-hover:opacity-100"}`}
+            title="Re-run Benchmark"
+          >
+            <RotateCw size={14} />
+          </button>
+        </div>
+
+        <div className="p-3 rounded-2xl bg-arc-bg border border-arc-border flex justify-between items-center">
+          <span className="text-[10px] text-arc-muted font-bold tracking-wider">
+            ID
+          </span>
+          <span className="text-[10px] font-mono text-arc-muted truncate max-w-20">
+            {workerId || "Connecting..."}
+          </span>
+        </div>
+      </div>
+    </Card>
+  );
+}
+```
+
 ## File: client/src/components/dashboard/GpuStatusMonitor.tsx
 ```typescript
 import { useEffect, useRef } from "react";
@@ -1462,7 +1269,9 @@ import {
   Wifi,
   WifiOff,
   AlertCircle,
+  Unplug,
 } from "lucide-react";
+
 import type {
   DeviceInfo,
   DeviceType,
@@ -1473,9 +1282,14 @@ import type {
 interface SwarmDashboardProps {
   devices: DeviceInfo[];
   stats: SwarmStats;
+  onToggleDevice?: (id: string, state: boolean) => void;
 }
 
-export function SwarmDashboard({ devices, stats }: SwarmDashboardProps) {
+export function SwarmDashboard({
+  devices,
+  stats,
+  onToggleDevice,
+}: SwarmDashboardProps) {
   const getDeviceIcon = (type: DeviceType) => {
     switch (type) {
       case "MOBILE":
@@ -1501,6 +1315,8 @@ export function SwarmDashboard({ devices, stats }: SwarmDashboardProps) {
         return "#f43f5e";
       case "OFFLINE":
         return "#6b7280";
+      case "DISABLED":
+        return "#52525b";
       default:
         return "#6b7280";
     }
@@ -1516,6 +1332,8 @@ export function SwarmDashboard({ devices, stats }: SwarmDashboardProps) {
         return AlertCircle;
       case "OFFLINE":
         return WifiOff;
+      case "DISABLED":
+        return Unplug;
       default:
         return Wifi;
     }
@@ -1624,11 +1442,11 @@ export function SwarmDashboard({ devices, stats }: SwarmDashboardProps) {
               const StatusIcon = getStatusIcon(device.status);
               const statusColor = getStatusColor(device.status);
               const connectedDuration = Date.now() - device.connectedAt;
-
+              const isEnabled = device.isEnabled !== false;
               return (
                 <div
                   key={device.id}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-arc-bg border border-arc-border hover:border-indigo-500/30 transition-all"
+                  className={`flex items-center gap-3 p-3 rounded-xl bg-arc-bg border border-arc-border hover:border-indigo-500/30 transition-all ${isEnabled ? "bg-arc-bg border-arc-border hover:border-indigo-500/30" : "bg-arc-bg/50 border-arc-border/50 opacity-60"}`}
                 >
                   {/* Device Icon */}
                   <div
@@ -1644,6 +1462,11 @@ export function SwarmDashboard({ devices, stats }: SwarmDashboardProps) {
                       <span className="text-sm font-medium text-arc-text truncate">
                         {device.name}
                       </span>
+                      {device.status === "DISABLED" && (
+                        <span className="text-[10px] bg-zinc-500/10 text-zinc-500 px-1.5 py-0.5 rounded font-bold">
+                          PAUSED
+                        </span>
+                      )}
                       <StatusIcon size={12} style={{ color: statusColor }} />
                     </div>
                     <div className="flex items-center gap-2 text-xs text-arc-muted">
@@ -1654,6 +1477,21 @@ export function SwarmDashboard({ devices, stats }: SwarmDashboardProps) {
                       <span>{formatDuration(connectedDuration)}</span>
                     </div>
                   </div>
+                  {/* TOGGLE SWITCH */}
+                  <button
+                    onClick={() => onToggleDevice?.(device.id, !isEnabled)}
+                    className={`
+                        w-12 h-6 rounded-full p-1 transition-colors relative
+                        ${isEnabled ? "bg-emerald-500/20" : "bg-zinc-500/20"}
+                    `}
+                  >
+                    <div
+                      className={`
+                            w-4 h-4 rounded-full shadow-sm transition-all duration-300
+                            ${isEnabled ? "translate-x-6 bg-emerald-500" : "translate-x-0 bg-zinc-400"}
+                        `}
+                    />
+                  </button>
 
                   {/* Performance */}
                   <div className="text-right">
@@ -1719,486 +1557,214 @@ function StatBox({ label, value, icon: Icon, color }: StatBoxProps) {
 }
 ```
 
-## File: client/src/hooks/useComputeSwarm.ts
+## File: client/src/hooks/usePersistentIdentity.ts
 ```typescript
-import { useCallback, useEffect, useRef, useState } from "react";
-import { io, Socket } from "socket.io-client";
-import { type JobChunk, type WorkerResult } from "../../../shared/types";
-// @ts-ignore
-import OstrichWorker from "../utils/worker?worker";
-import { usePersistentIdentity } from "./usePersistentIdentity";
+import { useState } from "react";
 
-// Add onLog prop to the hook
-export const useComputeSwarm = (onLog?: (msg: string) => void) => {
-  const [status, setStatus] = useState<
-    "IDLE" | "WORKING" | "PAUSED" | "STOPPED"
-  >("IDLE");
-  const [completedCount, setCompletedCount] = useState(0);
-  const completedCountRef = useRef(0);
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [workerId, setWorkerId] = useState<string>("");
-  const [opsScore, setOpsScore] = useState<number>(0);
-  const [activeThreads, setActiveThreads] = useState<number>(0); // Start at 0
-  const [currentThrottle, setCurrentThrottle] = useState<number>(30); // Default 30%
+// Helper to guess device name from User Agent
+function getFriendlyDeviceName() {
+  const ua = navigator.userAgent;
+  let os = "Node";
 
-  const isRunningRef = useRef(false); // Default false until started
-  const inFlightRequests = useRef(0);
-  const activeJobs = useRef(0);
-  const jobBuffer = useRef<JobChunk[]>([]);
-  const socketRef = useRef<Socket | null>(null);
-  const workerRef = useRef<Worker | null>(null);
+  if (ua.includes("Mac")) os = "Mac";
+  if (ua.includes("Win")) os = "Windows";
+  if (ua.includes("Linux")) os = "Linux";
+  if (ua.includes("Android")) os = "Android";
+  if (ua.includes("iPhone") || ua.includes("iPad")) os = "iOS";
 
-  const identity = usePersistentIdentity();
+  let browser = "Web";
+  if (ua.includes("Chrome")) browser = "Chrome";
+  if (ua.includes("Firefox")) browser = "Firefox";
+  if (ua.includes("Safari") && !ua.includes("Chrome")) browser = "Safari";
+  if (ua.includes("Edg")) browser = "Edge";
 
-  // --- CONTROLS ---
+  return `${os} (${browser})`;
+}
 
-  const startSwarm = useCallback(() => {
-    if (isRunningRef.current) return;
+export const usePersistentIdentity = () => {
+  // Initialize Synchronously from LocalStorage
+  const [identity] = useState<{ id: string; name: string }>(() => {
+    // 1. Try to get existing
+    let storedId = localStorage.getItem("ostrich_worker_id");
+    let storedName = localStorage.getItem("ostrich_device_name");
 
-    isRunningRef.current = true;
-    setStatus("WORKING");
-    onLog?.(`[SYS] System starting... requesting work.`);
-    processQueue();
-  }, [onLog]);
-
-  const pauseSwarm = useCallback(() => {
-    isRunningRef.current = false;
-    setStatus("PAUSED");
-    onLog?.(`[SYS] System paused. Finishing active jobs...`);
-    // We do NOT clear the buffer, just stop processing
-  }, [onLog]);
-
-  const stopSwarm = useCallback(() => {
-    isRunningRef.current = false;
-    setStatus("STOPPED");
-
-    // Clear everything
-    jobBuffer.current = [];
-    activeJobs.current = 0;
-    inFlightRequests.current = 0;
-
-    // Hard Reset Worker
-    workerRef.current?.terminate();
-    workerRef.current = new OstrichWorker();
-
-    // Re-initialize worker config
-    workerRef.current.postMessage({
-      type: "UPDATE_CONFIG",
-      throttleLevel: currentThrottle / 100,
-    });
-
-    onLog?.(`[SYS] System stopped. Worker reset.`);
-  }, [currentThrottle, onLog]);
-
-  const updateThrottle = useCallback(
-    (percent: number) => {
-      setCurrentThrottle(percent);
-      // Immediate Worker Update
-      workerRef.current?.postMessage({
-        type: "UPDATE_CONFIG",
-        throttleLevel: percent / 100,
-      });
-      onLog?.(`[CFG] Throttle updated to ${percent}%`);
-    },
-    [onLog],
-  );
-
-  // --- CORE LOOP ---
-
-  const processQueue = useCallback(() => {
-    if (!workerRef.current || !isRunningRef.current) return;
-
-    // 1. Fill Workers
-    while (jobBuffer.current.length > 0 && activeJobs.current < activeThreads) {
-      const job = jobBuffer.current.shift();
-      if (job) {
-        activeJobs.current += 1;
-        setStatus("WORKING");
-        workerRef.current.postMessage({
-          type: "JOB_CHUNK",
-          chunk: job,
-          workerId: socketRef.current?.id,
-        });
-      }
+    // 2. Create if missing
+    if (!storedId) {
+      storedId = crypto.randomUUID();
+      localStorage.setItem("ostrich_worker_id", storedId);
     }
 
-    // 2. Request More Work (Only if running)
-    const desiredBuffer = Math.max(10, activeThreads * 3);
-    const currentSupply =
-      activeJobs.current + jobBuffer.current.length + inFlightRequests.current;
-
-    if (currentSupply < desiredBuffer && socketRef.current?.connected) {
-      const deficit = desiredBuffer - currentSupply;
-      if (deficit > 0) {
-        inFlightRequests.current += deficit;
-        // Optimization: Request in batch if deficit is high
-        if (deficit > 5) {
-          socketRef.current.emit("REQUEST_BATCH", Math.min(deficit, 20));
-        } else {
-          socketRef.current.emit("REQUEST_WORK");
-        }
-      }
+    // 3. Fix name if missing or old format
+    const isOldName = storedName?.startsWith("Node-");
+    if (!storedName || isOldName) {
+      const friendlyName = getFriendlyDeviceName();
+      const shortHash = storedId.slice(0, 4).toUpperCase();
+      storedName = `${friendlyName} - ${shortHash}`;
+      localStorage.setItem("ostrich_device_name", storedName);
     }
 
-    // Auto-idle check
-    if (activeJobs.current === 0 && isRunningRef.current) {
-      // Keep status as working if we are just waiting for network
-      // But if buffer is empty and no requests inflight, maybe idle?
-    }
-  }, [activeThreads]);
+    return { id: storedId, name: storedName! };
+  });
 
-  // --- INITIALIZATION ---
-
-  useEffect(() => {
-    if (!identity?.id) return;
-    if (socketRef.current?.connected) return;
-
-    onLog?.(`[NET] Connecting as ${identity.name}...`);
-
-    const newSocket = io(window.location.origin, {
-      path: "/socket.io",
-      query: { persistentId: identity.id },
-    });
-
-    setSocket(newSocket);
-    socketRef.current = newSocket;
-
-    // Worker Init
-    workerRef.current = new OstrichWorker();
-    // Initialize with default throttle
-    workerRef.current.postMessage({
-      type: "UPDATE_CONFIG",
-      throttleLevel: currentThrottle / 100,
-    });
-
-    newSocket.on("connect", () => {
-      onLog?.(`[NET] Connected! Registering...`);
-      setWorkerId(newSocket.id || "ID");
-
-      newSocket.emit("REGISTER_DEVICE", {
-        id: identity.id,
-        name: identity.name,
-        type: "DESKTOP",
-        capabilities: {
-          cpuCores: navigator.hardwareConcurrency || 4,
-          memoryGB: 8,
-          maxConcurrency: navigator.hardwareConcurrency || 4,
-          supportedJobs: ["MATH_STRESS", "MAT_MUL"],
-        },
-      });
-    });
-
-    // ... handlers ...
-    newSocket.on("JOB_DISPATCH", (job) => {
-      inFlightRequests.current = Math.max(0, inFlightRequests.current - 1);
-      jobBuffer.current.push(job);
-      processQueue();
-    });
-
-    newSocket.on("BATCH_DISPATCH", (jobs) => {
-      inFlightRequests.current = Math.max(0, inFlightRequests.current - 1);
-      jobs.forEach((j: JobChunk) => jobBuffer.current.push(j));
-      processQueue();
-    });
-
-    // Worker Handler
-    if (workerRef.current) {
-      workerRef.current.onmessage = (e) => {
-        const msg = e.data;
-        if (msg.type === "CONFIG_APPLIED") {
-          // UPDATE LOCAL STATE WITH WORKER'S ACTUAL THREAD COUNT
-          setActiveThreads(msg.threads);
-          onLog?.(`[CPU] Worker scaled to ${msg.threads} threads`);
-          // Trigger queue processing in case we scaled up
-          processQueue();
-        } else if (msg.type === "JOB_COMPLETE") {
-          activeJobs.current--;
-          completedCountRef.current++;
-          socketRef.current?.emit("JOB_COMPLETE", {
-            chunkId: msg.chunkId,
-            result: msg.result as WorkerResult,
-          });
-          processQueue();
-        } else if (msg.type === "JOB_ERROR") {
-          activeJobs.current--;
-          onLog?.(`[ERR] Job failed: ${msg.error}`);
-          processQueue();
-        }
-      };
-    }
-
-    // Pump Loop
-    const pump = setInterval(processQueue, 100);
-
-    return () => {
-      clearInterval(pump);
-      newSocket.disconnect();
-      workerRef.current?.terminate();
-    };
-  }, [identity]); // Deps
-
-  // Sync completed count for UI
-  useEffect(() => {
-    const i = setInterval(
-      () => setCompletedCount(completedCountRef.current),
-      500,
-    );
-    return () => clearInterval(i);
-  }, []);
-
-  return {
-    status,
-    completedCount,
-    workerId,
-    opsScore,
-    setOpsScore,
-    activeThreads,
-    updateThrottle, // Use this one
-    throttle: currentThrottle,
-    socket,
-    isRunning: isRunningRef.current,
-    startSwarm,
-    pauseSwarm,
-    stopSwarm,
-  };
+  return identity;
 };
 ```
 
-## File: client/src/utils/worker.ts
-```typescript
-/// <reference lib="webworker" />
+## File: client/src/index.css
+```css
+@import "tailwindcss";
+:root {
+  --arc-bg: #0f0f11;
+  --arc-card: rgba(255, 255, 255, 0.03);
+  --arc-border: rgba(255, 255, 255, 0.08);
+  --grain-url: url("https://upload.wikimedia.org/wikipedia/commons/7/76/Noise.png"); /* Standard noise texture */
+}
 
-// Limits
-const LOGICAL_CORES = navigator.hardwareConcurrency || 4;
-const TOTAL_RAM_BYTES = (navigator as any).deviceMemory
-  ? (navigator as any).deviceMemory * 1e9
-  : 4e9;
+body {
+  background-color: var(--arc-bg);
+  color: #ececec;
+  font-family:
+    "Inter",
+    -apple-system,
+    sans-serif;
+  overflow-x: hidden;
+}
 
-// State - Use Map for better tracking
-const threadPool = new Map<
-  number,
-  {
-    worker: Worker;
-    busy: boolean;
-    currentChunkId: string | null;
-  }
->();
+/* THE ARC "GRAIN" EFFECT */
+.bg-grain {
+  position: relative;
+}
+.bg-grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--grain-url);
+  opacity: 0.04;
+  pointer-events: none;
+  z-index: 0;
+  mix-blend-mode: overlay;
+}
 
-let currentRamUsage = 0;
-let throttleLimit = 0.3; // Default 30%
-let nextWorkerId = 0;
-
-// --- KERNEL 1: Math Stress (Legacy) ---
-const runStressTest = (iterations: number) => {
-  let sum = 0;
-  for (let i = 0; i < iterations; i++) {
-    sum += Math.sqrt(i) * Math.sin(i);
-  }
-  return sum;
-};
-
-// --- KERNEL 2: Matrix Multiplication (ML Foundation) ---
-const runMatrixMul = (rowA: number[], matrixB: number[][]) => {
-  const resultRow = new Array(matrixB[0].length).fill(0);
-  for (let j = 0; j < matrixB[0].length; j++) {
-    let sum = 0;
-    for (let k = 0; k < rowA.length; k++) {
-      sum += rowA[k] * matrixB[k][j];
-    }
-    resultRow[j] = sum;
-  }
-  return resultRow;
-};
-
-// --- SUB-WORKER FACTORY ---
-const createSubWorker = (workerId: number) => {
-  const blob = new Blob(
-    [
-      `
-    const runStressTest = ${runStressTest.toString()};
-    const runMatrixMul = ${runMatrixMul.toString()};
-
-    self.onmessage = (e) => {
-      try {
-        const { type, data } = e.data;
-        let result;
-
-        if (type === "MATH_STRESS") {
-          result = runStressTest(data[0]);
-        } 
-        else if (type === "MATRIX_MUL") {
-          result = runMatrixMul(data.row, data.matrixB);
-        }
-        else {
-          throw new Error("Unknown Kernel: " + type);
-        }
-
-        self.postMessage({ success: true, result });
-      } catch (err) {
-        self.postMessage({ success: false, error: err.message });
-      }
-    }
-  `,
-    ],
-    { type: "application/javascript" },
-  );
-  const worker = new Worker(URL.createObjectURL(blob));
-
-  // Store workerId on the worker object for tracking
-  (worker as any).workerId = workerId;
-
-  return worker;
-};
-
-const calculateBenchmark = (): number => {
-  const start = performance.now();
-  let sum = 0;
-  const duration = 100;
-  while (performance.now() - start < duration) {
-    for (let i = 0; i < 10000; i++) {
-      sum += Math.sqrt(i) * Math.sin(i);
-    }
-  }
-  return Math.round((sum / (performance.now() - start)) * 100);
-};
-
-// Find first available worker
-const findAvailableWorker = (): { id: number; worker: Worker } | null => {
-  for (const [id, thread] of threadPool.entries()) {
-    if (!thread.busy) {
-      return { id, worker: thread.worker };
-    }
-  }
-  return null;
-};
-
-// --- MAIN CONTROLLER ---
-self.onmessage = async (e: MessageEvent) => {
-  const { type, chunk, throttleLevel, workerId } = e.data;
-
-  // SYSTEM: BENCHMARK
-  if (type === "BENCHMARK") {
-    self.postMessage({
-      type: "BENCHMARK_COMPLETE",
-      score: calculateBenchmark(),
-    });
-    return;
-  }
-
-  // SYSTEM: CONFIG UPDATE
-  if (type === "UPDATE_CONFIG") {
-    throttleLimit = throttleLevel;
-    const targetThreadCount = Math.max(
-      1,
-      Math.floor(LOGICAL_CORES * throttleLimit),
+/* AURORA GRADIENTS */
+.aurora-gradient {
+  background:
+    radial-gradient(
+      circle at 0% 0%,
+      rgba(255, 180, 180, 0.15),
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 100% 0%,
+      rgba(180, 200, 255, 0.15),
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 100% 100%,
+      rgba(180, 255, 200, 0.1),
+      transparent 40%
     );
+  filter: blur(60px);
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
 
-    const currentCount = threadPool.size;
+/* SQUIRCLE CARDS (Arc Style) */
+.arc-card {
+  background: var(--arc-card);
+  border: 1px solid var(--arc-border);
+  backdrop-filter: blur(20px);
+  border-radius: 24px; /* Soft rounding */
+  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
 
-    // Scale Up
-    if (targetThreadCount > currentCount) {
-      for (let i = currentCount; i < targetThreadCount; i++) {
-        const workerId = nextWorkerId++;
-        const worker = createSubWorker(workerId);
-        threadPool.set(workerId, {
-          worker,
-          busy: false,
-          currentChunkId: null,
-        });
-      }
+.arc-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3);
+}
+
+/* SCROLLBAR HIDE */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+@import "tailwindcss";
+
+/* 1. DEFINE YOUR THEME (The "DNA") 🧬 */
+@theme {
+  --color-arc-bg: var(--arc-bg);
+  --color-arc-card: var(--arc-card);
+  --color-arc-border: var(--arc-border);
+  --color-arc-text: var(--arc-text);
+  --color-arc-muted: var(--arc-muted);
+
+  --animate-gradient-x: gradient-x 15s ease infinite;
+
+  @keyframes gradient-x {
+    0%,
+    100% {
+      background-size: 200% 200%;
+      background-position: left center;
     }
-
-    // Scale Down - Only remove idle workers
-    if (targetThreadCount < currentCount) {
-      const toRemove = currentCount - targetThreadCount;
-      let removed = 0;
-
-      for (const [id, thread] of threadPool.entries()) {
-        if (!thread.busy && removed < toRemove) {
-          thread.worker.terminate();
-          threadPool.delete(id);
-          removed++;
-        }
-      }
+    50% {
+      background-size: 200% 200%;
+      background-position: right center;
     }
+  }
+}
 
-    self.postMessage({
-      type: "CONFIG_APPLIED",
-      threads: threadPool.size,
-      limit: throttleLimit,
-      score: calculateBenchmark(),
-    });
-    return;
+/* 2. BASE VARIABLES (The "Fuel") ⛽ */
+:root {
+  --arc-bg: #f0f2f5;
+  --arc-card: #ffffff;
+  --arc-border: rgba(0, 0, 0, 0.06);
+  --arc-text: #1a1a1a;
+  --arc-muted: #8e8e93;
+  --grain-opacity: 0.03;
+}
+
+.dark {
+  --arc-bg: #09090b;
+  --arc-card: rgba(255, 255, 255, 0.03);
+  --arc-border: rgba(255, 255, 255, 0.08);
+  --arc-text: #ececec;
+  --arc-muted: #71717a;
+  --grain-opacity: 0.04;
+}
+
+/* 3. CUSTOM COMPONENTS (The "Body") 🏎️ */
+@layer components {
+  body {
+    @apply bg-arc-bg text-arc-text transition-colors duration-500;
+    font-family: "Inter", sans-serif;
   }
 
-  // EXECUTION: JOB HANDLING
-  if (type === "JOB_CHUNK") {
-    // 1. RAM CHECK
-    const estimatedSize = 50000;
-    if (currentRamUsage + estimatedSize > TOTAL_RAM_BYTES * throttleLimit) {
-      self.postMessage({
-        type: "JOB_ERROR",
-        chunkId: chunk.id,
-        error: "OOM_PREVENTED",
-      });
-      return;
-    }
-
-    // 2. FIND AVAILABLE WORKER
-    const available = findAvailableWorker();
-    if (!available) {
-      self.postMessage({
-        type: "JOB_ERROR",
-        chunkId: chunk.id,
-        error: "CPU_SATURATED",
-      });
-      return;
-    }
-
-    // 3. RUN
-    const { id: threadId, worker } = available;
-    const start = performance.now();
-
-    currentRamUsage += estimatedSize;
-    const thread = threadPool.get(threadId)!;
-    thread.busy = true;
-    thread.currentChunkId = chunk.id;
-
-    worker.onmessage = (ev) => {
-      currentRamUsage -= estimatedSize;
-
-      // Only update if thread still exists (might have been scaled down)
-      const currentThread = threadPool.get(threadId);
-      if (currentThread) {
-        currentThread.busy = false;
-        currentThread.currentChunkId = null;
-      }
-
-      const duration = Math.round(performance.now() - start);
-
-      if (ev.data.success) {
-        self.postMessage({
-          type: "JOB_COMPLETE",
-          chunkId: chunk.id,
-          result: ev.data.result,
-          workerId: workerId,
-          durationMs: duration,
-          timestamp: performance.now(),
-        });
-      } else {
-        self.postMessage({
-          type: "JOB_ERROR",
-          chunkId: chunk.id,
-          error: ev.data.error,
-        });
-      }
-    };
-
-    worker.postMessage({ type: chunk.type, data: chunk.data });
+  .arc-card {
+    @apply bg-arc-card border border-arc-border backdrop-blur-xl rounded-3xl transition-all duration-400 ease-[cubic-bezier(0.2,0.8,0.2,1)];
   }
-};
 
-export {};
+  /* Shadow logic for Light Mode */
+  :not(.dark) .arc-card {
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
+  }
+
+  .dark .arc-card:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+}
+
+/* 4. UTILITIES (The "Gadgets") 🔧 */
+@layer utilities {
+  .bg-grain::before {
+    content: "";
+    @apply absolute inset-0 pointer-events-none z-0 mix-blend-overlay;
+    background-image: url("https://upload.wikimedia.org/wikipedia/commons/7/76/Noise.png");
+    opacity: var(--grain-opacity);
+  }
+}
 ```
 
 ## File: server/src/JobQueue.ts
@@ -2325,6 +1891,7 @@ export class DeviceRegistry extends EventEmitter {
   }
 
   register(device: DeviceInfo): void {
+    if (device.isEnabled === undefined) device.isEnabled = true;
     this.devices.set(device.id, device);
     this.socketToDevice.set(device.socketId, device.id);
     this.emit("deviceJoined", device);
@@ -2363,10 +1930,22 @@ export class DeviceRegistry extends EventEmitter {
   getAvailable(): DeviceInfo[] {
     return this.getOnline().filter(
       (d) =>
-        d.status === "ONLINE" && d.currentLoad < d.capabilities.maxConcurrency,
+        d.isEnabled &&
+        d.status !== "DISABLED" &&
+        d.currentLoad < d.capabilities.maxConcurrency,
     );
   }
-
+  // NEW: Toggle Enable/Disable
+  toggleDevice(deviceId: string, enabled: boolean): DeviceInfo | undefined {
+    const device = this.devices.get(deviceId);
+    if (device) {
+      device.isEnabled = enabled;
+      device.status = enabled ? "ONLINE" : "DISABLED";
+      this.emit("deviceUpdated", device); // Notify Coordinator
+      return device;
+    }
+    return undefined;
+  }
   getByType(type: DeviceType): DeviceInfo[] {
     return this.getAll().filter((d) => d.type === type);
   }
@@ -2692,6 +2271,1014 @@ export class JoinCodeManager {
     return { url, code };
   }
 }
+```
+
+## File: server/src/swarm/WorkStealingScheduler.ts
+```typescript
+import {
+  type JobChunk,
+  type WorkerResult,
+  type JobType,
+} from "../../../shared/types";
+import { EventEmitter } from "events";
+
+interface QueueMetrics {
+  totalJobs: number;
+  pendingJobs: number;
+  assignedJobs: number;
+  avgWaitTime: number;
+  jobsByType: Record<JobType, number>;
+}
+
+interface AssignmentRecord {
+  jobId: string;
+  deviceId: string;
+  assignedAt: number;
+  expiresAt: number;
+  retryCount: number;
+}
+
+export class WorkStealingScheduler extends EventEmitter {
+  private jobQueue: JobChunk[] = [];
+  private assignments = new Map<string, AssignmentRecord>();
+  private completedJobs = new Set<string>();
+  private failedJobs = new Map<string, { error: string; retries: number }>();
+
+  // Configuration
+  private readonly JOB_TIMEOUT = 60000; // 60 seconds
+  private readonly MAX_RETRIES = 3;
+  private readonly STEAL_THRESHOLD = 5; // Steal if device has 5+ jobs pending
+  private readonly STEAL_BATCH_SIZE = 3;
+
+  constructor() {
+    super();
+    this.startReaper();
+  }
+
+  submitJob(job: JobChunk): void {
+    job.createdAt = Date.now();
+    job.status = "PENDING";
+    this.jobQueue.push(job);
+    this.emit("jobSubmitted", job);
+  }
+
+  submitBatch(jobs: JobChunk[]): void {
+    const now = Date.now();
+    jobs.forEach((job) => {
+      job.createdAt = now;
+      job.status = "PENDING";
+    });
+    this.jobQueue.push(...jobs);
+    this.emit("batchSubmitted", jobs);
+  }
+
+  getNextJob(deviceId: string, capabilities?: JobType[]): JobChunk | null {
+    // Find first compatible job
+    const index = this.jobQueue.findIndex(
+      (job) =>
+        job.status === "PENDING" &&
+        (!capabilities || capabilities.includes(job.type)),
+    );
+
+    if (index === -1) return null;
+
+    const job = this.jobQueue[index];
+    job.status = "ASSIGNED";
+    job.assignedTo = deviceId;
+    job.assignedAt = Date.now();
+
+    // Track assignment
+    this.assignments.set(job.id, {
+      jobId: job.id,
+      deviceId,
+      assignedAt: job.assignedAt,
+      expiresAt: job.assignedAt + this.JOB_TIMEOUT,
+      retryCount: this.failedJobs.get(job.id)?.retries || 0,
+    });
+
+    this.emit("jobAssigned", job, deviceId);
+    return job;
+  }
+
+  getBatch(
+    deviceId: string,
+    count: number,
+    capabilities?: JobType[],
+  ): JobChunk[] {
+    const jobs: JobChunk[] = [];
+    let remaining = count;
+
+    for (let i = 0; i < this.jobQueue.length && remaining > 0; i++) {
+      const job = this.jobQueue[i];
+      if (
+        job.status === "PENDING" &&
+        (!capabilities || capabilities.includes(job.type))
+      ) {
+        job.status = "ASSIGNED";
+        job.assignedTo = deviceId;
+        job.assignedAt = Date.now();
+
+        this.assignments.set(job.id, {
+          jobId: job.id,
+          deviceId,
+          assignedAt: job.assignedAt,
+          expiresAt: job.assignedAt + this.JOB_TIMEOUT,
+          retryCount: this.failedJobs.get(job.id)?.retries || 0,
+        });
+
+        jobs.push(job);
+        remaining--;
+      }
+    }
+
+    if (jobs.length > 0) {
+      this.emit("batchAssigned", jobs, deviceId);
+    }
+
+    return jobs;
+  }
+
+  completeJob(result: WorkerResult): boolean {
+    const assignment = this.assignments.get(result.chunkId);
+
+    if (!assignment) {
+      console.warn(`[Scheduler] Completion for unknown job: ${result.chunkId}`);
+      return false;
+    }
+
+    if (result.error) {
+      // Handle failure
+      return this.handleFailure(result);
+    }
+
+    // Success - mark as completed
+    const job = this.jobQueue.find((j) => j.id === result.chunkId);
+    if (job) {
+      job.status = "COMPLETED";
+    }
+
+    this.completedJobs.add(result.chunkId);
+    this.assignments.delete(result.chunkId);
+    this.failedJobs.delete(result.chunkId);
+
+    this.emit("jobCompleted", result);
+    this.cleanupCompletedJobs();
+
+    return true;
+  }
+
+  private handleFailure(result: WorkerResult): boolean {
+    const jobId = result.chunkId;
+    const currentFails = this.failedJobs.get(jobId);
+    const retryCount = (currentFails?.retries || 0) + 1;
+
+    if (retryCount >= this.MAX_RETRIES) {
+      // Max retries reached - permanently fail
+      const job = this.jobQueue.find((j) => j.id === jobId);
+      if (job) {
+        job.status = "COMPLETED"; // Mark as completed to remove from queue
+      }
+
+      this.failedJobs.set(jobId, {
+        error: result.error!,
+        retries: retryCount,
+      });
+      this.assignments.delete(jobId);
+
+      this.emit("jobFailed", result, retryCount);
+      return true;
+    }
+
+    // Retry - reset to pending
+    const job = this.jobQueue.find((j) => j.id === jobId);
+    if (job) {
+      job.status = "PENDING";
+      job.assignedTo = undefined;
+      job.assignedAt = undefined;
+    }
+
+    this.failedJobs.set(jobId, {
+      error: result.error!,
+      retries: retryCount,
+    });
+    this.assignments.delete(jobId);
+
+    this.emit("jobRetry", result, retryCount);
+    return false;
+  }
+
+  // Work Stealing - called when a device is idle but has no work
+  stealWork(
+    thiefId: string,
+    maxJobs: number = this.STEAL_BATCH_SIZE,
+  ): JobChunk[] {
+    // Find jobs assigned to busy devices that can be stolen
+    const stealable: JobChunk[] = [];
+
+    for (const [jobId, assignment] of this.assignments.entries()) {
+      if (
+        assignment.deviceId !== thiefId &&
+        Date.now() - assignment.assignedAt > 5000
+      ) {
+        // Only steal jobs assigned >5s ago
+        const job = this.jobQueue.find((j) => j.id === jobId);
+        if (job && job.status === "ASSIGNED") {
+          stealable.push(job);
+        }
+      }
+
+      if (stealable.length >= maxJobs) break;
+    }
+
+    // Reassign stolen jobs
+    stealable.forEach((job) => {
+      const oldDevice = this.assignments.get(job.id)?.deviceId;
+
+      job.assignedTo = thiefId;
+      job.assignedAt = Date.now();
+
+      this.assignments.set(job.id, {
+        jobId: job.id,
+        deviceId: thiefId,
+        assignedAt: job.assignedAt,
+        expiresAt: job.assignedAt + this.JOB_TIMEOUT,
+        retryCount: this.assignments.get(job.id)?.retryCount || 0,
+      });
+
+      this.emit("workStolen", job, oldDevice, thiefId);
+    });
+
+    return stealable;
+  }
+
+  // Check if a device should offer work to steal
+  shouldOfferWork(deviceId: string): boolean {
+    const deviceJobs = Array.from(this.assignments.values()).filter(
+      (a) => a.deviceId === deviceId,
+    ).length;
+
+    return deviceJobs >= this.STEAL_THRESHOLD;
+  }
+
+  getWorkForDevice(deviceId: string): JobChunk[] {
+    return this.jobQueue.filter(
+      (job) => job.assignedTo === deviceId && job.status === "ASSIGNED",
+    );
+  }
+
+  // Metrics
+  getMetrics(): QueueMetrics {
+    const now = Date.now();
+    const pending = this.jobQueue.filter((j) => j.status === "PENDING");
+    const assigned = this.jobQueue.filter((j) => j.status === "ASSIGNED");
+
+    const waitTimes = pending
+      .filter((j) => j.createdAt)
+      .map((j) => now - j.createdAt);
+
+    const jobsByType = this.jobQueue.reduce(
+      (acc, job) => {
+        acc[job.type] = (acc[job.type] || 0) + 1;
+        return acc;
+      },
+      {} as Record<JobType, number>,
+    );
+
+    return {
+      totalJobs: this.jobQueue.length,
+      pendingJobs: pending.length,
+      assignedJobs: assigned.length,
+      avgWaitTime:
+        waitTimes.length > 0
+          ? waitTimes.reduce((a, b) => a + b, 0) / waitTimes.length
+          : 0,
+      jobsByType,
+    };
+  }
+
+  getPendingCount(): number {
+    return this.jobQueue.filter((j) => j.status === "PENDING").length;
+  }
+
+  getAssignedCount(): number {
+    return this.assignments.size;
+  }
+
+  getFailedCount(): number {
+    return this.failedJobs.size;
+  }
+
+  // Reaper - handles timeouts and cleanup
+  private startReaper(): void {
+    setInterval(() => {
+      const now = Date.now();
+
+      // Check for timed out assignments
+      for (const [jobId, assignment] of this.assignments.entries()) {
+        if (now > assignment.expiresAt) {
+          console.log(`[Scheduler] Job ${jobId} timed out, retrying...`);
+
+          const job = this.jobQueue.find((j) => j.id === jobId);
+          if (job) {
+            job.status = "PENDING";
+            job.assignedTo = undefined;
+            job.assignedAt = undefined;
+          }
+
+          this.assignments.delete(jobId);
+          this.emit("jobTimeout", jobId);
+        }
+      }
+    }, 5000); // Check every 5 seconds
+  }
+
+  private cleanupCompletedJobs(): void {
+    // Keep only last 1000 completed jobs to prevent memory bloat
+    if (this.completedJobs.size > 1000) {
+      const toDelete = Array.from(this.completedJobs).slice(
+        0,
+        this.completedJobs.size - 1000,
+      );
+      toDelete.forEach((id) => {
+        this.completedJobs.delete(id);
+        const index = this.jobQueue.findIndex((j) => j.id === id);
+        if (index !== -1) {
+          this.jobQueue.splice(index, 1);
+        }
+      });
+    }
+  }
+
+  // Emergency flush - clear all pending jobs
+  flush(): JobChunk[] {
+    const pending = this.jobQueue.filter((j) => j.status === "PENDING");
+    pending.forEach((job) => {
+      job.status = "COMPLETED";
+      this.emit("jobFlushed", job);
+    });
+    return pending;
+  }
+
+  dispose(): void {
+    this.jobQueue = [];
+    this.assignments.clear();
+    this.completedJobs.clear();
+    this.failedJobs.clear();
+    this.removeAllListeners();
+  }
+}
+```
+
+## File: shared/types.ts
+```typescript
+export type ChunkStatus = "PENDING" | "ASSIGNED" | "COMPLETED";
+export type DeviceType = "DESKTOP" | "MOBILE" | "COLAB" | "SERVER" | "TABLET";
+export type DeviceStatus = "ONLINE" | "OFFLINE" | "BUSY" | "ERROR" | "DISABLED";
+
+export type JobErrorType =
+  | "OOM_PREVENTED"
+  | "CPU_SATURATED"
+  | "EXECUTION_ERROR"
+  | "DEVICE_DISCONNECTED"
+  | "TIMEOUT";
+
+export type JobType = "MATH_STRESS" | "MAT_MUL" | "TEXT_TOKENIZE" | "CUSTOM";
+
+export interface JobChunk {
+  id: string;
+  type: JobType;
+  data: any;
+  script?: string;
+  status: ChunkStatus;
+  priority?: number;
+  assignedTo?: string;
+  assignedAt?: number;
+  createdAt: number;
+}
+
+export interface WorkerResult {
+  chunkId: string;
+  workerId: string;
+  deviceId?: string;
+  result?: any;
+  error?: JobErrorType;
+  details?: string;
+  durationMs?: number;
+  timestamp: number;
+}
+
+export interface WorkerPayload {
+  chunk: JobChunk;
+  workerId: string;
+}
+
+// Enhanced Device Types for Multi-Device Swarm
+export interface DeviceCapabilities {
+  cpuCores: number;
+  memoryGB: number;
+  gpuAvailable: boolean;
+  gpuType?: string;
+  maxConcurrency: number;
+  supportedJobs: JobType[];
+}
+
+export interface DeviceInfo {
+  id: string;
+  socketId: string;
+  name: string;
+  type: DeviceType;
+  status: DeviceStatus;
+  capabilities: DeviceCapabilities;
+
+  // Performance Metrics
+  opsScore: number;
+  currentLoad: number;
+  totalJobsCompleted: number;
+  avgJobDuration: number;
+
+  // Connection Info
+  ip?: string;
+  region?: string;
+  connectedAt: number;
+  lastHeartbeat: number;
+
+  // Throttling
+  throttleLevel: number;
+  isThrottled: boolean;
+
+  //Flags
+  isEnabled: boolean;
+}
+
+export interface SwarmStats {
+  totalDevices: number;
+  onlineDevices: number;
+  busyDevices: number;
+  totalCores: number;
+  totalMemoryGB: number;
+
+  // Job Stats
+  pendingJobs: number;
+  activeJobs: number;
+  completedJobs: number;
+  failedJobs: number;
+
+  // Performance
+  globalVelocity: number;
+  avgLatency: number;
+
+  // By Device Type
+  devicesByType: Record<DeviceType, number>;
+}
+
+export interface JoinCode {
+  code: string;
+  expiresAt: number;
+  maxUses: number;
+  usedCount: number;
+  createdBy: string;
+  metadata?: {
+    description?: string;
+    tags?: string[];
+  };
+}
+
+export interface WorkStealRequest {
+  thiefId: string;
+  victimId: string;
+  requestedJobs: number;
+}
+
+export interface DeviceHealth {
+  deviceId: string;
+  timestamp: number;
+  cpuUsage: number;
+  memoryUsage: number;
+  temperature?: number;
+  networkLatency: number;
+  isHealthy: boolean;
+}
+
+// Events
+export type SwarmEvent =
+  | { type: "DEVICE_JOINED"; device: DeviceInfo }
+  | { type: "DEVICE_LEFT"; deviceId: string }
+  | { type: "DEVICE_STATUS_CHANGED"; deviceId: string; status: DeviceStatus }
+  | { type: "JOB_ASSIGNED"; jobId: string; deviceId: string }
+  | { type: "JOB_COMPLETED"; result: WorkerResult }
+  | { type: "JOB_FAILED"; jobId: string; error: JobErrorType }
+  | { type: "WORK_STOLEN"; from: string; to: string; count: number }
+  | { type: "HEARTBEAT"; deviceId: string; health: DeviceHealth };
+```
+
+## File: client/src/hooks/useComputeSwarm.ts
+```typescript
+import { useCallback, useEffect, useRef, useState } from "react";
+import { io, Socket } from "socket.io-client";
+import { type JobChunk, type WorkerResult } from "../../../shared/types";
+// @ts-ignore
+import OstrichWorker from "../utils/worker?worker";
+import { usePersistentIdentity } from "./usePersistentIdentity";
+
+export const useComputeSwarm = (onLog?: (msg: string) => void) => {
+  const [status, setStatus] = useState<
+    "IDLE" | "WORKING" | "PAUSED" | "STOPPED"
+  >("IDLE");
+  const [completedCount, setCompletedCount] = useState(0);
+  const completedCountRef = useRef(0);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [workerId, setWorkerId] = useState<string>("");
+  const [opsScore, setOpsScore] = useState<number>(0);
+
+  // NEW: Manage Join Code here to avoid race conditions
+  const [joinCode, setJoinCode] = useState<string>("LOADING...");
+
+  // Initialize to 0 so we don't assume capacity until worker confirms
+  const [activeThreads, setActiveThreads] = useState<number>(0);
+  const [currentThrottle, setCurrentThrottle] = useState<number>(30);
+
+  const isRunningRef = useRef(false);
+  const inFlightRequests = useRef(0);
+  const activeJobs = useRef(0);
+  const jobBuffer = useRef<JobChunk[]>([]);
+
+  const socketRef = useRef<Socket | null>(null);
+  const workerRef = useRef<Worker | null>(null);
+
+  const identity = usePersistentIdentity();
+
+  // --- CORE LOOP ---
+  const processQueue = useCallback(() => {
+    // 1. SAFETY CHECK: Ensure worker exists and swarm is running
+    if (!workerRef.current || !isRunningRef.current) return;
+
+    // 2. Dispatch from Buffer to Worker
+    const maxConcurrency = activeThreads || 1;
+
+    while (
+      jobBuffer.current.length > 0 &&
+      activeJobs.current < maxConcurrency
+    ) {
+      const job = jobBuffer.current.shift();
+      if (job) {
+        activeJobs.current++;
+        workerRef.current.postMessage({
+          type: "JOB_CHUNK",
+          chunk: job,
+          workerId: socketRef.current?.id,
+        });
+      }
+    }
+
+    // 3. Request from Server
+    const desiredBuffer = maxConcurrency * 3;
+    const currentSupply =
+      activeJobs.current + jobBuffer.current.length + inFlightRequests.current;
+
+    if (currentSupply < desiredBuffer && socketRef.current?.connected) {
+      const deficit = desiredBuffer - currentSupply;
+      if (deficit > 0) {
+        inFlightRequests.current += deficit;
+        if (deficit >= 5) {
+          socketRef.current.emit("REQUEST_BATCH", Math.min(deficit, 20));
+        } else {
+          socketRef.current.emit("REQUEST_WORK");
+        }
+      }
+    }
+  }, [activeThreads]);
+
+  // --- CONTROLS ---
+  const startSwarm = useCallback(() => {
+    if (isRunningRef.current) return;
+    isRunningRef.current = true;
+    setStatus("WORKING");
+    onLog?.(`[SYS] Swarm started.`);
+    processQueue();
+  }, [onLog, processQueue]);
+
+  const pauseSwarm = useCallback(() => {
+    isRunningRef.current = false;
+    setStatus("PAUSED");
+    onLog?.(`[SYS] System paused. Finishing active jobs...`);
+  }, [onLog]);
+
+  const stopSwarm = useCallback(() => {
+    isRunningRef.current = false;
+    setStatus("STOPPED");
+    activeJobs.current = 0;
+    jobBuffer.current = [];
+    inFlightRequests.current = 0;
+
+    workerRef.current?.terminate();
+    workerRef.current = new OstrichWorker();
+    workerRef.current?.postMessage({
+      type: "UPDATE_CONFIG",
+      throttleLevel: currentThrottle / 100,
+    });
+
+    onLog?.(`[SYS] System stopped. Worker reset.`);
+  }, [currentThrottle, onLog]);
+
+  const updateThrottle = useCallback(
+    (val: number) => {
+      setCurrentThrottle(val);
+      workerRef.current?.postMessage({
+        type: "UPDATE_CONFIG",
+        throttleLevel: val / 100,
+      });
+      onLog?.(`[CFG] Throttle updated to ${val}%`);
+    },
+    [onLog],
+  );
+
+  const toggleDevice = useCallback(
+    (deviceId: string, enabled: boolean) => {
+      if (socketRef.current) {
+        socketRef.current.emit("TOGGLE_DEVICE", { deviceId, enabled });
+        onLog?.(
+          `[CMD] ${enabled ? "Enabling" : "Disabling"} device ${deviceId.slice(0, 4)}...`,
+        );
+      }
+    },
+    [onLog],
+  );
+
+  // --- INITIALIZATION ---
+  useEffect(() => {
+    if (!identity?.id) return;
+    if (socketRef.current?.connected) return;
+
+    onLog?.(`[NET] Connecting as ${identity.name}...`);
+
+    // 1. DETERMINE SOCKET URL (Dynamic for local network access)
+    const isDev = import.meta.env.DEV;
+    const socketUrl = isDev
+      ? `${window.location.protocol}//${window.location.hostname}:3000`
+      : window.location.origin;
+
+    // 2. INIT WORKER
+    workerRef.current = new OstrichWorker();
+    workerRef.current?.postMessage({
+      type: "UPDATE_CONFIG",
+      throttleLevel: currentThrottle / 100,
+    });
+
+    // 3. INIT SOCKET
+    const newSocket = io(socketUrl, {
+      path: "/socket.io",
+      query: { persistentId: identity.id },
+      transports: ["websocket", "polling"],
+    });
+
+    setSocket(newSocket);
+    socketRef.current = newSocket;
+
+    // --- SOCKET EVENTS ---
+    newSocket.on("connect", () => {
+      setWorkerId(newSocket.id || "...");
+      onLog?.(`[NET] Connected! Registering...`);
+
+      // CRITICAL: Request Join Code immediately
+      newSocket.emit("REQUEST_JOIN_CODE");
+
+      newSocket.emit("REGISTER_DEVICE", {
+        id: identity.id,
+        name: identity.name,
+        type: "DESKTOP",
+        capabilities: {
+          cpuCores: navigator.hardwareConcurrency || 4,
+          memoryGB: (navigator as any).deviceMemory || 8,
+          maxConcurrency: navigator.hardwareConcurrency || 4,
+          supportedJobs: ["MAT_MUL", "MATH_STRESS"],
+        },
+      });
+    });
+
+    // CRITICAL: Listen for code here, not in App.tsx
+    newSocket.on("JOIN_CODE", (data: { code: string }) => {
+      setJoinCode(data.code);
+    });
+
+    newSocket.on("JOB_DISPATCH", (job) => {
+      inFlightRequests.current = Math.max(0, inFlightRequests.current - 1);
+      jobBuffer.current.push(job);
+      processQueue();
+    });
+
+    newSocket.on("BATCH_DISPATCH", (jobs) => {
+      inFlightRequests.current = Math.max(0, inFlightRequests.current - 1);
+      jobs.forEach((j: JobChunk) => jobBuffer.current.push(j));
+      processQueue();
+    });
+
+    newSocket.on("NO_WORK", () => {
+      inFlightRequests.current = Math.max(0, inFlightRequests.current - 1);
+    });
+
+    // --- WORKER EVENTS ---
+    if (workerRef.current) {
+      workerRef.current.onmessage = (e) => {
+        const msg = e.data;
+        if (msg.type === "CONFIG_APPLIED") {
+          setActiveThreads(msg.threads);
+          onLog?.(`[CPU] Worker scaled to ${msg.threads} threads`);
+          processQueue();
+        } else if (msg.type === "JOB_COMPLETE") {
+          activeJobs.current--;
+          completedCountRef.current++;
+          socketRef.current?.emit("JOB_COMPLETE", {
+            chunkId: msg.chunkId,
+            result: msg.result as WorkerResult,
+          });
+          processQueue();
+        } else if (msg.type === "JOB_ERROR") {
+          activeJobs.current--;
+          onLog?.(`[ERR] Job failed: ${msg.error}`);
+          processQueue();
+        } else if (msg.type === "BENCHMARK_COMPLETE") {
+          setOpsScore(msg.score);
+        }
+      };
+    }
+
+    const pump = setInterval(processQueue, 100);
+
+    return () => {
+      clearInterval(pump);
+      newSocket.disconnect();
+      workerRef.current?.terminate();
+    };
+  }, [identity]);
+
+  useEffect(() => {
+    const i = setInterval(
+      () => setCompletedCount(completedCountRef.current),
+      500,
+    );
+    return () => clearInterval(i);
+  }, []);
+
+  return {
+    status,
+    completedCount,
+    workerId,
+    opsScore,
+    setOpsScore,
+    activeThreads,
+    updateThrottle,
+    throttle: currentThrottle,
+    socket,
+    isRunning: isRunningRef.current,
+    startSwarm,
+    pauseSwarm,
+    stopSwarm,
+    toggleDevice,
+    identity,
+    joinCode, // Export the code
+  };
+};
+```
+
+## File: client/src/utils/worker.ts
+```typescript
+/// <reference lib="webworker" />
+
+// --- CONFIGURATION & LIMITS ---
+const LOGICAL_CORES = navigator.hardwareConcurrency || 4;
+// RAM Limit Estimate (Performance.memory is not standard, so we estimate)
+const TOTAL_RAM_BYTES = (navigator as any).deviceMemory
+  ? (navigator as any).deviceMemory * 1e9
+  : 8e9; // Default to 8GB if unknown
+
+// --- STATE MANAGEMENT ---
+// Map stores: Worker ID -> { Worker Instance, Busy Status, Current Chunk ID }
+const threadPool = new Map<
+  number,
+  {
+    worker: Worker;
+    busy: boolean;
+    currentChunkId: string | null;
+  }
+>();
+
+let currentRamUsage = 0;
+let throttleLimit = 0.3; // Default start at 30%
+let nextWorkerId = 0;
+
+// --- KERNEL 1: Math Stress (CPU Intense) ---
+// Performs heavy floating point calculations
+const runStressTest = (iterations: number) => {
+  let sum = 0;
+  // Safety check for undefined input
+  const count = iterations || 1000000;
+  for (let i = 0; i < count; i++) {
+    sum += Math.sqrt(i) * Math.sin(i);
+  }
+  return sum;
+};
+
+// --- KERNEL 2: Matrix Multiplication (Memory & CPU Intense) ---
+// Standard O(n^3) matrix multiplication for ML simulation
+const runMatrixMul = (rowA: number[], matrixB: number[][]) => {
+  if (!rowA || !matrixB) return []; // Safety check
+
+  const resultRow = new Array(matrixB[0].length).fill(0);
+  for (let j = 0; j < matrixB[0].length; j++) {
+    let sum = 0;
+    for (let k = 0; k < rowA.length; k++) {
+      sum += rowA[k] * matrixB[k][j];
+    }
+    resultRow[j] = sum;
+  }
+  return resultRow;
+};
+
+// --- SUB-WORKER FACTORY ---
+// Creates a lightweight worker that runs the actual kernels
+const createSubWorker = (workerId: number) => {
+  const blob = new Blob(
+    [
+      `
+    const runStressTest = ${runStressTest.toString()};
+    const runMatrixMul = ${runMatrixMul.toString()};
+
+    self.onmessage = (e) => {
+      try {
+        const { type, data } = e.data;
+        let result;
+
+        // 1. Handle Math Stress
+        if (type === "MATH_STRESS") {
+          // Server sends data: { iterations: number }
+          // Or sometimes just the number depending on generator
+          const iterations = typeof data === 'object' ? data.iterations : data;
+          result = runStressTest(iterations);
+        } 
+        // 2. Handle Matrix Multiplication
+        else if (type === "MAT_MUL") {
+          // Server sends data: { row: [], matrixB: [][] }
+          result = runMatrixMul(data.row, data.matrixB);
+        }
+        else {
+          throw new Error("Unknown Kernel: " + type);
+        }
+
+        self.postMessage({ success: true, result });
+      } catch (err) {
+        self.postMessage({ success: false, error: err.message });
+      }
+    }
+  `,
+    ],
+    { type: "application/javascript" },
+  );
+
+  return new Worker(URL.createObjectURL(blob));
+};
+
+// --- THREAD POOL MANAGER ---
+const applyConfig = () => {
+  // Calculate target threads based on throttle %
+  const targetThreadCount = Math.max(
+    1,
+    Math.floor(LOGICAL_CORES * throttleLimit),
+  );
+
+  const currentCount = threadPool.size;
+
+  // SCALE UP
+  if (targetThreadCount > currentCount) {
+    for (let i = currentCount; i < targetThreadCount; i++) {
+      const wId = nextWorkerId++;
+      const worker = createSubWorker(wId);
+      threadPool.set(wId, {
+        worker,
+        busy: false,
+        currentChunkId: null,
+      });
+    }
+  }
+
+  // SCALE DOWN (Only remove idle workers to prevent killing active jobs)
+  if (targetThreadCount < currentCount) {
+    const toRemove = currentCount - targetThreadCount;
+    let removed = 0;
+
+    for (const [id, thread] of threadPool.entries()) {
+      if (!thread.busy && removed < toRemove) {
+        thread.worker.terminate();
+        threadPool.delete(id);
+        removed++;
+      }
+    }
+  }
+
+  // Notify Main Thread about the actual active thread count
+  self.postMessage({
+    type: "CONFIG_APPLIED",
+    threads: threadPool.size,
+    limit: throttleLimit,
+  });
+};
+
+// --- INITIALIZATION ---
+// 1. CRITICAL FIX: Initialize threads immediately on load
+applyConfig();
+
+// --- MAIN MESSAGE DISPATCHER ---
+self.onmessage = async (e: MessageEvent) => {
+  const { type, chunk, throttleLevel, workerId } = e.data;
+
+  // CONFIG UPDATE
+  if (type === "UPDATE_CONFIG") {
+    if (throttleLevel !== undefined) {
+      throttleLimit = throttleLevel;
+    }
+    applyConfig();
+    return;
+  }
+
+  // BENCHMARKING
+  if (type === "BENCHMARK") {
+    const start = performance.now();
+    let sum = 0;
+    // Quick burst calculation
+    for (let i = 0; i < 500000; i++) {
+      sum += Math.sqrt(i);
+    }
+    const duration = performance.now() - start;
+    // Calculate OPS (Operations Per Second approximation)
+    const score = Math.round((500000 / (duration || 1)) * 1000);
+
+    self.postMessage({
+      type: "BENCHMARK_COMPLETE",
+      score: score,
+    });
+    return;
+  }
+
+  // JOB PROCESSING
+  if (type === "JOB_CHUNK") {
+    // 1. Find an idle worker
+    let selectedThreadId = -1;
+    let selectedWorker = null;
+
+    for (const [id, thread] of threadPool.entries()) {
+      if (!thread.busy) {
+        selectedThreadId = id;
+        selectedWorker = thread.worker;
+        break;
+      }
+    }
+
+    // 2. If no worker is free, reject (Shouldn't happen if queue logic is good)
+    if (!selectedWorker) {
+      self.postMessage({
+        type: "JOB_ERROR",
+        chunkId: chunk.id,
+        error: "CPU_SATURATED",
+      });
+      return;
+    }
+
+    // 3. Mark thread as busy
+    const thread = threadPool.get(selectedThreadId)!;
+    thread.busy = true;
+    thread.currentChunkId = chunk.id;
+
+    // 4. Set up completion handler
+    selectedWorker.onmessage = (ev) => {
+      // Mark as free immediately
+      thread.busy = false;
+      thread.currentChunkId = null;
+
+      if (ev.data.success) {
+        self.postMessage({
+          type: "JOB_COMPLETE",
+          chunkId: chunk.id,
+          result: ev.data.result,
+          workerId: workerId, // Pass back socket ID for tracking
+        });
+      } else {
+        self.postMessage({
+          type: "JOB_ERROR",
+          chunkId: chunk.id,
+          error: ev.data.error,
+        });
+      }
+    };
+
+    // 5. Dispatch to sub-worker
+    // Note: We pass chunk.data exactly as received
+    selectedWorker.postMessage({
+      type: chunk.type,
+      data: chunk.data,
+    });
+  }
+};
+
+export {};
 ```
 
 ## File: server/src/swarm/SwarmCoordinator.ts
@@ -3107,501 +3694,6 @@ export class SwarmCoordinator extends EventEmitter {
 }
 ```
 
-## File: server/src/swarm/WorkStealingScheduler.ts
-```typescript
-import {
-  type JobChunk,
-  type WorkerResult,
-  type JobType,
-} from "../../../shared/types";
-import { EventEmitter } from "events";
-
-interface QueueMetrics {
-  totalJobs: number;
-  pendingJobs: number;
-  assignedJobs: number;
-  avgWaitTime: number;
-  jobsByType: Record<JobType, number>;
-}
-
-interface AssignmentRecord {
-  jobId: string;
-  deviceId: string;
-  assignedAt: number;
-  expiresAt: number;
-  retryCount: number;
-}
-
-export class WorkStealingScheduler extends EventEmitter {
-  private jobQueue: JobChunk[] = [];
-  private assignments = new Map<string, AssignmentRecord>();
-  private completedJobs = new Set<string>();
-  private failedJobs = new Map<string, { error: string; retries: number }>();
-
-  // Configuration
-  private readonly JOB_TIMEOUT = 60000; // 60 seconds
-  private readonly MAX_RETRIES = 3;
-  private readonly STEAL_THRESHOLD = 5; // Steal if device has 5+ jobs pending
-  private readonly STEAL_BATCH_SIZE = 3;
-
-  constructor() {
-    super();
-    this.startReaper();
-  }
-
-  submitJob(job: JobChunk): void {
-    job.createdAt = Date.now();
-    job.status = "PENDING";
-    this.jobQueue.push(job);
-    this.emit("jobSubmitted", job);
-  }
-
-  submitBatch(jobs: JobChunk[]): void {
-    const now = Date.now();
-    jobs.forEach((job) => {
-      job.createdAt = now;
-      job.status = "PENDING";
-    });
-    this.jobQueue.push(...jobs);
-    this.emit("batchSubmitted", jobs);
-  }
-
-  getNextJob(deviceId: string, capabilities?: JobType[]): JobChunk | null {
-    // Find first compatible job
-    const index = this.jobQueue.findIndex(
-      (job) =>
-        job.status === "PENDING" &&
-        (!capabilities || capabilities.includes(job.type)),
-    );
-
-    if (index === -1) return null;
-
-    const job = this.jobQueue[index];
-    job.status = "ASSIGNED";
-    job.assignedTo = deviceId;
-    job.assignedAt = Date.now();
-
-    // Track assignment
-    this.assignments.set(job.id, {
-      jobId: job.id,
-      deviceId,
-      assignedAt: job.assignedAt,
-      expiresAt: job.assignedAt + this.JOB_TIMEOUT,
-      retryCount: this.failedJobs.get(job.id)?.retries || 0,
-    });
-
-    this.emit("jobAssigned", job, deviceId);
-    return job;
-  }
-
-  getBatch(
-    deviceId: string,
-    count: number,
-    capabilities?: JobType[],
-  ): JobChunk[] {
-    const jobs: JobChunk[] = [];
-    let remaining = count;
-
-    for (let i = 0; i < this.jobQueue.length && remaining > 0; i++) {
-      const job = this.jobQueue[i];
-      if (
-        job.status === "PENDING" &&
-        (!capabilities || capabilities.includes(job.type))
-      ) {
-        job.status = "ASSIGNED";
-        job.assignedTo = deviceId;
-        job.assignedAt = Date.now();
-
-        this.assignments.set(job.id, {
-          jobId: job.id,
-          deviceId,
-          assignedAt: job.assignedAt,
-          expiresAt: job.assignedAt + this.JOB_TIMEOUT,
-          retryCount: this.failedJobs.get(job.id)?.retries || 0,
-        });
-
-        jobs.push(job);
-        remaining--;
-      }
-    }
-
-    if (jobs.length > 0) {
-      this.emit("batchAssigned", jobs, deviceId);
-    }
-
-    return jobs;
-  }
-
-  completeJob(result: WorkerResult): boolean {
-    const assignment = this.assignments.get(result.chunkId);
-
-    if (!assignment) {
-      console.warn(`[Scheduler] Completion for unknown job: ${result.chunkId}`);
-      return false;
-    }
-
-    if (result.error) {
-      // Handle failure
-      return this.handleFailure(result);
-    }
-
-    // Success - mark as completed
-    const job = this.jobQueue.find((j) => j.id === result.chunkId);
-    if (job) {
-      job.status = "COMPLETED";
-    }
-
-    this.completedJobs.add(result.chunkId);
-    this.assignments.delete(result.chunkId);
-    this.failedJobs.delete(result.chunkId);
-
-    this.emit("jobCompleted", result);
-    this.cleanupCompletedJobs();
-
-    return true;
-  }
-
-  private handleFailure(result: WorkerResult): boolean {
-    const jobId = result.chunkId;
-    const currentFails = this.failedJobs.get(jobId);
-    const retryCount = (currentFails?.retries || 0) + 1;
-
-    if (retryCount >= this.MAX_RETRIES) {
-      // Max retries reached - permanently fail
-      const job = this.jobQueue.find((j) => j.id === jobId);
-      if (job) {
-        job.status = "COMPLETED"; // Mark as completed to remove from queue
-      }
-
-      this.failedJobs.set(jobId, {
-        error: result.error!,
-        retries: retryCount,
-      });
-      this.assignments.delete(jobId);
-
-      this.emit("jobFailed", result, retryCount);
-      return true;
-    }
-
-    // Retry - reset to pending
-    const job = this.jobQueue.find((j) => j.id === jobId);
-    if (job) {
-      job.status = "PENDING";
-      job.assignedTo = undefined;
-      job.assignedAt = undefined;
-    }
-
-    this.failedJobs.set(jobId, {
-      error: result.error!,
-      retries: retryCount,
-    });
-    this.assignments.delete(jobId);
-
-    this.emit("jobRetry", result, retryCount);
-    return false;
-  }
-
-  // Work Stealing - called when a device is idle but has no work
-  stealWork(
-    thiefId: string,
-    maxJobs: number = this.STEAL_BATCH_SIZE,
-  ): JobChunk[] {
-    // Find jobs assigned to busy devices that can be stolen
-    const stealable: JobChunk[] = [];
-
-    for (const [jobId, assignment] of this.assignments.entries()) {
-      if (
-        assignment.deviceId !== thiefId &&
-        Date.now() - assignment.assignedAt > 5000
-      ) {
-        // Only steal jobs assigned >5s ago
-        const job = this.jobQueue.find((j) => j.id === jobId);
-        if (job && job.status === "ASSIGNED") {
-          stealable.push(job);
-        }
-      }
-
-      if (stealable.length >= maxJobs) break;
-    }
-
-    // Reassign stolen jobs
-    stealable.forEach((job) => {
-      const oldDevice = this.assignments.get(job.id)?.deviceId;
-
-      job.assignedTo = thiefId;
-      job.assignedAt = Date.now();
-
-      this.assignments.set(job.id, {
-        jobId: job.id,
-        deviceId: thiefId,
-        assignedAt: job.assignedAt,
-        expiresAt: job.assignedAt + this.JOB_TIMEOUT,
-        retryCount: this.assignments.get(job.id)?.retryCount || 0,
-      });
-
-      this.emit("workStolen", job, oldDevice, thiefId);
-    });
-
-    return stealable;
-  }
-
-  // Check if a device should offer work to steal
-  shouldOfferWork(deviceId: string): boolean {
-    const deviceJobs = Array.from(this.assignments.values()).filter(
-      (a) => a.deviceId === deviceId,
-    ).length;
-
-    return deviceJobs >= this.STEAL_THRESHOLD;
-  }
-
-  getWorkForDevice(deviceId: string): JobChunk[] {
-    return this.jobQueue.filter(
-      (job) => job.assignedTo === deviceId && job.status === "ASSIGNED",
-    );
-  }
-
-  // Metrics
-  getMetrics(): QueueMetrics {
-    const now = Date.now();
-    const pending = this.jobQueue.filter((j) => j.status === "PENDING");
-    const assigned = this.jobQueue.filter((j) => j.status === "ASSIGNED");
-
-    const waitTimes = pending
-      .filter((j) => j.createdAt)
-      .map((j) => now - j.createdAt);
-
-    const jobsByType = this.jobQueue.reduce(
-      (acc, job) => {
-        acc[job.type] = (acc[job.type] || 0) + 1;
-        return acc;
-      },
-      {} as Record<JobType, number>,
-    );
-
-    return {
-      totalJobs: this.jobQueue.length,
-      pendingJobs: pending.length,
-      assignedJobs: assigned.length,
-      avgWaitTime:
-        waitTimes.length > 0
-          ? waitTimes.reduce((a, b) => a + b, 0) / waitTimes.length
-          : 0,
-      jobsByType,
-    };
-  }
-
-  getPendingCount(): number {
-    return this.jobQueue.filter((j) => j.status === "PENDING").length;
-  }
-
-  getAssignedCount(): number {
-    return this.assignments.size;
-  }
-
-  getFailedCount(): number {
-    return this.failedJobs.size;
-  }
-
-  // Reaper - handles timeouts and cleanup
-  private startReaper(): void {
-    setInterval(() => {
-      const now = Date.now();
-
-      // Check for timed out assignments
-      for (const [jobId, assignment] of this.assignments.entries()) {
-        if (now > assignment.expiresAt) {
-          console.log(`[Scheduler] Job ${jobId} timed out, retrying...`);
-
-          const job = this.jobQueue.find((j) => j.id === jobId);
-          if (job) {
-            job.status = "PENDING";
-            job.assignedTo = undefined;
-            job.assignedAt = undefined;
-          }
-
-          this.assignments.delete(jobId);
-          this.emit("jobTimeout", jobId);
-        }
-      }
-    }, 5000); // Check every 5 seconds
-  }
-
-  private cleanupCompletedJobs(): void {
-    // Keep only last 1000 completed jobs to prevent memory bloat
-    if (this.completedJobs.size > 1000) {
-      const toDelete = Array.from(this.completedJobs).slice(
-        0,
-        this.completedJobs.size - 1000,
-      );
-      toDelete.forEach((id) => {
-        this.completedJobs.delete(id);
-        const index = this.jobQueue.findIndex((j) => j.id === id);
-        if (index !== -1) {
-          this.jobQueue.splice(index, 1);
-        }
-      });
-    }
-  }
-
-  // Emergency flush - clear all pending jobs
-  flush(): JobChunk[] {
-    const pending = this.jobQueue.filter((j) => j.status === "PENDING");
-    pending.forEach((job) => {
-      job.status = "COMPLETED";
-      this.emit("jobFlushed", job);
-    });
-    return pending;
-  }
-
-  dispose(): void {
-    this.jobQueue = [];
-    this.assignments.clear();
-    this.completedJobs.clear();
-    this.failedJobs.clear();
-    this.removeAllListeners();
-  }
-}
-```
-
-## File: shared/types.ts
-```typescript
-export type ChunkStatus = "PENDING" | "ASSIGNED" | "COMPLETED";
-export type DeviceType = "DESKTOP" | "MOBILE" | "COLAB" | "SERVER" | "TABLET";
-export type DeviceStatus = "ONLINE" | "OFFLINE" | "BUSY" | "ERROR";
-
-export type JobErrorType =
-  | "OOM_PREVENTED"
-  | "CPU_SATURATED"
-  | "EXECUTION_ERROR"
-  | "DEVICE_DISCONNECTED"
-  | "TIMEOUT";
-
-export type JobType = "MATH_STRESS" | "MAT_MUL" | "TEXT_TOKENIZE" | "CUSTOM";
-
-export interface JobChunk {
-  id: string;
-  type: JobType;
-  data: any;
-  script?: string;
-  status: ChunkStatus;
-  priority?: number;
-  assignedTo?: string;
-  assignedAt?: number;
-  createdAt: number;
-}
-
-export interface WorkerResult {
-  chunkId: string;
-  workerId: string;
-  deviceId?: string;
-  result?: any;
-  error?: JobErrorType;
-  details?: string;
-  durationMs?: number;
-  timestamp: number;
-}
-
-export interface WorkerPayload {
-  chunk: JobChunk;
-  workerId: string;
-}
-
-// Enhanced Device Types for Multi-Device Swarm
-export interface DeviceCapabilities {
-  cpuCores: number;
-  memoryGB: number;
-  gpuAvailable: boolean;
-  gpuType?: string;
-  maxConcurrency: number;
-  supportedJobs: JobType[];
-}
-
-export interface DeviceInfo {
-  id: string;
-  socketId: string;
-  name: string;
-  type: DeviceType;
-  status: DeviceStatus;
-  capabilities: DeviceCapabilities;
-
-  // Performance Metrics
-  opsScore: number;
-  currentLoad: number;
-  totalJobsCompleted: number;
-  avgJobDuration: number;
-
-  // Connection Info
-  ip?: string;
-  region?: string;
-  connectedAt: number;
-  lastHeartbeat: number;
-
-  // Throttling
-  throttleLevel: number;
-  isThrottled: boolean;
-}
-
-export interface SwarmStats {
-  totalDevices: number;
-  onlineDevices: number;
-  busyDevices: number;
-  totalCores: number;
-  totalMemoryGB: number;
-
-  // Job Stats
-  pendingJobs: number;
-  activeJobs: number;
-  completedJobs: number;
-  failedJobs: number;
-
-  // Performance
-  globalVelocity: number;
-  avgLatency: number;
-
-  // By Device Type
-  devicesByType: Record<DeviceType, number>;
-}
-
-export interface JoinCode {
-  code: string;
-  expiresAt: number;
-  maxUses: number;
-  usedCount: number;
-  createdBy: string;
-  metadata?: {
-    description?: string;
-    tags?: string[];
-  };
-}
-
-export interface WorkStealRequest {
-  thiefId: string;
-  victimId: string;
-  requestedJobs: number;
-}
-
-export interface DeviceHealth {
-  deviceId: string;
-  timestamp: number;
-  cpuUsage: number;
-  memoryUsage: number;
-  temperature?: number;
-  networkLatency: number;
-  isHealthy: boolean;
-}
-
-// Events
-export type SwarmEvent =
-  | { type: "DEVICE_JOINED"; device: DeviceInfo }
-  | { type: "DEVICE_LEFT"; deviceId: string }
-  | { type: "DEVICE_STATUS_CHANGED"; deviceId: string; status: DeviceStatus }
-  | { type: "JOB_ASSIGNED"; jobId: string; deviceId: string }
-  | { type: "JOB_COMPLETED"; result: WorkerResult }
-  | { type: "JOB_FAILED"; jobId: string; error: JobErrorType }
-  | { type: "WORK_STOLEN"; from: string; to: string; count: number }
-  | { type: "HEARTBEAT"; deviceId: string; health: DeviceHealth };
-```
-
 ## File: client/src/App.tsx
 ```typescript
 import { useState, useEffect, useCallback } from "react";
@@ -3618,6 +3710,7 @@ import { ThemeToggle } from "./components/ui/ThemeToggle";
 import { SwarmDashboard } from "./components/dashboard/SwarmDashboard";
 import type { DeviceInfo, SwarmStats } from "../../shared/types";
 import { SwarmControls } from "./components/dashboard/SwarmControls";
+import { usePersistentIdentity } from "./hooks/usePersistentIdentity";
 
 function App() {
   const [showQR, setShowQR] = useState(false);
@@ -3645,7 +3738,7 @@ function App() {
       TABLET: 0,
     },
   });
-  const [joinCode, setJoinCode] = useState("LOADING...");
+
   // 1. Create a stable log function
   const addLog = useCallback((msg: string) => {
     setLogs((prev) => [...prev.slice(-19), `> ${msg}`]); // Keep last 20
@@ -3662,11 +3755,19 @@ function App() {
     isRunning,
     startSwarm,
     pauseSwarm,
+    joinCode,
     stopSwarm,
+    toggleDevice,
   } = useComputeSwarm(addLog);
   // Listen for swarm updates
+  const persistentIdentity = usePersistentIdentity();
+  // Find "My" Device Status from the devices list
+  const myDevice = devices.find((d) => d.id === persistentIdentity.id);
+  const amIEnabled = myDevice?.isEnabled !== false; // Default to true
+
   useEffect(() => {
     if (!socket) return;
+    const serverUrl = `${window.location.protocol}//${window.location.hostname}:3000`; // Use hostname for local network support
     // 1. Fetch the initial list of connected devices via REST
     const fetchDevices = () => {
       fetch(`${serverUrl}/api/devices`)
@@ -3680,11 +3781,19 @@ function App() {
     // 4. Polling Fallback (Refresh every 5 seconds)
     // This guarantees the list fixes itself even if an event is missed
     const interval = setInterval(fetchDevices, 5000);
+    socket.on("connect", () => {
+      // Request code immediately upon successful connection
+      socket.emit("REQUEST_JOIN_CODE");
+    });
 
+    if (socket.connected) {
+      socket.emit("REQUEST_JOIN_CODE");
+    }
     // 5. Real-time Listeners
     socket.on("DEVICE_JOINED", fetchDevices); // Just re-fetch to be safe
     socket.on("DEVICE_LEFT", fetchDevices);
     socket.on("CURRENT_DEVICES", (data) => setDevices(data));
+    socket.on("DEVICE_UPDATED", fetchDevices);
     // 2. Fetch initial stats
     fetch(`${serverUrl}/api/stats`)
       .then((res) => res.json())
@@ -3694,11 +3803,6 @@ function App() {
       .catch((err) => console.error("Failed to fetch stats:", err));
 
     // Request initial join code
-    socket.emit("REQUEST_JOIN_CODE");
-
-    socket.on("JOIN_CODE", (data: { code: string }) => {
-      setJoinCode(data.code);
-    });
 
     socket.on("SWARM_STATS", (stats: SwarmStats) => {
       setSwarmStats(stats);
@@ -3740,16 +3844,16 @@ function App() {
     });
 
     return () => {
-      socket.off("JOIN_CODE");
       socket.off("SWARM_STATS");
       clearInterval(interval);
       socket.off("DEVICE_JOINED");
       socket.off("DEVICE_LEFT");
       socket.off("CURRENT_DEVICES");
+      socket.off("DEVICE_UPDATED");
     };
   }, [socket]);
 
-  const serverUrl = `${window.location.protocol}//${window.location.host}`;
+  const serverUrl = `${window.location.protocol}//${window.location.hostname}:3000`;
 
   return (
     <div className="min-h-screen relative bg-grain p-6 md:p-12 transition-colors duration-500">
@@ -3825,13 +3929,17 @@ function App() {
         <ThrottleControl
           throttle={throttle}
           setThrottle={(val) => updateThrottle(val)} // Wiring fixed
-          updateThrottle={() => {}} // Deprecated prop, can remove from component
           activeThreads={activeThreads}
+          isSystemEnabled={amIEnabled}
         />
         <LiveTerminal logs={logs} status={status} />
 
         {/* Swarm Overview */}
-        <SwarmDashboard devices={devices} stats={swarmStats} />
+        <SwarmDashboard
+          devices={devices}
+          stats={swarmStats}
+          onToggleDevice={toggleDevice}
+        />
 
         {/* Logs */}
       </div>
@@ -3872,37 +3980,26 @@ app.use(express.json());
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: "*", methods: ["GET", "POST"] },
-  transports: ["websocket", "polling"], // Support both for mobile/Colab compatibility
+  transports: ["websocket", "polling"],
 });
 
-// Initialize Swarm Coordinator
 const swarm = new SwarmCoordinator(io, {
   enableWorkStealing: true,
   enableHealthChecks: true,
   autoRebalance: true,
 });
 
-// Generate initial join code
 const initialJoinCode = swarm.generateJoinCode({
   maxUses: 1000,
-  metadata: {
-    description: "Default swarm join code",
-    tags: ["general"],
-  },
+  metadata: { description: "Default swarm join code" },
 });
 console.log(`[Server] Initial join code: ${initialJoinCode}`);
 
 // REST API Endpoints
 
 // Get swarm statistics
-app.get("/api/stats", (req, res) => {
-  res.json(swarm.getStats());
-});
-
-// Get all connected devices
-app.get("/api/devices", (req, res) => {
-  res.json(swarm.getDevices());
-});
+app.get("/api/stats", (_, res) => res.json(swarm.getStats()));
+app.get("/api/devices", (_, res) => res.json(swarm.getDevices()));
 
 // Generate new join code
 app.post("/api/join-codes", (req, res) => {
@@ -3944,7 +4041,7 @@ app.post("/api/jobs", (req, res) => {
 });
 
 // Get job queue status
-app.get("/api/jobs/status", (req, res) => {
+app.get("/api/jobs/status", (_, res) => {
   // Access scheduler metrics through coordinator
   const stats = swarm.getStats();
   res.json({
@@ -3962,21 +4059,17 @@ io.on("connection", (socket) => {
   let deviceId: string | null = null;
 
   // Send join code on request
-  socket.on("REQUEST_JOIN_CODE", () => {
-    socket.emit("JOIN_CODE", { code: initialJoinCode });
-  });
-
-  // Device Registration
   socket.on(
     "REGISTER_DEVICE",
     (data: {
+      id: string; // <--- ADDED THIS
       name?: string;
       type?: DeviceType;
       capabilities?: DeviceCapabilities;
       opsScore?: number;
       joinCode?: string;
     }) => {
-      // Validate join code if provided
+      // Join Code Validation
       if (data.joinCode) {
         const validation = swarm.validateJoinCode(data.joinCode);
         if (!validation.valid) {
@@ -3986,8 +4079,9 @@ io.on("connection", (socket) => {
         swarm.useJoinCode(data.joinCode);
       }
 
-      // Register device
+      // 2. FIX: Pass the ID to the coordinator
       const device = swarm.registerDevice(socket.id, {
+        id: data.id, // <--- CRITICAL FIX: Pass persistent ID
         name: data.name,
         type: data.type || "DESKTOP",
         capabilities: data.capabilities,
@@ -4000,10 +4094,9 @@ io.on("connection", (socket) => {
         deviceId: device.id,
         swarmStats: swarm.getStats(),
       });
-      socket.emit("CURRENT_DEVICES", swarm.getDevices());
-      console.log(
-        `[Socket] Device registered: ${device.name} (${device.type})`,
-      );
+
+      // Broadcast to everyone so dashboards update immediately
+      io.emit("CURRENT_DEVICES", swarm.getDevices());
     },
   );
 
@@ -4063,6 +4156,22 @@ io.on("connection", (socket) => {
     const jobs = swarm.offerWork(deviceId);
     if (jobs.length > 0) {
       socket.emit("WORK_OFFLOADED", jobs);
+    }
+  });
+  // NEW: Handle Device Toggling
+  socket.on("TOGGLE_DEVICE", (data: { deviceId: string; enabled: boolean }) => {
+    const device = swarm.getDevice(data.deviceId);
+    if (device) {
+      // @ts-ignore - Accessing registry directly for speed, or add method to SwarmCoordinator
+      swarm["registry"].toggleDevice(data.deviceId, data.enabled);
+
+      // Broadcast update to everyone immediately
+      io.emit("DEVICE_UPDATED", device);
+      io.emit("CURRENT_DEVICES", swarm.getDevices()); // Refresh lists
+
+      console.log(
+        `[Swarm] Device ${device.name} ${data.enabled ? "ENABLED" : "DISABLED"}`,
+      );
     }
   });
 
@@ -4200,12 +4309,12 @@ setInterval(() => {
 
 // Start server
 try {
-  const PORT = process.env.PORT || 3000;
-  httpServer.listen(PORT, () => {
+  const PORT = Number(process.env.PORT) || 3000;
+
+  // CHANGE: Added "0.0.0.0" as the second argument
+  httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`[Server] Ostrich Swarm Coordinator running on port: ${PORT}`);
-    console.log(
-      `[Server] Join URL: http://localhost:${PORT}/join/${initialJoinCode}`,
-    );
+    console.log(`[Server] Local: http://localhost:${PORT}`);
   });
 } catch (e) {
   console.error("[Server] Failed to start:", e);

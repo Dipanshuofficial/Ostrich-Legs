@@ -1,7 +1,7 @@
 import { Cpu, RotateCw } from "lucide-react";
 import { Card } from "../ui/Card";
 import { Badge } from "../ui/Badge";
-import { useComputeSwarm } from "../../hooks/useComputeSwarm";
+// import { useComputeSwarm } from "../../hooks/useComputeSwarm";
 
 // Add className prop to allow parent to control dimensions
 export function DeviceHealth({
@@ -9,14 +9,14 @@ export function DeviceHealth({
   opsScore,
   workerId,
   className = "",
+  onRunBenchmark,
 }: {
   status: string;
   opsScore: number;
   workerId: string;
   className?: string;
+  onRunBenchmark: () => void;
 }) {
-  const { runBenchmark } = useComputeSwarm();
-
   return (
     // Changed: Removed "h-75" and "md:col-span-4". Added {className}.
     <Card className={`flex flex-col justify-between ${className}`}>
@@ -47,7 +47,7 @@ export function DeviceHealth({
           </div>
 
           <button
-            onClick={runBenchmark}
+            onClick={onRunBenchmark} // <--- USE THE PROP
             className={`p-2 rounded-full hover:bg-indigo-500/10 transition-colors ${opsScore === 0 ? "animate-pulse text-indigo-500" : "text-arc-muted opacity-0 group-hover:opacity-100"}`}
             title="Re-run Benchmark"
           >

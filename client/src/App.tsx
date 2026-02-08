@@ -12,6 +12,7 @@ import { ThemeToggle } from "./components/ui/ThemeToggle";
 import { SwarmDashboard } from "./components/dashboard/SwarmDashboard";
 import type { DeviceInfo, SwarmStats } from "../../shared/types";
 import { SwarmControls } from "./components/dashboard/SwarmControls";
+import { usePersistentIdentity } from "./hooks/usePersistentIdentity";
 
 function App() {
   const [showQR, setShowQR] = useState(false);
@@ -39,11 +40,22 @@ function App() {
       TABLET: 0,
     },
   });
-  const [joinCode, setJoinCode] = useState("LOADING...");
+
   // 1. Create a stable log function
   const addLog = useCallback((msg: string) => {
-    setLogs((prev) => [...prev.slice(-19), `> ${msg}`]); // Keep last 20
+    setLogs((prev) => {
+      // Prevent processing if logs are already flooded within the same render cycle
+      if (prev.length > 50) return prev.slice(-20);
+      return [...prev.slice(-19), `> ${msg}`];
+    });
   }, []);
+
+  // 2. Identify Myself
+  const persistentIdentity = usePersistentIdentity();
+  const myDevice = devices.find((d) => d.id === persistentIdentity.id);
+  const amIEnabled = myDevice?.isEnabled !== false; // Default true if not found yet
+
+  // 3. Pass amIEnabled to the hook
   const {
     status,
     completedCount,
@@ -56,11 +68,14 @@ function App() {
     isRunning,
     startSwarm,
     pauseSwarm,
+    joinCode,
     stopSwarm,
-  } = useComputeSwarm(addLog);
-  // Listen for swarm updates
+    toggleDevice,
+    runBenchmark, // New export
+  } = useComputeSwarm(addLog, amIEnabled); // <--- PASS HERE
   useEffect(() => {
     if (!socket) return;
+    const serverUrl = `${window.location.protocol}//${window.location.hostname}:3000`; // Use hostname for local network support
     // 1. Fetch the initial list of connected devices via REST
     const fetchDevices = () => {
       fetch(`${serverUrl}/api/devices`)
@@ -74,11 +89,19 @@ function App() {
     // 4. Polling Fallback (Refresh every 5 seconds)
     // This guarantees the list fixes itself even if an event is missed
     const interval = setInterval(fetchDevices, 5000);
+    socket.on("connect", () => {
+      // Request code immediately upon successful connection
+      socket.emit("REQUEST_JOIN_CODE");
+    });
 
+    if (socket.connected) {
+      socket.emit("REQUEST_JOIN_CODE");
+    }
     // 5. Real-time Listeners
     socket.on("DEVICE_JOINED", fetchDevices); // Just re-fetch to be safe
     socket.on("DEVICE_LEFT", fetchDevices);
     socket.on("CURRENT_DEVICES", (data) => setDevices(data));
+    socket.on("DEVICE_UPDATED", fetchDevices);
     // 2. Fetch initial stats
     fetch(`${serverUrl}/api/stats`)
       .then((res) => res.json())
@@ -88,11 +111,6 @@ function App() {
       .catch((err) => console.error("Failed to fetch stats:", err));
 
     // Request initial join code
-    socket.emit("REQUEST_JOIN_CODE");
-
-    socket.on("JOIN_CODE", (data: { code: string }) => {
-      setJoinCode(data.code);
-    });
 
     socket.on("SWARM_STATS", (stats: SwarmStats) => {
       setSwarmStats(stats);
@@ -134,16 +152,16 @@ function App() {
     });
 
     return () => {
-      socket.off("JOIN_CODE");
       socket.off("SWARM_STATS");
       clearInterval(interval);
       socket.off("DEVICE_JOINED");
       socket.off("DEVICE_LEFT");
       socket.off("CURRENT_DEVICES");
+      socket.off("DEVICE_UPDATED");
     };
   }, [socket]);
 
-  const serverUrl = `${window.location.protocol}//${window.location.host}`;
+  const serverUrl = `${window.location.protocol}//${window.location.hostname}:3000`;
 
   return (
     <div className="min-h-screen relative bg-grain p-6 md:p-12 transition-colors duration-500">
@@ -204,6 +222,7 @@ function App() {
             status={status}
             opsScore={opsScore}
             workerId={workerId}
+            onRunBenchmark={runBenchmark}
           />
           {/* 2. The Vertical Controls Strip */}
           <SwarmControls
@@ -218,14 +237,19 @@ function App() {
         {/* Control Row */}
         <ThrottleControl
           throttle={throttle}
-          setThrottle={(val) => updateThrottle(val)} // Wiring fixed
-          updateThrottle={() => {}} // Deprecated prop, can remove from component
+          setThrottle={updateThrottle} // Wiring fixed
           activeThreads={activeThreads}
+          isSystemEnabled={amIEnabled}
+          onToggleSystem={(enabled: boolean) => toggleDevice(persistentIdentity.id, enabled)}
         />
         <LiveTerminal logs={logs} status={status} />
 
         {/* Swarm Overview */}
-        <SwarmDashboard devices={devices} stats={swarmStats} />
+        <SwarmDashboard
+          devices={devices}
+          stats={swarmStats}
+          onToggleDevice={toggleDevice}
+        />
 
         {/* Logs */}
       </div>

@@ -83,7 +83,7 @@ export class SwarmCoordinator extends EventEmitter {
         memoryGB: 4,
         gpuAvailable: false,
         maxConcurrency: 2,
-        supportedJobs: [],
+        supportedJobs: ["MAT_MUL", "MATH_STRESS"],
       },
       opsScore: deviceInfo.opsScore || 0,
       currentLoad: 0,
@@ -315,15 +315,16 @@ export class SwarmCoordinator extends EventEmitter {
     if (pendingCount === 0) return;
 
     const available = this.registry.getAvailable();
+    console.log(`[Swarm] Job assignment: ${pendingCount} pending, ${available.length} available devices`);
 
     for (const device of available) {
       const capacity = device.capabilities.maxConcurrency - device.currentLoad;
       if (capacity <= 0) continue;
 
-      // Request batch of jobs based on capacity
+      // OVERPROVISIONING: Request 3x capacity for better pipeline utilization
       const jobs = this.scheduler.getBatch(
         device.id,
-        capacity,
+        capacity * 3,
         device.capabilities.supportedJobs,
       );
 
@@ -335,6 +336,9 @@ export class SwarmCoordinator extends EventEmitter {
         const socket = this.io.sockets.sockets.get(device.socketId);
         if (socket) {
           socket.emit("BATCH_DISPATCH", jobs);
+          console.log(`[Swarm] Sent ${jobs.length} jobs to ${device.name} (${device.id.slice(0, 4)})`);
+        } else {
+          console.log(`[Swarm] WARNING: Socket not found for device ${device.name} (${device.id.slice(0, 4)})`);
         }
       }
     }

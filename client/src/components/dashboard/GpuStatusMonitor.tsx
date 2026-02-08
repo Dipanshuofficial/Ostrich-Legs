@@ -1,6 +1,12 @@
 import { useEffect, useRef } from "react";
 import { Card } from "../ui/Card";
 
+interface DataPoint {
+  value: number;
+  throttle: number;
+  timestamp: number;
+}
+
 interface GpuStatusMonitorProps {
   completedCount: number;
   throttle: number;
@@ -13,22 +19,32 @@ export function GpuStatusMonitor({
   currentThrottle,
 }: GpuStatusMonitorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const dataRef = useRef<number[]>(new Array(30).fill(0));
+  const dataRef = useRef<DataPoint[]>([]);
   const countRef = useRef(completedCount);
   const prevCountRef = useRef(completedCount);
   const lastUpdateRef = useRef<number>(0);
   const animationFrameRef = useRef<number>(0);
+  const throttleRef = useRef(throttle);
+
+  // Keep throttle ref in sync without re-triggering canvas setup
+  useEffect(() => {
+    throttleRef.current = throttle;
+  }, [throttle]);
 
   // Update count ref without triggering re-renders
   useEffect(() => {
     countRef.current = completedCount;
   }, [completedCount]);
 
-  // GPU-accelerated canvas rendering
+  // GPU-accelerated canvas rendering with priority scheduling
   useEffect(() => {
-    // Initialize on first render
-    if (lastUpdateRef.current === 0) {
-      lastUpdateRef.current = Date.now();
+    // Initialize data array once
+    if (dataRef.current.length === 0) {
+      dataRef.current = new Array(60).fill(null).map(() => ({ 
+        value: 0, 
+        throttle: 50, 
+        timestamp: Date.now() 
+      }));
     }
 
     const canvas = canvasRef.current;
@@ -44,31 +60,36 @@ export function GpuStatusMonitor({
     canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
 
-    const draw = () => {
+    // Data update loop - runs every 200ms for smoother updates
+    const dataInterval = setInterval(() => {
       const now = Date.now();
+      const delta = countRef.current - prevCountRef.current;
+      prevCountRef.current = countRef.current;
+
+      // Shift data and add new point with current throttle
+      dataRef.current.shift();
+      dataRef.current.push({
+        value: delta * 5, // Multiply by 5 to get per-second rate (200ms * 5 = 1000ms)
+        throttle: throttleRef.current,
+        timestamp: now,
+      });
+
+      lastUpdateRef.current = now;
+    }, 200); // Update 5 times per second
+
+    // Render loop - uses requestAnimationFrame for smooth GPU rendering
+    const draw = () => {
       const width = rect.width;
       const height = rect.height;
-
-      // Update data every 1 second (not every frame)
-      if (now - lastUpdateRef.current > 1000) {
-        // Calculate actual delta since last update
-        const delta = countRef.current - prevCountRef.current;
-        prevCountRef.current = countRef.current;
-
-        // Shift data and add new point
-        dataRef.current.shift();
-        dataRef.current.push(delta);
-
-        lastUpdateRef.current = now;
-      }
 
       // Clear canvas
       ctx.clearRect(0, 0, width, height);
 
-      // Calculate current velocity (average of last 3 points)
-      const recentData = dataRef.current.slice(-3);
-      const currentVelocity =
-        recentData.reduce((a, b) => a + b, 0) / recentData.length;
+      // Calculate current velocity (average of last 5 points = last second)
+      const recentData = dataRef.current.slice(-5);
+      const currentVelocity = recentData.length > 0
+        ? recentData.reduce((a, b) => a + b.value, 0) / recentData.length
+        : 0;
 
       // Draw grid lines (subtle)
       ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
@@ -81,64 +102,59 @@ export function GpuStatusMonitor({
         ctx.stroke();
       }
 
-      // Get color based on throttle
+      // Find max value for scaling (with minimum of 10)
+      const maxVal = Math.max(...dataRef.current.map(d => d.value), 10);
+
+      // Get color based on throttle level
       const getColor = (level: number) => {
         if (level <= 30) return [16, 185, 129]; // Emerald
         if (level >= 80) return [244, 63, 94]; // Rose
         return [99, 102, 241]; // Indigo
       };
 
-      const [r, g, b] = getColor(throttle);
+      // Draw area under the curve with segmented colors
+      const data = dataRef.current;
+      
+      // Draw each segment with its own color based on throttle at that point
+      for (let i = 0; i < data.length - 1; i++) {
+        const [r, g, b] = getColor(data[i].throttle);
+        
+        const x1 = (i / (data.length - 1)) * width;
+        const x2 = ((i + 1) / (data.length - 1)) * width;
+        const y1 = height - (data[i].value / maxVal) * (height * 0.8);
+        const y2 = height - (data[i + 1].value / maxVal) * (height * 0.8);
 
-      // Find max value for scaling
-      const maxVal = Math.max(...dataRef.current, 10);
+        // Create gradient for this segment
+        const gradient = ctx.createLinearGradient(x1, y1, x1, height);
+        gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.3)`);
+        gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
 
-      // Draw area under the curve
-      ctx.beginPath();
-      ctx.moveTo(0, height);
+        ctx.beginPath();
+        ctx.moveTo(x1, height);
+        ctx.lineTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.lineTo(x2, height);
+        ctx.closePath();
+        ctx.fillStyle = gradient;
+        ctx.fill();
+      }
 
-      dataRef.current.forEach((val, i) => {
-        const x = (i / (dataRef.current.length - 1)) * width;
-        const y = height - (val / maxVal) * (height * 0.8);
+      // Draw line segments with individual colors
+      for (let i = 0; i < data.length - 1; i++) {
+        const [r, g, b] = getColor(data[i].throttle);
+        
+        const x1 = (i / (data.length - 1)) * width;
+        const x2 = ((i + 1) / (data.length - 1)) * width;
+        const y1 = height - (data[i].value / maxVal) * (height * 0.8);
+        const y2 = height - (data[i + 1].value / maxVal) * (height * 0.8);
 
-        if (i === 0) {
-          ctx.lineTo(x, y);
-        } else {
-          // Bezier curve for smoothness
-          const prevX = ((i - 1) / (dataRef.current.length - 1)) * width;
-          const prevY =
-            height - (dataRef.current[i - 1] / maxVal) * (height * 0.8);
-          const cpX = (prevX + x) / 2;
-          ctx.quadraticCurveTo(prevX, prevY, cpX, (prevY + y) / 2);
-        }
-      });
-
-      ctx.lineTo(width, height);
-      ctx.closePath();
-
-      // Gradient fill
-      const gradient = ctx.createLinearGradient(0, 0, 0, height);
-      gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.3)`);
-      gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-      ctx.fillStyle = gradient;
-      ctx.fill();
-
-      // Draw line
-      ctx.beginPath();
-      dataRef.current.forEach((val, i) => {
-        const x = (i / (dataRef.current.length - 1)) * width;
-        const y = height - (val / maxVal) * (height * 0.8);
-
-        if (i === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      });
-
-      ctx.strokeStyle = `rgb(${r}, ${g}, ${b})`;
-      ctx.lineWidth = 2;
-      ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = `rgb(${r}, ${g}, ${b})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
 
       // Draw current value text on canvas
       ctx.font = "bold 48px Inter, sans-serif";
@@ -157,11 +173,12 @@ export function GpuStatusMonitor({
     draw();
 
     return () => {
+      clearInterval(dataInterval);
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [throttle]);
+  }, []); // Empty deps - setup once
 
   const getColor = (level: number) => {
     if (level <= 30) return "#10b981";
@@ -175,7 +192,6 @@ export function GpuStatusMonitor({
     <Card
       className="md:col-span-8 h-90 flex flex-col justify-between gpu-isolated"
       noPadding
-      // style={{ contain: "paint layout" } as React.CSSProperties}
     >
       <div className="p-8 pb-0 z-20">
         <div className="flex items-center gap-3 mb-2">
