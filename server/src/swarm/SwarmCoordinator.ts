@@ -46,20 +46,44 @@ export class SwarmCoordinator extends EventEmitter {
     socketId: string,
     deviceInfo: Partial<DeviceInfo>,
   ): DeviceInfo {
-    const device: DeviceInfo = {
-      id: deviceInfo.id || this.generateDeviceId(),
+    // 1. CRITICAL FIX: Check for existing device by Persistent ID first
+    // The client sends 'id' which is the persistent localStorage ID.
+    let device = deviceInfo.id ? this.registry.get(deviceInfo.id) : undefined;
+
+    if (device) {
+      // 2. RECONNECT: Update existing device record
+      console.log(`[Swarm] Device reconnected: ${device.name} (${device.id})`);
+
+      // Update the socket mapping in registry
+      // We need to access the private map or add a method in DeviceRegistry
+      // For now, assuming we can update the device object directly:
+      device.socketId = socketId;
+      device.status = "ONLINE";
+      device.lastHeartbeat = Date.now();
+
+      // Update registry internal mappings (You might need to add a method to DeviceRegistry for this)
+      this.registry["socketToDevice"].set(socketId, device.id);
+
+      // Do NOT emit "deviceJoined" for reconnects to prevent log spam
+      this.emit("deviceReconnect", device);
+      return device;
+    }
+
+    // 3. NEW REGISTRATION: Only if no ID found
+    const newId = deviceInfo.id || this.generateDeviceId();
+
+    device = {
+      id: newId,
       socketId,
-      name:
-        deviceInfo.name ||
-        `Device-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+      name: deviceInfo.name || `Device-${newId.slice(0, 4)}`,
       type: deviceInfo.type || "DESKTOP",
       status: "ONLINE",
       capabilities: deviceInfo.capabilities || {
-        cpuCores: navigator.hardwareConcurrency || 2,
+        cpuCores: 2,
         memoryGB: 4,
         gpuAvailable: false,
-        maxConcurrency: navigator.hardwareConcurrency || 2,
-        supportedJobs: ["MATH_STRESS", "MAT_MUL"],
+        maxConcurrency: 2,
+        supportedJobs: [],
       },
       opsScore: deviceInfo.opsScore || 0,
       currentLoad: 0,
@@ -69,14 +93,10 @@ export class SwarmCoordinator extends EventEmitter {
       lastHeartbeat: Date.now(),
       throttleLevel: 1.0,
       isThrottled: false,
-      ...deviceInfo,
     };
 
     this.registry.register(device);
-    console.log(
-      `[Swarm] Device registered: ${device.name} (${device.type}) - ${device.capabilities.cpuCores} cores`,
-    );
-
+    console.log(`[Swarm] New Device joined: ${device.name}`);
     this.emit("deviceJoined", device);
     this.broadcastStats();
 

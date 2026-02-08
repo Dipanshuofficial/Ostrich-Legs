@@ -128,7 +128,7 @@ body {
   }
 
   .arc-card {
-    @apply bg-arc-card border border-arc-border backdrop-blur-xl rounded-[24px] transition-all duration-400 ease-[cubic-bezier(0.2,0.8,0.2,1)];
+    @apply bg-arc-card border border-arc-border backdrop-blur-xl rounded-3xl transition-all duration-400 ease-[cubic-bezier(0.2,0.8,0.2,1)];
   }
 
   /* Shadow logic for Light Mode */

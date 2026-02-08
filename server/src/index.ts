@@ -20,37 +20,26 @@ app.use(express.json());
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: "*", methods: ["GET", "POST"] },
-  transports: ["websocket", "polling"], // Support both for mobile/Colab compatibility
+  transports: ["websocket", "polling"],
 });
 
-// Initialize Swarm Coordinator
 const swarm = new SwarmCoordinator(io, {
   enableWorkStealing: true,
   enableHealthChecks: true,
   autoRebalance: true,
 });
 
-// Generate initial join code
 const initialJoinCode = swarm.generateJoinCode({
   maxUses: 1000,
-  metadata: {
-    description: "Default swarm join code",
-    tags: ["general"],
-  },
+  metadata: { description: "Default swarm join code" },
 });
 console.log(`[Server] Initial join code: ${initialJoinCode}`);
 
 // REST API Endpoints
 
 // Get swarm statistics
-app.get("/api/stats", (req, res) => {
-  res.json(swarm.getStats());
-});
-
-// Get all connected devices
-app.get("/api/devices", (req, res) => {
-  res.json(swarm.getDevices());
-});
+app.get("/api/stats", (_, res) => res.json(swarm.getStats()));
+app.get("/api/devices", (_, res) => res.json(swarm.getDevices()));
 
 // Generate new join code
 app.post("/api/join-codes", (req, res) => {
@@ -92,7 +81,7 @@ app.post("/api/jobs", (req, res) => {
 });
 
 // Get job queue status
-app.get("/api/jobs/status", (req, res) => {
+app.get("/api/jobs/status", (_, res) => {
   // Access scheduler metrics through coordinator
   const stats = swarm.getStats();
   res.json({
@@ -110,21 +99,17 @@ io.on("connection", (socket) => {
   let deviceId: string | null = null;
 
   // Send join code on request
-  socket.on("REQUEST_JOIN_CODE", () => {
-    socket.emit("JOIN_CODE", { code: initialJoinCode });
-  });
-
-  // Device Registration
   socket.on(
     "REGISTER_DEVICE",
     (data: {
+      id: string; // <--- ADDED THIS
       name?: string;
       type?: DeviceType;
       capabilities?: DeviceCapabilities;
       opsScore?: number;
       joinCode?: string;
     }) => {
-      // Validate join code if provided
+      // Join Code Validation
       if (data.joinCode) {
         const validation = swarm.validateJoinCode(data.joinCode);
         if (!validation.valid) {
@@ -134,8 +119,9 @@ io.on("connection", (socket) => {
         swarm.useJoinCode(data.joinCode);
       }
 
-      // Register device
+      // 2. FIX: Pass the ID to the coordinator
       const device = swarm.registerDevice(socket.id, {
+        id: data.id, // <--- CRITICAL FIX: Pass persistent ID
         name: data.name,
         type: data.type || "DESKTOP",
         capabilities: data.capabilities,
@@ -149,9 +135,8 @@ io.on("connection", (socket) => {
         swarmStats: swarm.getStats(),
       });
 
-      console.log(
-        `[Socket] Device registered: ${device.name} (${device.type})`,
-      );
+      // Broadcast to everyone so dashboards update immediately
+      io.emit("CURRENT_DEVICES", swarm.getDevices());
     },
   );
 

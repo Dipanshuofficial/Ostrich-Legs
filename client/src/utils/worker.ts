@@ -1,12 +1,14 @@
 /// <reference lib="webworker" />
 
-// Limits
+// --- CONFIGURATION & LIMITS ---
 const LOGICAL_CORES = navigator.hardwareConcurrency || 4;
+// RAM Limit Estimate (Performance.memory is not standard, so we estimate)
 const TOTAL_RAM_BYTES = (navigator as any).deviceMemory
   ? (navigator as any).deviceMemory * 1e9
-  : 4e9;
+  : 8e9; // Default to 8GB if unknown
 
-// State - Use Map for better tracking
+// --- STATE MANAGEMENT ---
+// Map stores: Worker ID -> { Worker Instance, Busy Status, Current Chunk ID }
 const threadPool = new Map<
   number,
   {
@@ -17,20 +19,26 @@ const threadPool = new Map<
 >();
 
 let currentRamUsage = 0;
-let throttleLimit = 0.3; // Default 30%
+let throttleLimit = 0.3; // Default start at 30%
 let nextWorkerId = 0;
 
-// --- KERNEL 1: Math Stress (Legacy) ---
+// --- KERNEL 1: Math Stress (CPU Intense) ---
+// Performs heavy floating point calculations
 const runStressTest = (iterations: number) => {
   let sum = 0;
-  for (let i = 0; i < iterations; i++) {
+  // Safety check for undefined input
+  const count = iterations || 1000000;
+  for (let i = 0; i < count; i++) {
     sum += Math.sqrt(i) * Math.sin(i);
   }
   return sum;
 };
 
-// --- KERNEL 2: Matrix Multiplication (ML Foundation) ---
+// --- KERNEL 2: Matrix Multiplication (Memory & CPU Intense) ---
+// Standard O(n^3) matrix multiplication for ML simulation
 const runMatrixMul = (rowA: number[], matrixB: number[][]) => {
+  if (!rowA || !matrixB) return []; // Safety check
+
   const resultRow = new Array(matrixB[0].length).fill(0);
   for (let j = 0; j < matrixB[0].length; j++) {
     let sum = 0;
@@ -43,6 +51,7 @@ const runMatrixMul = (rowA: number[], matrixB: number[][]) => {
 };
 
 // --- SUB-WORKER FACTORY ---
+// Creates a lightweight worker that runs the actual kernels
 const createSubWorker = (workerId: number) => {
   const blob = new Blob(
     [
@@ -55,10 +64,16 @@ const createSubWorker = (workerId: number) => {
         const { type, data } = e.data;
         let result;
 
+        // 1. Handle Math Stress
         if (type === "MATH_STRESS") {
-          result = runStressTest(data[0]);
+          // Server sends data: { iterations: number }
+          // Or sometimes just the number depending on generator
+          const iterations = typeof data === 'object' ? data.iterations : data;
+          result = runStressTest(iterations);
         } 
-        else if (type === "MATRIX_MUL") {
+        // 2. Handle Matrix Multiplication
+        else if (type === "MAT_MUL") {
+          // Server sends data: { row: [], matrixB: [][] }
           result = runMatrixMul(data.row, data.matrixB);
         }
         else {
@@ -74,111 +89,107 @@ const createSubWorker = (workerId: number) => {
     ],
     { type: "application/javascript" },
   );
-  const worker = new Worker(URL.createObjectURL(blob));
 
-  // Store workerId on the worker object for tracking
-  (worker as any).workerId = workerId;
-
-  return worker;
+  return new Worker(URL.createObjectURL(blob));
 };
 
-const calculateBenchmark = (): number => {
-  const start = performance.now();
-  let sum = 0;
-  const duration = 100;
-  while (performance.now() - start < duration) {
-    for (let i = 0; i < 10000; i++) {
-      sum += Math.sqrt(i) * Math.sin(i);
+// --- THREAD POOL MANAGER ---
+const applyConfig = () => {
+  // Calculate target threads based on throttle %
+  const targetThreadCount = Math.max(
+    1,
+    Math.floor(LOGICAL_CORES * throttleLimit),
+  );
+
+  const currentCount = threadPool.size;
+
+  // SCALE UP
+  if (targetThreadCount > currentCount) {
+    for (let i = currentCount; i < targetThreadCount; i++) {
+      const wId = nextWorkerId++;
+      const worker = createSubWorker(wId);
+      threadPool.set(wId, {
+        worker,
+        busy: false,
+        currentChunkId: null,
+      });
     }
   }
-  return Math.round((sum / (performance.now() - start)) * 100);
-};
 
-// Find first available worker
-const findAvailableWorker = (): { id: number; worker: Worker } | null => {
-  for (const [id, thread] of threadPool.entries()) {
-    if (!thread.busy) {
-      return { id, worker: thread.worker };
+  // SCALE DOWN (Only remove idle workers to prevent killing active jobs)
+  if (targetThreadCount < currentCount) {
+    const toRemove = currentCount - targetThreadCount;
+    let removed = 0;
+
+    for (const [id, thread] of threadPool.entries()) {
+      if (!thread.busy && removed < toRemove) {
+        thread.worker.terminate();
+        threadPool.delete(id);
+        removed++;
+      }
     }
   }
-  return null;
+
+  // Notify Main Thread about the actual active thread count
+  self.postMessage({
+    type: "CONFIG_APPLIED",
+    threads: threadPool.size,
+    limit: throttleLimit,
+  });
 };
 
-// --- MAIN CONTROLLER ---
+// --- INITIALIZATION ---
+// 1. CRITICAL FIX: Initialize threads immediately on load
+applyConfig();
+
+// --- MAIN MESSAGE DISPATCHER ---
 self.onmessage = async (e: MessageEvent) => {
   const { type, chunk, throttleLevel, workerId } = e.data;
 
-  // SYSTEM: BENCHMARK
+  // CONFIG UPDATE
+  if (type === "UPDATE_CONFIG") {
+    if (throttleLevel !== undefined) {
+      throttleLimit = throttleLevel;
+    }
+    applyConfig();
+    return;
+  }
+
+  // BENCHMARKING
   if (type === "BENCHMARK") {
+    const start = performance.now();
+    let sum = 0;
+    // Quick burst calculation
+    for (let i = 0; i < 500000; i++) {
+      sum += Math.sqrt(i);
+    }
+    const duration = performance.now() - start;
+    // Calculate OPS (Operations Per Second approximation)
+    const score = Math.round((500000 / (duration || 1)) * 1000);
+
     self.postMessage({
       type: "BENCHMARK_COMPLETE",
-      score: calculateBenchmark(),
+      score: score,
     });
     return;
   }
 
-  // SYSTEM: CONFIG UPDATE
-  if (type === "UPDATE_CONFIG") {
-    throttleLimit = throttleLevel;
-    const targetThreadCount = Math.max(
-      1,
-      Math.floor(LOGICAL_CORES * throttleLimit),
-    );
-
-    const currentCount = threadPool.size;
-
-    // Scale Up
-    if (targetThreadCount > currentCount) {
-      for (let i = currentCount; i < targetThreadCount; i++) {
-        const workerId = nextWorkerId++;
-        const worker = createSubWorker(workerId);
-        threadPool.set(workerId, {
-          worker,
-          busy: false,
-          currentChunkId: null,
-        });
-      }
-    }
-
-    // Scale Down - Only remove idle workers
-    if (targetThreadCount < currentCount) {
-      const toRemove = currentCount - targetThreadCount;
-      let removed = 0;
-
-      for (const [id, thread] of threadPool.entries()) {
-        if (!thread.busy && removed < toRemove) {
-          thread.worker.terminate();
-          threadPool.delete(id);
-          removed++;
-        }
-      }
-    }
-
-    self.postMessage({
-      type: "CONFIG_APPLIED",
-      threads: threadPool.size,
-      limit: throttleLimit,
-      score: calculateBenchmark(),
-    });
-    return;
-  }
-
-  // EXECUTION: JOB HANDLING
+  // JOB PROCESSING
   if (type === "JOB_CHUNK") {
-    // 1. RAM CHECK
-    const estimatedSize = 50000;
-    if (currentRamUsage + estimatedSize > TOTAL_RAM_BYTES * throttleLimit) {
-      self.postMessage({
-        type: "JOB_ERROR",
-        chunkId: chunk.id,
-        error: "OOM_PREVENTED",
-      });
-      return;
+    // 1. Find an idle worker
+    let selectedThreadId = -1;
+    let selectedWorker = null;
+
+    for (const [id, thread] of threadPool.entries()) {
+      if (!thread.busy) {
+        selectedThreadId = id;
+        selectedWorker = thread.worker;
+        break;
+      }
     }
 
-    // 2. FIND AVAILABLE WORKER
-    const available = findAvailableWorker();
-    if (!available) {
+    // 2. If no worker is free, reject (Shouldn't happen if queue logic is good)
+    if (!selectedWorker) {
       self.postMessage({
         type: "JOB_ERROR",
         chunkId: chunk.id,
@@ -187,35 +198,23 @@ self.onmessage = async (e: MessageEvent) => {
       return;
     }
 
-    // 3. RUN
-    const { id: threadId, worker } = available;
-    const start = performance.now();
-
-    currentRamUsage += estimatedSize;
-    const thread = threadPool.get(threadId)!;
+    // 3. Mark thread as busy
+    const thread = threadPool.get(selectedThreadId)!;
     thread.busy = true;
     thread.currentChunkId = chunk.id;
 
-    worker.onmessage = (ev) => {
-      currentRamUsage -= estimatedSize;
-
-      // Only update if thread still exists (might have been scaled down)
-      const currentThread = threadPool.get(threadId);
-      if (currentThread) {
-        currentThread.busy = false;
-        currentThread.currentChunkId = null;
-      }
-
-      const duration = Math.round(performance.now() - start);
+    // 4. Set up completion handler
+    selectedWorker.onmessage = (ev) => {
+      // Mark as free immediately
+      thread.busy = false;
+      thread.currentChunkId = null;
 
       if (ev.data.success) {
         self.postMessage({
           type: "JOB_COMPLETE",
           chunkId: chunk.id,
           result: ev.data.result,
-          workerId: workerId,
-          durationMs: duration,
-          timestamp: performance.now(),
+          workerId: workerId, // Pass back socket ID for tracking
         });
       } else {
         self.postMessage({
@@ -226,7 +225,12 @@ self.onmessage = async (e: MessageEvent) => {
       }
     };
 
-    worker.postMessage({ type: chunk.type, data: chunk.data });
+    // 5. Dispatch to sub-worker
+    // Note: We pass chunk.data exactly as received
+    selectedWorker.postMessage({
+      type: chunk.type,
+      data: chunk.data,
+    });
   }
 };
 

@@ -1,51 +1,83 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { type JobChunk, type WorkerResult } from "../../../shared/types";
 // @ts-ignore
 import OstrichWorker from "../utils/worker?worker";
 import { usePersistentIdentity } from "./usePersistentIdentity";
 
-const SERVER_URL = "http://localhost:3000";
-
-export const useComputeSwarm = () => {
-  const [status, setStatus] = useState<"IDLE" | "WORKING">("IDLE");
+export const useComputeSwarm = (onLog?: (msg: string) => void) => {
+  const [status, setStatus] = useState<
+    "IDLE" | "WORKING" | "PAUSED" | "STOPPED"
+  >("IDLE");
   const [completedCount, setCompletedCount] = useState(0);
   const completedCountRef = useRef(0);
+  const [socket, setSocket] = useState<Socket | null>(null);
   const [workerId, setWorkerId] = useState<string>("");
   const [opsScore, setOpsScore] = useState<number>(0);
 
-  const [activeThreads, setActiveThreads] = useState<number>(1);
-  const [currentThrottle, setCurrentThrottle] = useState<number>(0.3);
+  // Initialize activeThreads to 0, wait for Worker to confirm real count
+  const [activeThreads, setActiveThreads] = useState<number>(0);
+  const [currentThrottle, setCurrentThrottle] = useState<number>(30);
 
+  const isRunningRef = useRef(false);
   const inFlightRequests = useRef(0);
   const activeJobs = useRef(0);
   const jobBuffer = useRef<JobChunk[]>([]);
-
   const socketRef = useRef<Socket | null>(null);
   const workerRef = useRef<Worker | null>(null);
+
   const identity = usePersistentIdentity();
 
-  // SYNC LOOP: Decouple Engine Speed from UI Updates
-  useEffect(() => {
-    const syncInterval = setInterval(() => {
-      setCompletedCount((prev) => {
-        if (prev !== completedCountRef.current)
-          return completedCountRef.current;
-        return prev;
-      });
-    }, 100);
-    return () => clearInterval(syncInterval);
+  // ... (Keep startSwarm, pauseSwarm, stopSwarm as is) ...
+  const startSwarm = useCallback(() => {
+    if (isRunningRef.current) return;
+    isRunningRef.current = true;
+    setStatus("WORKING");
+    onLog?.(`[SYS] Swarm started.`);
+    processQueue();
+  }, [onLog]);
+
+  const pauseSwarm = useCallback(() => {
+    isRunningRef.current = false;
+    setStatus("PAUSED");
   }, []);
 
-  const processQueue = () => {
-    if (!workerRef.current) return;
+  const stopSwarm = useCallback(() => {
+    isRunningRef.current = false;
+    setStatus("STOPPED");
+    activeJobs.current = 0;
+    jobBuffer.current = [];
+    workerRef.current?.terminate();
+    // Restart worker
+    workerRef.current = new OstrichWorker();
+    workerRef.current?.postMessage({
+      type: "UPDATE_CONFIG",
+      throttleLevel: currentThrottle / 100,
+    });
+  }, [currentThrottle]);
 
-    // 1. Assign Jobs to Free Threads AGGRESSIVELY
-    while (jobBuffer.current.length > 0 && activeJobs.current < activeThreads) {
+  const updateThrottle = useCallback((val: number) => {
+    setCurrentThrottle(val);
+    workerRef.current?.postMessage({
+      type: "UPDATE_CONFIG",
+      throttleLevel: val / 100,
+    });
+  }, []);
+
+  const processQueue = useCallback(() => {
+    if (!workerRef.current || !isRunningRef.current) return;
+
+    // 1. Dispatch from Buffer to Worker
+    // Note: Use activeThreads from state, or fallback to 1 if not ready
+    const maxConcurrency = activeThreads || 1;
+
+    while (
+      jobBuffer.current.length > 0 &&
+      activeJobs.current < maxConcurrency
+    ) {
       const job = jobBuffer.current.shift();
       if (job) {
-        activeJobs.current += 1;
-        setStatus("WORKING");
+        activeJobs.current++;
         workerRef.current.postMessage({
           type: "JOB_CHUNK",
           chunk: job,
@@ -54,188 +86,131 @@ export const useComputeSwarm = () => {
       }
     }
 
-    // 2. Prefetch: Keep (Threads * 5) jobs in pipeline for high throughput
-    // This ensures threads never wait for network round-trips
-    const desiredBuffer = Math.max(20, activeThreads * 5);
+    // 2. Request from Server
+    const desiredBuffer = maxConcurrency * 3;
     const currentSupply =
       activeJobs.current + jobBuffer.current.length + inFlightRequests.current;
 
-    if (currentSupply < desiredBuffer) {
+    if (currentSupply < desiredBuffer && socketRef.current?.connected) {
       const deficit = desiredBuffer - currentSupply;
-
-      // Use batch requesting for large deficits (5+ jobs)
-      if (deficit >= 5) {
-        inFlightRequests.current += 1;
-        socketRef.current?.emit("REQUEST_BATCH", Math.min(deficit, 15));
-      } else {
-        // Request individual jobs for small deficits
-        for (let i = 0; i < deficit; i++) {
-          inFlightRequests.current += 1;
-          socketRef.current?.emit("REQUEST_WORK");
-        }
+      if (deficit > 0) {
+        inFlightRequests.current += deficit;
+        if (deficit >= 5)
+          socketRef.current.emit("REQUEST_BATCH", Math.min(deficit, 20));
+        else socketRef.current.emit("REQUEST_WORK");
       }
     }
-  };
+  }, [activeThreads]); // Rerun when threads change
 
+  // --- CONNECTION ---
   useEffect(() => {
-    if (!identity) return;
+    if (!identity?.id) return;
+    if (socketRef.current?.connected) return;
 
+    // 1. Init Worker immediately
     workerRef.current = new OstrichWorker();
     workerRef.current.postMessage({
       type: "UPDATE_CONFIG",
-      throttleLevel: 0.3,
+      throttleLevel: currentThrottle / 100,
     });
 
-    socketRef.current = io(SERVER_URL, {
-      query: { persistentId: identity.id, deviceName: identity.name },
+    const newSocket = io(window.location.origin, {
+      path: "/socket.io",
+      query: { persistentId: identity.id },
     });
 
-    workerRef.current.postMessage({ type: "BENCHMARK" });
+    setSocket(newSocket);
+    socketRef.current = newSocket;
 
-    let deviceId: string | null = null;
+    newSocket.on("connect", () => {
+      setWorkerId(newSocket.id || "...");
+      onLog?.(`[NET] Connected as ${identity.name}`);
 
-    socketRef.current.on("connect", () => {
-      setWorkerId(socketRef.current?.id || "Unknown ID");
-
-      // Register device with swarm coordinator
-      socketRef.current?.emit("REGISTER_DEVICE", {
-        name: identity?.name || "Unknown Device",
+      // SEND ID HERE
+      newSocket.emit("REGISTER_DEVICE", {
+        id: identity.id, // <--- Matching server expectation
+        name: identity.name,
         type: "DESKTOP",
         capabilities: {
-          cpuCores: navigator.hardwareConcurrency || 2,
-          memoryGB: 4, // Estimated
-          gpuAvailable: false,
-          maxConcurrency: navigator.hardwareConcurrency || 2,
-          supportedJobs: ["MATH_STRESS", "MAT_MUL"],
+          cpuCores: navigator.hardwareConcurrency || 4,
+          memoryGB: (navigator as any).deviceMemory || 8,
+          maxConcurrency: navigator.hardwareConcurrency || 4,
+          supportedJobs: ["MAT_MUL", "MATH_STRESS"], // Matches server job types
         },
       });
-
-      processQueue();
     });
 
-    socketRef.current.on(
-      "REGISTERED",
-      (data: { deviceId: string; swarmStats: any }) => {
-        deviceId = data.deviceId;
-        console.log("[Swarm] Registered as device:", deviceId);
-      },
-    );
-
-    socketRef.current.on("JOB_DISPATCH", (job: JobChunk) => {
+    // ... (Keep JOB_DISPATCH, BATCH_DISPATCH handlers) ...
+    newSocket.on("JOB_DISPATCH", (job) => {
       inFlightRequests.current = Math.max(0, inFlightRequests.current - 1);
       jobBuffer.current.push(job);
       processQueue();
     });
 
-    socketRef.current.on("BATCH_DISPATCH", (jobs: JobChunk[]) => {
-      // Decrement in-flight counter for the batch request
+    newSocket.on("BATCH_DISPATCH", (jobs) => {
       inFlightRequests.current = Math.max(0, inFlightRequests.current - 1);
-      // Add all jobs to buffer
-      jobs.forEach((job) => jobBuffer.current.push(job));
+      jobs.forEach((j: any) => jobBuffer.current.push(j));
       processQueue();
     });
 
-    socketRef.current.on("NO_WORK", () => {
-      // Decrement in-flight counter when server has no work
+    newSocket.on("NO_WORK", () => {
       inFlightRequests.current = Math.max(0, inFlightRequests.current - 1);
     });
 
-    socketRef.current.on("WORK_ACK", () => {
-      processQueue();
-    });
+    // Worker Message Handling
+    workerRef.current.onmessage = (e) => {
+      const msg = e.data;
 
-    // AGGRESSIVE PUMP: Keep queue full every 50ms
-    const pumpInterval = setInterval(() => {
-      processQueue();
-    }, 50);
-
-    // HEARTBEAT: Report health every 10 seconds
-    const heartbeatInterval = setInterval(() => {
-      if (deviceId && socketRef.current) {
-        socketRef.current.emit("HEARTBEAT", {
-          cpuUsage: 50, // Placeholder - would come from performance API
-          memoryUsage: 30, // Placeholder
-          networkLatency: 0,
-          currentLoad: activeJobs.current,
+      if (msg.type === "CONFIG_APPLIED") {
+        setActiveThreads(msg.threads); // This fixes the "2 cores" issue
+        onLog?.(`[CPU] Scaling to ${msg.threads} threads`);
+        processQueue();
+      } else if (msg.type === "JOB_COMPLETE") {
+        activeJobs.current--;
+        completedCountRef.current++;
+        socketRef.current?.emit("JOB_COMPLETE", {
+          chunkId: msg.chunkId,
+          result: msg.result as WorkerResult,
         });
+        processQueue();
+      } else if (msg.type === "JOB_ERROR") {
+        activeJobs.current--;
+        onLog?.(`[ERR] Job failed: ${msg.error}`);
+        processQueue();
       }
-    }, 10000);
+    };
 
-    if (workerRef.current) {
-      workerRef.current.onmessage = (e: MessageEvent) => {
-        const message = e.data;
-
-        if (message.type === "BENCHMARK_COMPLETE") {
-          setOpsScore(message.score);
-        } else if (message.type === "JOB_COMPLETE") {
-          activeJobs.current = Math.max(0, activeJobs.current - 1);
-          const resultPayload: WorkerResult = {
-            chunkId: message.chunkId,
-            workerId: workerId,
-            result: message.result,
-            durationMs: message.durationMs,
-            timestamp: message.timestamp,
-          };
-          socketRef.current?.emit("JOB_COMPLETE", resultPayload);
-          completedCountRef.current += 1;
-
-          if (activeJobs.current === 0 && jobBuffer.current.length === 0) {
-            setStatus("IDLE");
-          }
-          processQueue();
-        } else if (message.type === "JOB_ERROR") {
-          activeJobs.current = Math.max(0, activeJobs.current - 1);
-          const errorPayload: WorkerResult = {
-            chunkId: message.chunkId,
-            workerId: workerId,
-            error: message.error,
-            details: message.details,
-            timestamp: message.timestamp,
-          };
-          socketRef.current?.emit("JOB_COMPLETE", errorPayload);
-          processQueue();
-        } else if (message.type === "CONFIG_APPLIED") {
-          setActiveThreads(message.threads);
-          setCurrentThrottle(message.limit);
-          if (message.score) setOpsScore(message.score);
-          processQueue();
-        }
-      };
-    }
+    const pump = setInterval(processQueue, 100);
 
     return () => {
-      clearInterval(pumpInterval);
-      clearInterval(heartbeatInterval);
-      socketRef.current?.disconnect();
+      clearInterval(pump);
+      newSocket.disconnect();
       workerRef.current?.terminate();
     };
   }, [identity]);
 
+  // Sync count to UI
   useEffect(() => {
-    processQueue();
-  }, [activeThreads]);
+    const i = setInterval(
+      () => setCompletedCount(completedCountRef.current),
+      500,
+    );
+    return () => clearInterval(i);
+  }, []);
 
-  const updateThrottle = (level: number) => {
-    workerRef.current?.postMessage({
-      type: "UPDATE_CONFIG",
-      throttleLevel: level,
-    });
-  };
-  const runBenchmark = () => {
-    if (workerRef.current) {
-      setOpsScore(0);
-      workerRef.current.postMessage({ type: "BENCHMARK" });
-    }
-  };
   return {
     status,
     completedCount,
     workerId,
     opsScore,
-    updateThrottle,
     activeThreads,
-    runBenchmark,
-    currentThrottle,
-    socket: socketRef.current,
+    updateThrottle,
+    throttle: currentThrottle,
+    socket,
+    isRunning: isRunningRef.current,
+    startSwarm,
+    pauseSwarm,
+    stopSwarm,
+    setOpsScore,
   };
 };
