@@ -1,68 +1,94 @@
-import { Cpu, RotateCw } from "lucide-react";
+import { Cpu, RotateCw, Monitor, Smartphone, Server } from "lucide-react";
 import { Card } from "../ui/Card";
-import { Badge } from "../ui/Badge";
-// import { useComputeSwarm } from "../../hooks/useComputeSwarm";
+import { type DeviceInfo, type DeviceType } from "../../../../shared/types";
 
-// Add className prop to allow parent to control dimensions
-export function DeviceHealth({
-  status,
-  opsScore,
-  workerId,
-  className = "",
-  onRunBenchmark,
-}: {
-  status: string;
-  opsScore: number;
-  workerId: string;
+interface DeviceHealthProps {
+  devices: DeviceInfo[];
   className?: string;
   onRunBenchmark: () => void;
-}) {
+}
+
+export function DeviceHealth({
+  devices,
+  className = "",
+  onRunBenchmark,
+}: DeviceHealthProps) {
+  const getIcon = (type: DeviceType) => {
+    switch (type) {
+      case "MOBILE":
+        return Smartphone;
+      case "SERVER":
+        return Server;
+      case "COLAB":
+        return Server;
+      default:
+        return Monitor;
+    }
+  };
+
   return (
-    // Changed: Removed "h-75" and "md:col-span-4". Added {className}.
-    <Card className={`flex flex-col justify-between ${className}`}>
-      <div>
-        <div className="flex justify-between items-start mb-4">
-          <div className="p-2 bg-arc-bg rounded-xl border border-arc-border">
-            <Cpu size={20} className="text-indigo-500" />
+    <Card className={`flex flex-col ${className}`} noPadding>
+      <div className="p-6 pb-0 flex justify-between items-start">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-1.5 bg-indigo-500/10 rounded-lg">
+              <Cpu size={16} className="text-indigo-500" />
+            </div>
+            <h3 className="text-sm font-bold text-arc-text uppercase tracking-wider">
+              Benchmarks
+            </h3>
           </div>
-          <Badge active={status === "WORKING"} text={status} />
+          <p className="text-xs text-arc-muted">
+            {devices.length} Connected Nodes
+          </p>
         </div>
-        <h3 className="text-base font-medium text-arc-text">Device Health</h3>
-        <p className="text-xs text-arc-muted mt-0.5">Allocation & Benchmarks</p>
+
+        <button
+          onClick={onRunBenchmark}
+          className="p-2 rounded-xl bg-arc-bg hover:bg-indigo-500/10 hover:text-indigo-500 text-arc-muted transition-all active:scale-95 border border-arc-border"
+          title="Benchmark Swarm"
+        >
+          <RotateCw size={16} />
+        </button>
       </div>
 
-      <div className="space-y-2 mt-2">
-        {/* BENCHMARK ROW */}
-        <div className="p-3 rounded-2xl bg-arc-bg border border-arc-border flex justify-between items-center group">
-          <div className="flex flex-col">
-            <span className="text-[10px] text-arc-muted font-bold tracking-wider mb-0.5">
-              BENCHMARK
-            </span>
-            <span className="text-base font-mono text-indigo-500 font-bold">
-              {opsScore > 0 ? opsScore.toLocaleString() : "---"}
-              <span className="text-[10px] text-arc-muted font-normal ml-1">
-                OPS
-              </span>
-            </span>
-          </div>
+      <div className="p-4 space-y-2 overflow-y-auto custom-scrollbar h-full">
+        {devices.map((device) => {
+          const Icon = getIcon(device.type);
+          return (
+            <div
+              key={device.id}
+              className="flex items-center justify-between p-3 rounded-xl bg-arc-bg/50 border border-arc-border/50"
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={`p-2 rounded-lg ${device.opsScore > 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-zinc-500/10 text-zinc-500"}`}
+                >
+                  <Icon size={14} />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-medium text-arc-text truncate max-w-25">
+                    {device.name}
+                  </span>
+                  <span className="text-[10px] text-arc-muted font-mono">
+                    {device.id.slice(0, 6)}
+                  </span>
+                </div>
+              </div>
 
-          <button
-            onClick={onRunBenchmark} // <--- USE THE PROP
-            className={`p-2 rounded-full hover:bg-indigo-500/10 transition-colors ${opsScore === 0 ? "animate-pulse text-indigo-500" : "text-arc-muted opacity-0 group-hover:opacity-100"}`}
-            title="Re-run Benchmark"
-          >
-            <RotateCw size={14} />
-          </button>
-        </div>
-
-        <div className="p-3 rounded-2xl bg-arc-bg border border-arc-border flex justify-between items-center">
-          <span className="text-[10px] text-arc-muted font-bold tracking-wider">
-            ID
-          </span>
-          <span className="text-[10px] font-mono text-arc-muted truncate max-w-20">
-            {workerId || "Connecting..."}
-          </span>
-        </div>
+              <div className="text-right">
+                <span className="text-sm font-mono font-bold text-indigo-500 block">
+                  {device.opsScore > 0
+                    ? device.opsScore.toLocaleString()
+                    : "---"}
+                </span>
+                <span className="text-[9px] text-arc-muted uppercase tracking-wider">
+                  OPS
+                </span>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </Card>
   );

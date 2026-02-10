@@ -1,0 +1,3360 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+client/eslint.config.js
+client/index.html
+client/package.json
+client/public/vite.svg
+client/README.md
+client/src/App.css
+client/src/App.tsx
+client/src/assets/react.svg
+client/src/components/dashboard/DeviceConnector.tsx
+client/src/components/dashboard/DeviceHealth.tsx
+client/src/components/dashboard/GpuStatusMonitor.tsx
+client/src/components/dashboard/LiveTerminal.tsx
+client/src/components/dashboard/StatusMonitor.tsx
+client/src/components/dashboard/SwarmControls.tsx
+client/src/components/dashboard/SwarmDashboard.tsx
+client/src/components/dashboard/ThrottleControl.tsx
+client/src/components/ui/Badge.tsx
+client/src/components/ui/Card.tsx
+client/src/components/ui/ThemeToggle.tsx
+client/src/hooks/useComputeSwarm.ts
+client/src/hooks/usePersistentIdentity.ts
+client/src/index.css
+client/src/main.tsx
+client/src/utils/worker.ts
+client/tsconfig.app.json
+client/tsconfig.json
+client/tsconfig.node.json
+client/vite.config.ts
+server/package.json
+server/src/index.ts
+server/src/socket/SwarmSocketHandler.ts
+server/src/swarm/JobGenerator.ts
+server/src/swarm/JoinCodeManager.ts
+server/src/swarm/SwarmCoordinator.ts
+server/src/swarm/SwarmStateStore.ts
+server/src/swarm/WorkStealingScheduler.ts
+server/tsconfig.json
+shared/types.ts
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="client/eslint.config.js">
+import js from '@eslint/js'
+import globals from 'globals'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
+import tseslint from 'typescript-eslint'
+import { defineConfig, globalIgnores } from 'eslint/config'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      js.configs.recommended,
+      tseslint.configs.recommended,
+      reactHooks.configs.flat.recommended,
+      reactRefresh.configs.vite,
+    ],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.browser,
+    },
+  },
+])
+</file>
+
+<file path="client/index.html">
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>client</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+</file>
+
+<file path="client/public/vite.svg">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="31.88" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 257"><defs><linearGradient id="IconifyId1813088fe1fbc01fb466" x1="-.828%" x2="57.636%" y1="7.652%" y2="78.411%"><stop offset="0%" stop-color="#41D1FF"></stop><stop offset="100%" stop-color="#BD34FE"></stop></linearGradient><linearGradient id="IconifyId1813088fe1fbc01fb467" x1="43.376%" x2="50.316%" y1="2.242%" y2="89.03%"><stop offset="0%" stop-color="#FFEA83"></stop><stop offset="8.333%" stop-color="#FFDD35"></stop><stop offset="100%" stop-color="#FFA800"></stop></linearGradient></defs><path fill="url(#IconifyId1813088fe1fbc01fb466)" d="M255.153 37.938L134.897 252.976c-2.483 4.44-8.862 4.466-11.382.048L.875 37.958c-2.746-4.814 1.371-10.646 6.827-9.67l120.385 21.517a6.537 6.537 0 0 0 2.322-.004l117.867-21.483c5.438-.991 9.574 4.796 6.877 9.62Z"></path><path fill="url(#IconifyId1813088fe1fbc01fb467)" d="M185.432.063L96.44 17.501a3.268 3.268 0 0 0-2.634 3.014l-5.474 92.456a3.268 3.268 0 0 0 3.997 3.378l24.777-5.718c2.318-.535 4.413 1.507 3.936 3.838l-7.361 36.047c-.495 2.426 1.782 4.5 4.151 3.78l15.304-4.649c2.372-.72 4.652 1.36 4.15 3.788l-11.698 56.621c-.732 3.542 3.979 5.473 5.943 2.437l1.313-2.028l72.516-144.72c1.215-2.423-.88-5.186-3.54-4.672l-25.505 4.922c-2.396.462-4.435-1.77-3.759-4.114l16.646-57.705c.677-2.35-1.37-4.583-3.769-4.113Z"></path></svg>
+</file>
+
+<file path="client/README.md">
+# React + TypeScript + Vite
+
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+
+Currently, two official plugins are available:
+
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+
+## React Compiler
+
+The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+
+## Expanding the ESLint configuration
+
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+
+```js
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+
+      // Remove tseslint.configs.recommended and replace with this
+      tseslint.configs.recommendedTypeChecked,
+      // Alternatively, use this for stricter rules
+      tseslint.configs.strictTypeChecked,
+      // Optionally, add this for stylistic rules
+      tseslint.configs.stylisticTypeChecked,
+
+      // Other configs...
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```
+
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+      // Enable lint rules for React
+      reactX.configs['recommended-typescript'],
+      // Enable lint rules for React DOM
+      reactDom.configs.recommended,
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```
+</file>
+
+<file path="client/src/assets/react.svg">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-11.769-62.708c-13.355-7.7-35.196.329-57.254 19.526a171.23 171.23 0 0 0-6.375 5.848a155.866 155.866 0 0 0-4.241-3.917C100.759 3.829 77.587-4.822 63.673 3.233C50.33 10.957 46.379 33.89 51.995 62.588a170.974 170.974 0 0 0 1.892 8.48c-3.28.932-6.445 1.924-9.474 2.98C17.309 83.498 0 98.307 0 113.668c0 15.865 18.582 31.778 46.812 41.427a145.52 145.52 0 0 0 6.921 2.165a167.467 167.467 0 0 0-2.01 9.138c-5.354 28.2-1.173 50.591 12.134 58.266c13.744 7.926 36.812-.22 59.273-19.855a145.567 145.567 0 0 0 5.342-4.923a168.064 168.064 0 0 0 6.92 6.314c21.758 18.722 43.246 26.282 56.54 18.586c13.731-7.949 18.194-32.003 12.4-61.268a145.016 145.016 0 0 0-1.535-6.842c1.62-.48 3.21-.974 4.76-1.488c29.348-9.723 48.443-25.443 48.443-41.52c0-15.417-17.868-30.326-45.517-39.844Zm-6.365 70.984c-1.4.463-2.836.91-4.3 1.345c-3.24-10.257-7.612-21.163-12.963-32.432c5.106-11 9.31-21.767 12.459-31.957c2.619.758 5.16 1.557 7.61 2.4c23.69 8.156 38.14 20.213 38.14 29.504c0 9.896-15.606 22.743-40.946 31.14Zm-10.514 20.834c2.562 12.94 2.927 24.64 1.23 33.787c-1.524 8.219-4.59 13.698-8.382 15.893c-8.067 4.67-25.32-1.4-43.927-17.412a156.726 156.726 0 0 1-6.437-5.87c7.214-7.889 14.423-17.06 21.459-27.246c12.376-1.098 24.068-2.894 34.671-5.345a134.17 134.17 0 0 1 1.386 6.193ZM87.276 214.515c-7.882 2.783-14.16 2.863-17.955.675c-8.075-4.657-11.432-22.636-6.853-46.752a156.923 156.923 0 0 1 1.869-8.499c10.486 2.32 22.093 3.988 34.498 4.994c7.084 9.967 14.501 19.128 21.976 27.15a134.668 134.668 0 0 1-4.877 4.492c-9.933 8.682-19.886 14.842-28.658 17.94ZM50.35 144.747c-12.483-4.267-22.792-9.812-29.858-15.863c-6.35-5.437-9.555-10.836-9.555-15.216c0-9.322 13.897-21.212 37.076-29.293c2.813-.98 5.757-1.905 8.812-2.773c3.204 10.42 7.406 21.315 12.477 32.332c-5.137 11.18-9.399 22.249-12.634 32.792a134.718 134.718 0 0 1-6.318-1.979Zm12.378-84.26c-4.811-24.587-1.616-43.134 6.425-47.789c8.564-4.958 27.502 2.111 47.463 19.835a144.318 144.318 0 0 1 3.841 3.545c-7.438 7.987-14.787 17.08-21.808 26.988c-12.04 1.116-23.565 2.908-34.161 5.309a160.342 160.342 0 0 1-1.76-7.887Zm110.427 27.268a347.8 347.8 0 0 0-7.785-12.803c8.168 1.033 15.994 2.404 23.343 4.08c-2.206 7.072-4.956 14.465-8.193 22.045a381.151 381.151 0 0 0-7.365-13.322Zm-45.032-43.861c5.044 5.465 10.096 11.566 15.065 18.186a322.04 322.04 0 0 0-30.257-.006c4.974-6.559 10.069-12.652 15.192-18.18ZM82.802 87.83a323.167 323.167 0 0 0-7.227 13.238c-3.184-7.553-5.909-14.98-8.134-22.152c7.304-1.634 15.093-2.97 23.209-3.984a321.524 321.524 0 0 0-7.848 12.897Zm8.081 65.352c-8.385-.936-16.291-2.203-23.593-3.793c2.26-7.3 5.045-14.885 8.298-22.6a321.187 321.187 0 0 0 7.257 13.246c2.594 4.48 5.28 8.868 8.038 13.147Zm37.542 31.03c-5.184-5.592-10.354-11.779-15.403-18.433c4.902.192 9.899.29 14.978.29c5.218 0 10.376-.117 15.453-.343c-4.985 6.774-10.018 12.97-15.028 18.486Zm52.198-57.817c3.422 7.8 6.306 15.345 8.596 22.52c-7.422 1.694-15.436 3.058-23.88 4.071a382.417 382.417 0 0 0 7.859-13.026a347.403 347.403 0 0 0 7.425-13.565Zm-16.898 8.101a358.557 358.557 0 0 1-12.281 19.815a329.4 329.4 0 0 1-23.444.823c-7.967 0-15.716-.248-23.178-.732a310.202 310.202 0 0 1-12.513-19.846h.001a307.41 307.41 0 0 1-10.923-20.627a310.278 310.278 0 0 1 10.89-20.637l-.001.001a307.318 307.318 0 0 1 12.413-19.761c7.613-.576 15.42-.876 23.31-.876H128c7.926 0 15.743.303 23.354.883a329.357 329.357 0 0 1 12.335 19.695a358.489 358.489 0 0 1 11.036 20.54a329.472 329.472 0 0 1-11 20.722Zm22.56-122.124c8.572 4.944 11.906 24.881 6.52 51.026c-.344 1.668-.73 3.367-1.15 5.09c-10.622-2.452-22.155-4.275-34.23-5.408c-7.034-10.017-14.323-19.124-21.64-27.008a160.789 160.789 0 0 1 5.888-5.4c18.9-16.447 36.564-22.941 44.612-18.3ZM128 90.808c12.625 0 22.86 10.235 22.86 22.86s-10.235 22.86-22.86 22.86s-22.86-10.235-22.86-22.86s10.235-22.86 22.86-22.86Z"></path></svg>
+</file>
+
+<file path="client/src/components/dashboard/StatusMonitor.tsx">
+import { Card } from "../ui/Card";
+import { AreaChart, Area, ResponsiveContainer, YAxis, Tooltip } from "recharts";
+
+interface StatusMonitorProps {
+  completedCount: number;
+  chartData: { val: number; throttle: number }[];
+  throttle: number;
+  currentThrottle: number;
+}
+
+export function StatusMonitor({
+  completedCount,
+  chartData,
+  throttle,
+  currentThrottle,
+}: StatusMonitorProps) {
+  const currentVelocity =
+    chartData.length > 0 ? chartData[chartData.length - 1].val : 0;
+
+  // Helper to get color string from throttle value
+  const getColor = (level: number) => {
+    if (level <= 30) return "#10b981"; // Emerald
+    if (level >= 80) return "#f43f5e"; // Rose
+    return "#6366f1"; // Indigo
+  };
+
+  const currentColor = getColor(throttle);
+
+  return (
+    <Card
+      className="md:col-span-8 h-90 flex flex-col justify-between"
+      noPadding
+    >
+      <div className="p-8 pb-0 z-20">
+        {/* Header Section (Keep your existing header code) */}
+        <div className="flex items-center gap-3 mb-2">
+          <div
+            className="w-2 h-2 rounded-full animate-pulse transition-colors duration-500"
+            style={{ backgroundColor: currentColor }}
+          />
+          <h2 className="text-xs font-bold tracking-widest text-arc-muted uppercase">
+            Live Velocity
+          </h2>
+        </div>
+
+        <div className="flex items-baseline gap-2 mb-1">
+          <span className="text-7xl font-medium tracking-tighter text-arc-text transition-all duration-300">
+            {currentVelocity}
+          </span>
+          <span className="text-lg text-arc-muted font-normal">
+            chunks / sec
+          </span>
+        </div>
+
+        <p className="text-xs text-arc-muted font-medium">
+          Lifetime Contribution:{" "}
+          <span className="font-mono text-arc-text opacity-80">
+            {completedCount.toLocaleString()}
+          </span>{" "}
+          chunks
+        </p>
+
+        {/* Dynamic Badge */}
+        <div className="flex items-center gap-2 mt-2">
+          <span
+            className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+            style={{
+              backgroundColor: `${currentColor}20`,
+              color: currentColor,
+            }}
+          >
+            {Math.round(currentThrottle * 100)}% Throttle
+          </span>
+        </div>
+      </div>
+
+      <div className="absolute bottom-0 left-0 right-0 h-55 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={chartData}>
+            <defs>
+              {/* 1. GRADIENT FOR THE LINE (STROKE) */}
+              {/* This maps the color of every segment to the throttle value at that time */}
+              <linearGradient id="strokeGradient" x1="0" y1="0" x2="1" y2="0">
+                {chartData.map((entry, index) => (
+                  <stop
+                    key={index}
+                    offset={`${(index / (chartData.length - 1 || 1)) * 100}%`}
+                    stopColor={getColor(entry.throttle)}
+                  />
+                ))}
+              </linearGradient>
+
+              {/* 2. GRADIENT FOR THE FILL (FADE OUT) */}
+              <linearGradient id="fillGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={currentColor} stopOpacity={0.4} />
+                <stop offset="100%" stopColor={currentColor} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+
+            <YAxis
+              width={0}
+              domain={[0, (max: number) => Math.max(max, 10)]}
+              hide
+            />
+
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "var(--arc-card)",
+                borderColor: "var(--arc-border)",
+                borderRadius: "12px",
+                fontSize: "12px",
+              }}
+              formatter={(value: any) => [`${value} cps`, "Speed"]}
+              labelStyle={{ display: "none" }}
+            />
+
+            <Area
+              type="monotone"
+              dataKey="val"
+              stroke="url(#strokeGradient)" /* USE THE DYNAMIC STROKE */
+              strokeWidth={3}
+              fill="url(#fillGradient)" /* USE THE STANDARD FILL */
+              isAnimationActive={
+                false
+              } /* Disable animation for smoother real-time updates */
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
+  );
+}
+</file>
+
+<file path="client/src/components/dashboard/SwarmControls.tsx">
+import { Play, Pause, Square, Power } from "lucide-react";
+import { Card } from "../ui/Card";
+
+interface SwarmControlsProps {
+  isRunning: boolean;
+  status: string;
+  onStart: () => void;
+  onPause: () => void;
+  onStop: () => void;
+}
+
+export function SwarmControls({
+  isRunning,
+  status,
+  onStart,
+  onPause,
+  onStop,
+}: SwarmControlsProps) {
+  return (
+    <Card
+      className="w-24 h-full flex flex-col justify-between relative overflow-hidden shrink-0"
+      noPadding
+    >
+      <div
+        className={`absolute inset-0 transition-opacity duration-1000 opacity-20 pointer-events-none
+          ${status === "WORKING" ? "bg-emerald-500/10" : ""}
+          ${status === "PAUSED" ? "bg-amber-500/10" : ""}
+          ${status === "STOPPED" ? "bg-rose-500/5" : ""}
+        `}
+      />
+
+      <div className="relative z-10 flex flex-col h-full p-2">
+        {/* Status Indicator */}
+        <div className="flex justify-center pt-2 mb-4">
+          <div
+            className={`p-2 rounded-full border transition-all duration-500 shadow-lg ${
+              status === "WORKING"
+                ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-500 shadow-emerald-500/20"
+                : "bg-arc-bg border-arc-border text-arc-muted"
+            }`}
+          >
+            <Power size={18} />
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="flex-1 flex flex-col justify-end gap-2">
+          {/* START */}
+          <button
+            onClick={onStart}
+            disabled={isRunning}
+            className={`
+              group flex flex-col items-center justify-center py-3 rounded-xl border transition-all duration-200 active:scale-95
+              ${
+                isRunning
+                  ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]"
+                  : "bg-arc-bg border-arc-border hover:border-emerald-500/50 hover:text-emerald-500"
+              }
+            `}
+          >
+            <Play
+              size={18}
+              className={isRunning ? "fill-emerald-400" : "fill-current"}
+            />
+            <span className="text-[9px] font-bold tracking-widest mt-1">
+              RUN
+            </span>
+          </button>
+
+          {/* PAUSE */}
+          <button
+            onClick={onPause}
+            disabled={!isRunning}
+            className={`
+              group flex flex-col items-center justify-center py-3 rounded-xl border transition-all duration-200 active:scale-95
+              ${
+                status === "PAUSED"
+                  ? "bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]"
+                  : !isRunning
+                    ? "opacity-50 cursor-not-allowed border-arc-border"
+                    : "bg-arc-bg border-arc-border hover:border-amber-500/50 hover:text-amber-500"
+              }
+            `}
+          >
+            <Pause
+              size={18}
+              className={
+                status === "PAUSED" ? "fill-amber-400" : "fill-current"
+              }
+            />
+            <span className="text-[9px] font-bold tracking-widest mt-1">
+              PAUSE
+            </span>
+          </button>
+
+          {/* STOP */}
+          <button
+            onClick={onStop}
+            className="group flex flex-col items-center justify-center py-3 rounded-xl border border-arc-border bg-arc-bg hover:border-rose-500/50 hover:bg-rose-500/10 hover:text-rose-500 transition-all duration-200 active:scale-95 active:bg-rose-500/20"
+          >
+            <Square size={18} className="fill-current" />
+            <span className="text-[9px] font-bold tracking-widest mt-1">
+              END
+            </span>
+          </button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+</file>
+
+<file path="client/src/components/ui/Badge.tsx">
+interface BadgeProps {
+  active: boolean;
+  text: string;
+}
+
+export function Badge({ active, text }: BadgeProps) {
+  return (
+    <span
+      className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase transition-colors duration-500 ${
+        active
+          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+          : "bg-white/5 text-slate-500 border border-white/5"
+      }`}
+    >
+      {text}
+    </span>
+  );
+}
+</file>
+
+<file path="client/src/components/ui/Card.tsx">
+import { type ReactNode } from "react";
+import { twMerge } from "tailwind-merge";
+
+export function Card({
+  children,
+  className,
+  noPadding = false,
+}: {
+  children: ReactNode;
+  className?: string;
+  noPadding?: boolean;
+}) {
+  return (
+    <div
+      className={twMerge(
+        "arc-card relative overflow-hidden group",
+        noPadding ? "" : "p-8",
+        className,
+      )}
+    >
+      {/* Subtle Inner Glow on Hover */}
+      <div className="absolute inset-0 bg-linear-to-tr from-white/0 via-white/0 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+      <div className="relative z-10 h-full">{children}</div>
+    </div>
+  );
+}
+</file>
+
+<file path="client/src/components/ui/ThemeToggle.tsx">
+import { Sun, Moon } from "lucide-react";
+import { useEffect, useState } from "react";
+
+export function ThemeToggle() {
+  // 1. Initialize from LocalStorage or System Preference 🧠
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("theme");
+      if (saved) return saved === "dark";
+      return window.matchMedia("(prefers-color-scheme: dark)").matches;
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (isDark) {
+      root.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    } else {
+      root.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    }
+  }, [isDark]);
+
+  return (
+    <button
+      onClick={() => setIsDark(!isDark)}
+      className="p-2 rounded-full bg-arc-card border border-arc-border text-arc-text hover:scale-110 active:scale-95 transition-all"
+      aria-label="Toggle Theme"
+    >
+      {isDark ? <Moon size={18} /> : <Sun size={18} />}
+    </button>
+  );
+}
+</file>
+
+<file path="client/src/main.tsx">
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.tsx'
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
+</file>
+
+<file path="client/tsconfig.app.json">
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "types": ["vite/client"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["src"]
+}
+</file>
+
+<file path="client/tsconfig.json">
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}
+</file>
+
+<file path="client/tsconfig.node.json">
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "types": ["node"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["vite.config.ts"]
+}
+</file>
+
+<file path="server/src/socket/SwarmSocketHandler.ts">
+import { Server, Socket } from "socket.io";
+import { SwarmCoordinator } from "../swarm/SwarmCoordinator.js";
+import {
+  SwarmRunState,
+  type RegisterPayload,
+  type WorkerResult,
+} from "../../../shared/types.js";
+
+export class SwarmSocketHandler {
+  // Explicit properties required for erasable syntax
+  private io: Server;
+  private coordinator: SwarmCoordinator;
+
+  constructor(io: Server, coordinator: SwarmCoordinator) {
+    this.io = io;
+    this.coordinator = coordinator;
+
+    this.setupStateBroadcasting();
+    this.io.on("connection", (s) => this.handleConnection(s));
+  }
+
+  private setupStateBroadcasting() {
+    this.coordinator.stateStore.on("change", (snapshot) => {
+      this.io.emit("swarm:snapshot", snapshot);
+    });
+  }
+
+  private handleConnection(socket: Socket) {
+    const persistentId = socket.handshake.query.persistentId as string;
+
+    if (!persistentId) {
+      socket.disconnect(true);
+      return;
+    }
+
+    socket.on("device:register", (data: RegisterPayload) => {
+      this.coordinator.handleRegistration(socket.id, persistentId, data);
+      socket.emit("swarm:snapshot", this.coordinator.stateStore.getSnapshot());
+    });
+
+    socket.on("cmd:set_run_state", (state: SwarmRunState) => {
+      this.coordinator.setRunState(state);
+    });
+
+    socket.on("cmd:toggle_device", (data: { id: string; enabled: boolean }) => {
+      this.coordinator.toggleDevice(data.id, data.enabled);
+    });
+
+    socket.on("job:request_batch", () => {
+      const jobs = this.coordinator.getWorkForDevice(persistentId);
+      if (jobs.length > 0) {
+        socket.emit("job:batch", jobs);
+      }
+    });
+
+    socket.on("job:complete", (result: WorkerResult) => {
+      result.deviceId = persistentId;
+      this.coordinator.completeJob(result);
+    });
+
+    socket.on("disconnect", () => {
+      this.coordinator.handleDisconnect(socket.id);
+    });
+  }
+}
+</file>
+
+<file path="server/src/swarm/JobGenerator.ts">
+import { SwarmCoordinator } from "./SwarmCoordinator.js";
+import { type JobChunk, SwarmRunState } from "../../../shared/types.js";
+
+export class JobGenerator {
+  // Explicit property declarations required for Erasable Syntax
+  private coordinator: SwarmCoordinator;
+  private interval: NodeJS.Timeout | null = null;
+
+  constructor(coordinator: SwarmCoordinator) {
+    this.coordinator = coordinator; // Explicit assignment
+
+    this.coordinator.stateStore.on("change", (snapshot) => {
+      if (snapshot.runState === SwarmRunState.RUNNING) {
+        this.start();
+      } else {
+        this.stop();
+      }
+    });
+  }
+
+  private start() {
+    if (this.interval) return;
+    console.log("[Generator] Swarm RUNNING -> Starting job stream...");
+
+    this.fillQueue();
+
+    this.interval = setInterval(() => {
+      this.fillQueue();
+    }, 1000);
+  }
+
+  private stop() {
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
+      console.log("[Generator] Swarm STOPPED -> Pausing job stream.");
+    }
+  }
+
+  private fillQueue() {
+    const metrics = this.coordinator.scheduler.getMetrics();
+
+    if (metrics.pendingJobs < 100) {
+      const batchSize = 50;
+      const jobs: JobChunk[] = [];
+
+      for (let i = 0; i < batchSize; i++) {
+        jobs.push({
+          id: `job-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          type: Math.random() > 0.5 ? "MAT_MUL" : "MATH_STRESS",
+          data: { size: 30, iterations: 50000 },
+          status: "PENDING",
+          createdAt: Date.now(),
+        });
+      }
+
+      this.coordinator.submitBatch(jobs);
+    }
+  }
+}
+</file>
+
+<file path="server/src/swarm/SwarmStateStore.ts">
+import { EventEmitter } from "events";
+import {
+  type SwarmSnapshot,
+  SwarmRunState,
+  type DeviceInfo,
+} from "../../../shared/types";
+
+export class SwarmStateStore extends EventEmitter {
+  private snapshot: SwarmSnapshot;
+
+  constructor() {
+    super();
+    this.snapshot = {
+      runState: SwarmRunState.IDLE,
+      globalThrottle: 0.3,
+      devices: {},
+      stats: {
+        totalJobs: 0,
+        activeJobs: 0,
+        pendingJobs: 0,
+      },
+    };
+  }
+
+  public getSnapshot(): SwarmSnapshot {
+    return JSON.parse(JSON.stringify(this.snapshot));
+  }
+
+  public getDevice(deviceId: string): DeviceInfo | undefined {
+    return this.snapshot.devices[deviceId];
+  }
+
+  public getAllDevices(): DeviceInfo[] {
+    return Object.values(this.snapshot.devices);
+  }
+
+  public updateRunState(state: SwarmRunState): void {
+    if (this.snapshot.runState !== state) {
+      this.snapshot.runState = state;
+      this.emitChange();
+    }
+  }
+
+  public upsertDevice(device: DeviceInfo): void {
+    this.snapshot.devices[device.id] = device;
+    this.emitChange();
+  }
+
+  public updateDeviceState(
+    deviceId: string,
+    partial: Partial<DeviceInfo>,
+  ): void {
+    const device = this.snapshot.devices[deviceId];
+    if (device) {
+      this.snapshot.devices[deviceId] = { ...device, ...partial };
+      this.emitChange();
+    }
+  }
+
+  public removeDevice(deviceId: string): void {
+    if (this.snapshot.devices[deviceId]) {
+      delete this.snapshot.devices[deviceId];
+      this.emitChange();
+    }
+  }
+
+  public updateStats(stats: Partial<SwarmSnapshot["stats"]>): void {
+    this.snapshot.stats = { ...this.snapshot.stats, ...stats };
+    this.emitChange();
+  }
+
+  private emitChange() {
+    this.emit("change", this.getSnapshot());
+  }
+}
+</file>
+
+<file path="server/tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "types": ["node"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  }
+}
+</file>
+
+<file path="client/package.json">
+{
+  "name": "client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.33.0",
+    "lucide-react": "^0.563.0",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "recharts": "^3.7.0",
+    "socket.io-client": "^4.8.3",
+    "tailwind-merge": "^3.4.0",
+    "tailwindcss": "^4.1.18"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react-swc": "^4.2.2",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vite": "^7.2.4"
+  }
+}
+</file>
+
+<file path="client/src/App.css">
+@import "tailwindcss";
+@import "tailwindcss";
+@import "tailwindcss";
+
+/* 1. DEFINE YOUR THEME (The "DNA") 🧬 */
+@theme {
+  --color-arc-bg: var(--arc-bg);
+  --color-arc-card: var(--arc-card);
+  --color-arc-border: var(--arc-border);
+  --color-arc-text: var(--arc-text);
+  --color-arc-muted: var(--arc-muted);
+
+  --animate-gradient-x: gradient-x 15s ease infinite;
+
+  @keyframes gradient-x {
+    0%,
+    100% {
+      background-size: 200% 200%;
+      background-position: left center;
+    }
+    50% {
+      background-size: 200% 200%;
+      background-position: right center;
+    }
+  }
+}
+
+/* 2. BASE VARIABLES (The "Fuel") ⛽ */
+:root {
+  --arc-bg: #f0f2f5;
+  --arc-card: #ffffff;
+  --arc-border: rgba(0, 0, 0, 0.06);
+  --arc-text: #1a1a1a;
+  --arc-muted: #8e8e93;
+  --grain-opacity: 0.03;
+}
+
+.dark {
+  --arc-bg: #09090b;
+  --arc-card: rgba(255, 255, 255, 0.03);
+  --arc-border: rgba(255, 255, 255, 0.08);
+  --arc-text: #ececec;
+  --arc-muted: #71717a;
+  --grain-opacity: 0.04;
+}
+
+/* 3. CUSTOM COMPONENTS (The "Body") 🏎️ */
+@layer components {
+  body {
+    @apply bg-arc-bg text-arc-text transition-colors duration-500;
+    font-family: "Inter", sans-serif;
+  }
+
+  .arc-card {
+    @apply bg-arc-card border border-arc-border backdrop-blur-xl rounded-3xl transition-all duration-400 ease-[cubic-bezier(0.2,0.8,0.2,1)];
+  }
+
+  /* Shadow logic for Light Mode */
+  :not(.dark) .arc-card {
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
+  }
+
+  .dark .arc-card:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+}
+
+/* 4. UTILITIES (The "Gadgets") 🔧 */
+@layer utilities {
+  .bg-grain::before {
+    content: "";
+    @apply absolute inset-0 pointer-events-none z-0 mix-blend-overlay;
+    background-image: url("https://upload.wikimedia.org/wikipedia/commons/7/76/Noise.png");
+    opacity: var(--grain-opacity);
+  }
+}
+</file>
+
+<file path="client/src/components/dashboard/LiveTerminal.tsx">
+import { useEffect, useRef } from "react";
+import { Terminal } from "lucide-react";
+import { Card } from "../ui/Card";
+
+interface LiveTerminalProps {
+  logs: string[];
+  status: string;
+}
+
+export function LiveTerminal({ logs, status }: LiveTerminalProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const logsEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when new logs arrive
+  useEffect(() => {
+    if (logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [logs]);
+
+  // Helper to colorize logs based on content
+  const getColor = (text: string) => {
+    if (text.includes("[ERR]") || text.includes("[err]")) return "text-red-400";
+    if (text.includes("[SYS]") || text.includes("System")) return "text-blue-400";
+    if (text.includes("[NET]") || text.includes("Connected")) return "text-cyan-400";
+    if (text.includes("[CFG]") || text.includes("Throttle")) return "text-yellow-400";
+    if (text.includes("[CPU]") || text.includes("threads")) return "text-purple-400";
+    if (text.includes("Device") || text.includes("joined") || text.includes("left")) return "text-emerald-400";
+    return "text-zinc-300";
+  };
+
+  return (
+    <Card className="md:col-span-6 h-60 bg-zinc-950 text-zinc-300 font-mono text-[11px] overflow-hidden flex flex-col border-zinc-800 shadow-inner">
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5 bg-white/5 shrink-0">
+        <Terminal size={12} className="text-zinc-500" />
+        <span className="text-zinc-500 uppercase tracking-wider font-bold text-[10px]">
+          Kernel Output
+        </span>
+        <span className="ml-auto text-[10px] text-zinc-600">
+          {logs.length} entries
+        </span>
+      </div>
+
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto p-4 space-y-1.5 font-mono leading-relaxed scroll-smooth"
+        style={{ scrollbarWidth: 'thin', scrollbarColor: '#3f3f46 #18181b' }}
+      >
+        <p className="text-emerald-500/50 text-[10px]">-- SYSTEM READY --</p>
+
+        {logs.map((log: string, i: number) => (
+          <p 
+            key={i} 
+            className={`${getColor(log)} break-words whitespace-pre-wrap py-0.5`}
+          >
+            {log}
+          </p>
+        ))}
+
+        <div ref={logsEndRef} />
+
+        {status === "IDLE" && logs.length === 0 && (
+          <div className="flex items-center gap-2 mt-2 opacity-50">
+            <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-pulse" />
+            <span className="text-zinc-600">Awaiting dispatch...</span>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+</file>
+
+<file path="client/src/hooks/usePersistentIdentity.ts">
+import { useState } from "react";
+
+// Helper to guess device name from User Agent
+function getFriendlyDeviceName() {
+  const ua = navigator.userAgent;
+  let os = "Node";
+
+  if (ua.includes("Mac")) os = "Mac";
+  if (ua.includes("Win")) os = "Windows";
+  if (ua.includes("Linux")) os = "Linux";
+  if (ua.includes("Android")) os = "Android";
+  if (ua.includes("iPhone") || ua.includes("iPad")) os = "iOS";
+
+  let browser = "Web";
+  if (ua.includes("Chrome")) browser = "Chrome";
+  if (ua.includes("Firefox")) browser = "Firefox";
+  if (ua.includes("Safari") && !ua.includes("Chrome")) browser = "Safari";
+  if (ua.includes("Edg")) browser = "Edge";
+
+  return `${os} (${browser})`;
+}
+
+export const usePersistentIdentity = () => {
+  // Initialize Synchronously from LocalStorage
+  const [identity] = useState<{ id: string; name: string }>(() => {
+    // 1. Try to get existing
+    let storedId = localStorage.getItem("ostrich_worker_id");
+    let storedName = localStorage.getItem("ostrich_device_name");
+
+    // 2. Create if missing
+    if (!storedId) {
+      storedId = crypto.randomUUID();
+      localStorage.setItem("ostrich_worker_id", storedId);
+    }
+
+    // 3. Fix name if missing or old format
+    const isOldName = storedName?.startsWith("Node-");
+    if (!storedName || isOldName) {
+      const friendlyName = getFriendlyDeviceName();
+      const shortHash = storedId.slice(0, 4).toUpperCase();
+      storedName = `${friendlyName} - ${shortHash}`;
+      localStorage.setItem("ostrich_device_name", storedName);
+    }
+
+    return { id: storedId, name: storedName! };
+  });
+
+  return identity;
+};
+</file>
+
+<file path="client/src/index.css">
+@import "tailwindcss";
+:root {
+  --arc-bg: #0f0f11;
+  --arc-card: rgba(255, 255, 255, 0.03);
+  --arc-border: rgba(255, 255, 255, 0.08);
+  --grain-url: url("https://upload.wikimedia.org/wikipedia/commons/7/76/Noise.png"); /* Standard noise texture */
+}
+
+body {
+  background-color: var(--arc-bg);
+  color: #ececec;
+  font-family:
+    "Inter",
+    -apple-system,
+    sans-serif;
+  overflow-x: hidden;
+}
+
+/* THE ARC "GRAIN" EFFECT */
+.bg-grain {
+  position: relative;
+}
+.bg-grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--grain-url);
+  opacity: 0.04;
+  pointer-events: none;
+  z-index: 0;
+  mix-blend-mode: overlay;
+}
+
+/* AURORA GRADIENTS */
+.aurora-gradient {
+  background:
+    radial-gradient(
+      circle at 0% 0%,
+      rgba(255, 180, 180, 0.15),
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 100% 0%,
+      rgba(180, 200, 255, 0.15),
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 100% 100%,
+      rgba(180, 255, 200, 0.1),
+      transparent 40%
+    );
+  filter: blur(60px);
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+/* SQUIRCLE CARDS (Arc Style) */
+.arc-card {
+  background: var(--arc-card);
+  border: 1px solid var(--arc-border);
+  backdrop-filter: blur(20px);
+  border-radius: 24px; /* Soft rounding */
+  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.arc-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3);
+}
+
+/* SCROLLBAR HIDE */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+@import "tailwindcss";
+
+/* 1. DEFINE YOUR THEME (The "DNA") 🧬 */
+@theme {
+  --color-arc-bg: var(--arc-bg);
+  --color-arc-card: var(--arc-card);
+  --color-arc-border: var(--arc-border);
+  --color-arc-text: var(--arc-text);
+  --color-arc-muted: var(--arc-muted);
+
+  --animate-gradient-x: gradient-x 15s ease infinite;
+
+  @keyframes gradient-x {
+    0%,
+    100% {
+      background-size: 200% 200%;
+      background-position: left center;
+    }
+    50% {
+      background-size: 200% 200%;
+      background-position: right center;
+    }
+  }
+}
+
+/* 2. BASE VARIABLES (The "Fuel") ⛽ */
+:root {
+  --arc-bg: #f0f2f5;
+  --arc-card: #ffffff;
+  --arc-border: rgba(0, 0, 0, 0.06);
+  --arc-text: #1a1a1a;
+  --arc-muted: #8e8e93;
+  --grain-opacity: 0.03;
+}
+
+.dark {
+  --arc-bg: #09090b;
+  --arc-card: rgba(255, 255, 255, 0.03);
+  --arc-border: rgba(255, 255, 255, 0.08);
+  --arc-text: #ececec;
+  --arc-muted: #71717a;
+  --grain-opacity: 0.04;
+}
+
+/* 3. CUSTOM COMPONENTS (The "Body") 🏎️ */
+@layer components {
+  body {
+    @apply bg-arc-bg text-arc-text transition-colors duration-500;
+    font-family: "Inter", sans-serif;
+  }
+
+  .arc-card {
+    @apply bg-arc-card border border-arc-border backdrop-blur-xl rounded-3xl transition-all duration-400 ease-[cubic-bezier(0.2,0.8,0.2,1)];
+  }
+
+  /* Shadow logic for Light Mode */
+  :not(.dark) .arc-card {
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
+  }
+
+  .dark .arc-card:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+}
+
+/* 4. UTILITIES (The "Gadgets") 🔧 */
+@layer utilities {
+  .bg-grain::before {
+    content: "";
+    @apply absolute inset-0 pointer-events-none z-0 mix-blend-overlay;
+    background-image: url("https://upload.wikimedia.org/wikipedia/commons/7/76/Noise.png");
+    opacity: var(--grain-opacity);
+  }
+}
+</file>
+
+<file path="client/vite.config.ts">
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react-swc";
+import tailwindcss from "@tailwindcss/vite";
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  server: {
+    proxy: {
+      // Forward all requests starting with /api to the backend
+      "/api": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+      },
+      // Also proxy the socket.io connection
+      "/socket.io": {
+        target: "http://localhost:3000",
+        ws: true,
+      },
+    },
+  },
+});
+</file>
+
+<file path="server/package.json">
+{
+  "name": "ostrich-server",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun src/index.ts"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "http": "^0.0.1-security",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.13",
+    "@types/express": "^4.17.17",
+    "@types/node": "^25.2.1",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.1.6"
+  }
+}
+</file>
+
+<file path="client/src/components/dashboard/DeviceConnector.tsx">
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { QRCodeSVG } from "qrcode.react";
+import {
+  X,
+  QrCode,
+  Copy,
+  Check,
+  Smartphone,
+  Laptop,
+  Server,
+  type LucideIcon,
+} from "lucide-react";
+import type { DeviceType } from "../../../../shared/types";
+
+interface DeviceConnectorProps {
+  isOpen: boolean;
+  onClose: () => void;
+  joinCode: string;
+  serverUrl: string;
+  onJoinCodeChange?: (code: string) => void;
+}
+
+export function DeviceConnector({
+  isOpen,
+  onClose,
+  joinCode,
+  serverUrl,
+  onJoinCodeChange,
+}: DeviceConnectorProps) {
+  // --- 1. State Management ---
+  const [activeTab, setActiveTab] = useState<"qr" | "code" | "link">("qr");
+  const [copied, setCopied] = useState(false);
+  const [customCode, setCustomCode] = useState("");
+
+  const fullJoinUrl = `${serverUrl}/join/${joinCode}`;
+
+  const deviceTypes: Array<{
+    type: DeviceType;
+    icon: LucideIcon;
+    label: string;
+    color: string;
+  }> = [
+    { type: "MOBILE", icon: Smartphone, label: "Mobile", color: "#10b981" },
+    { type: "DESKTOP", icon: Laptop, label: "Desktop", color: "#6366f1" },
+    { type: "COLAB", icon: Server, label: "Colab/Cloud", color: "#f43f5e" },
+  ];
+
+  // --- 2. Logic Helpers ---
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  // --- 3. The "Security Guard" (Escape Key Listener) ---
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
+  // --- 4. Render ---
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        >
+          {/* Main Card */}
+          <motion.div
+            initial={{ scale: 0.95, y: 10 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.95, y: 10 }}
+            // Using your custom CSS class 'arc-card' and theme variables
+            className="arc-card w-full max-w-md shadow-2xl relative overflow-hidden flex flex-col"
+          >
+            {/* Close Button */}
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 text-arc-muted hover:text-arc-text transition-colors z-10"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
+                  <QrCode className="text-indigo-400" size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-arc-text">
+                    Connect Devices
+                  </h3>
+                  <p className="text-sm text-arc-muted">
+                    Add mobile, laptop, or cloud resources
+                  </p>
+                </div>
+              </div>
+
+              {/* Custom Tabs */}
+              <div className="flex p-1 gap-1 bg-arc-bg/50 rounded-xl mb-6 border border-arc-border">
+                {[
+                  { id: "qr", label: "QR Code" },
+                  { id: "code", label: "Join Code" },
+                  { id: "link", label: "Direct Link" },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                      activeTab === tab.id
+                        ? "bg-indigo-600 text-white shadow-lg"
+                        : "text-arc-muted hover:text-arc-text hover:bg-white/5"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* --- TAB CONTENT: QR Code --- */}
+              {activeTab === "qr" && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col items-center gap-4 py-2"
+                >
+                  <div className="p-4 bg-white rounded-2xl shadow-inner">
+                    <QRCodeSVG
+                      value={fullJoinUrl}
+                      size={180}
+                      level="H"
+                      includeMargin={false}
+                    />
+                  </div>
+                  <p className="text-xs text-arc-muted text-center max-w-50">
+                    Scan with your mobile camera or any QR scanner app
+                  </p>
+                </motion.div>
+              )}
+
+              {/* --- TAB CONTENT: Join Code --- */}
+              {activeTab === "code" && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-4"
+                >
+                  <div className="relative group">
+                    <div className="flex items-center justify-center py-8 bg-arc-bg/30 rounded-2xl border border-arc-border group-hover:border-arc-text/20 transition-colors">
+                      <span className="text-5xl font-mono font-bold tracking-widest text-arc-text drop-shadow-sm">
+                        {joinCode}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => copyToClipboard(joinCode)}
+                      className="absolute right-3 top-3 p-2 rounded-lg bg-arc-bg hover:bg-arc-border border border-arc-border transition-all text-arc-muted hover:text-arc-text"
+                    >
+                      {copied ? (
+                        <Check size={16} className="text-emerald-400" />
+                      ) : (
+                        <Copy size={16} />
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 pt-2">
+                    <p className="text-xs text-arc-muted uppercase font-bold tracking-wider">
+                      Or enter custom code
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={customCode}
+                        onChange={(e) =>
+                          setCustomCode(e.target.value.toUpperCase())
+                        }
+                        placeholder="ENTER CODE"
+                        className="flex-1 px-4 py-3 bg-arc-bg/50 border border-arc-border rounded-xl text-arc-text uppercase tracking-wider font-mono text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-arc-muted/50"
+                        maxLength={6}
+                      />
+                      <button
+                        onClick={() => onJoinCodeChange?.(customCode)}
+                        disabled={customCode.length !== 6}
+                        className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-500/20"
+                      >
+                        Connect
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* --- TAB CONTENT: Direct Link --- */}
+              {activeTab === "link" && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-5"
+                >
+                  <div className="p-4 bg-arc-bg/30 rounded-xl border border-arc-border">
+                    <p className="text-xs text-arc-muted mb-2 font-medium">
+                      Share this link
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <code className="flex-1 text-xs text-indigo-300 truncate font-mono bg-indigo-500/10 px-2 py-1 rounded">
+                        {fullJoinUrl}
+                      </code>
+                      <button
+                        onClick={() => copyToClipboard(fullJoinUrl)}
+                        className="p-2 rounded-lg hover:bg-arc-bg text-arc-muted hover:text-arc-text transition-colors"
+                      >
+                        {copied ? (
+                          <Check size={16} className="text-emerald-400" />
+                        ) : (
+                          <Copy size={16} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="text-xs text-arc-muted uppercase font-bold tracking-wider">
+                      Connect specific device
+                    </p>
+                    <div className="grid grid-cols-3 gap-3">
+                      {deviceTypes.map(({ type, icon: Icon, label, color }) => (
+                        <button
+                          key={type}
+                          onClick={() =>
+                            copyToClipboard(`${fullJoinUrl}?type=${type}`)
+                          }
+                          className="flex flex-col items-center gap-3 p-4 rounded-xl bg-arc-bg/30 border border-arc-border hover:border-indigo-500/50 hover:bg-arc-bg/50 transition-all group"
+                        >
+                          <Icon
+                            size={24}
+                            style={{ color }}
+                            className="group-hover:scale-110 transition-transform drop-shadow-md"
+                          />
+                          <span className="text-[10px] font-medium text-arc-muted group-hover:text-arc-text">
+                            {label}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Footer */}
+              <div className="mt-6 pt-6 border-t border-arc-border">
+                <p className="text-xs text-arc-muted text-center">
+                  Devices will appear in the swarm instantly once connected.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+</file>
+
+<file path="client/src/components/dashboard/DeviceHealth.tsx">
+import { Cpu, RotateCw } from "lucide-react";
+import { Card } from "../ui/Card";
+import { Badge } from "../ui/Badge";
+// import { useComputeSwarm } from "../../hooks/useComputeSwarm";
+
+// Add className prop to allow parent to control dimensions
+export function DeviceHealth({
+  status,
+  opsScore,
+  workerId,
+  className = "",
+  onRunBenchmark,
+}: {
+  status: string;
+  opsScore: number;
+  workerId: string;
+  className?: string;
+  onRunBenchmark: () => void;
+}) {
+  return (
+    // Changed: Removed "h-75" and "md:col-span-4". Added {className}.
+    <Card className={`flex flex-col justify-between ${className}`}>
+      <div>
+        <div className="flex justify-between items-start mb-4">
+          <div className="p-2 bg-arc-bg rounded-xl border border-arc-border">
+            <Cpu size={20} className="text-indigo-500" />
+          </div>
+          <Badge active={status === "WORKING"} text={status} />
+        </div>
+        <h3 className="text-base font-medium text-arc-text">Device Health</h3>
+        <p className="text-xs text-arc-muted mt-0.5">Allocation & Benchmarks</p>
+      </div>
+
+      <div className="space-y-2 mt-2">
+        {/* BENCHMARK ROW */}
+        <div className="p-3 rounded-2xl bg-arc-bg border border-arc-border flex justify-between items-center group">
+          <div className="flex flex-col">
+            <span className="text-[10px] text-arc-muted font-bold tracking-wider mb-0.5">
+              BENCHMARK
+            </span>
+            <span className="text-base font-mono text-indigo-500 font-bold">
+              {opsScore > 0 ? opsScore.toLocaleString() : "---"}
+              <span className="text-[10px] text-arc-muted font-normal ml-1">
+                OPS
+              </span>
+            </span>
+          </div>
+
+          <button
+            onClick={onRunBenchmark} // <--- USE THE PROP
+            className={`p-2 rounded-full hover:bg-indigo-500/10 transition-colors ${opsScore === 0 ? "animate-pulse text-indigo-500" : "text-arc-muted opacity-0 group-hover:opacity-100"}`}
+            title="Re-run Benchmark"
+          >
+            <RotateCw size={14} />
+          </button>
+        </div>
+
+        <div className="p-3 rounded-2xl bg-arc-bg border border-arc-border flex justify-between items-center">
+          <span className="text-[10px] text-arc-muted font-bold tracking-wider">
+            ID
+          </span>
+          <span className="text-[10px] font-mono text-arc-muted truncate max-w-20">
+            {workerId || "Connecting..."}
+          </span>
+        </div>
+      </div>
+    </Card>
+  );
+}
+</file>
+
+<file path="server/src/swarm/JoinCodeManager.ts">
+import { type JoinCode } from "../../../shared/types.js";
+import { randomBytes } from "crypto";
+
+export class JoinCodeManager {
+  private codes = new Map<string, JoinCode>();
+  private DEFAULT_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
+  private CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour
+
+  constructor() {
+    this.startCleanup();
+  }
+
+  public generateCode(options?: {
+    expiresIn?: number;
+    maxUses?: number;
+    createdBy?: string;
+    metadata?: JoinCode["metadata"];
+  }): string {
+    const code = this.generateRandomCode();
+
+    const joinCode: JoinCode = {
+      code,
+      expiresAt: Date.now() + (options?.expiresIn || this.DEFAULT_EXPIRY),
+      maxUses: options?.maxUses || 100,
+      usedCount: 0,
+      createdBy: options?.createdBy || "system",
+      metadata: options?.metadata,
+    };
+
+    this.codes.set(code, joinCode);
+    return code;
+  }
+
+  public validateCode(code: string): {
+    valid: boolean;
+    error?: string;
+    joinCode?: JoinCode;
+  } {
+    const joinCode = this.codes.get(code.toUpperCase());
+
+    if (!joinCode) {
+      return { valid: false, error: "Invalid join code" };
+    }
+
+    if (Date.now() > joinCode.expiresAt) {
+      this.codes.delete(code);
+      return { valid: false, error: "Join code has expired" };
+    }
+
+    if (joinCode.usedCount >= joinCode.maxUses) {
+      return { valid: false, error: "Join code has reached maximum uses" };
+    }
+
+    return { valid: true, joinCode };
+  }
+
+  public useCode(code: string): boolean {
+    const result = this.validateCode(code);
+
+    if (!result.valid || !result.joinCode) {
+      return false;
+    }
+
+    result.joinCode.usedCount++;
+
+    if (result.joinCode.usedCount >= result.joinCode.maxUses) {
+      this.codes.delete(code);
+    }
+
+    return true;
+  }
+
+  private generateRandomCode(): string {
+    return randomBytes(4)
+      .toString("base64")
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .substring(0, 6)
+      .toUpperCase();
+  }
+
+  private startCleanup(): void {
+    setInterval(() => {
+      const now = Date.now();
+      for (const [code, joinCode] of this.codes.entries()) {
+        if (now > joinCode.expiresAt) {
+          this.codes.delete(code);
+        }
+      }
+    }, this.CLEANUP_INTERVAL);
+  }
+}
+</file>
+
+<file path="client/src/components/dashboard/GpuStatusMonitor.tsx">
+import { useEffect, useRef } from "react";
+import { Card } from "../ui/Card";
+
+interface DataPoint {
+  value: number;
+  throttle: number;
+  timestamp: number;
+}
+
+interface GpuStatusMonitorProps {
+  completedCount: number;
+  throttle: number; // 0 to 100
+}
+
+export function GpuStatusMonitor({
+  completedCount,
+  throttle,
+}: GpuStatusMonitorProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const dataRef = useRef<DataPoint[]>([]);
+  const countRef = useRef(completedCount);
+  const prevCountRef = useRef(completedCount);
+  const animationFrameRef = useRef<number>(0);
+  const throttleRef = useRef(throttle);
+
+  useEffect(() => {
+    throttleRef.current = throttle;
+  }, [throttle]);
+
+  useEffect(() => {
+    countRef.current = completedCount;
+  }, [completedCount]);
+
+  useEffect(() => {
+    // Initialize data array
+    if (dataRef.current.length === 0) {
+      dataRef.current = new Array(60).fill(null).map(() => ({
+        value: 0,
+        throttle: 30,
+        timestamp: Date.now(),
+      }));
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const dataInterval = setInterval(() => {
+      const now = Date.now();
+      const delta = countRef.current - prevCountRef.current;
+      prevCountRef.current = countRef.current;
+
+      dataRef.current.shift();
+      dataRef.current.push({
+        value: delta * 5,
+        throttle: throttleRef.current,
+        timestamp: now,
+      });
+    }, 200);
+
+    const draw = () => {
+      if (!ctx || !canvas) return;
+      const width = rect.width;
+      const height = rect.height;
+
+      ctx.clearRect(0, 0, width, height);
+
+      const recentData = dataRef.current.slice(-5);
+      const currentVelocity =
+        recentData.length > 0
+          ? recentData.reduce((a, b) => a + b.value, 0) / recentData.length
+          : 0;
+
+      // Draw Grid
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 5; i++) {
+        const y = (height / 4) * i;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+
+      const maxVal = Math.max(...dataRef.current.map((d) => d.value), 10);
+      const getColor = (level: number) => {
+        if (level <= 30) return [16, 185, 129]; // Emerald
+        if (level >= 80) return [244, 63, 94]; // Rose
+        return [99, 102, 241]; // Indigo
+      };
+
+      // Draw Chart
+      const data = dataRef.current;
+      for (let i = 0; i < data.length - 1; i++) {
+        const [r, g, b] = getColor(data[i].throttle);
+
+        const x1 = (i / (data.length - 1)) * width;
+        const x2 = ((i + 1) / (data.length - 1)) * width;
+        const y1 = height - (data[i].value / maxVal) * (height * 0.8);
+        const y2 = height - (data[i + 1].value / maxVal) * (height * 0.8);
+
+        // Fill
+        const gradient = ctx.createLinearGradient(x1, y1, x1, height);
+        gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.3)`);
+        gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+
+        ctx.beginPath();
+        ctx.moveTo(x1, height);
+        ctx.lineTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.lineTo(x2, height);
+        ctx.closePath();
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Stroke
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = `rgb(${r}, ${g}, ${b})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      // Text Overlay
+      ctx.font = "bold 48px Inter, sans-serif";
+      ctx.fillStyle = "var(--arc-text)"; // Uses CSS variable
+      ctx.textAlign = "left";
+      ctx.fillText(Math.round(currentVelocity).toString(), 32, 60);
+
+      ctx.font = "16px Inter, sans-serif";
+      ctx.fillStyle = "var(--arc-muted)";
+      ctx.fillText("chunks / sec", 32, 85);
+
+      animationFrameRef.current = requestAnimationFrame(draw);
+    };
+
+    draw();
+
+    return () => {
+      clearInterval(dataInterval);
+      if (animationFrameRef.current)
+        cancelAnimationFrame(animationFrameRef.current);
+    };
+  }, []);
+
+  const getColorHex = (level: number) => {
+    if (level <= 30) return "#10b981";
+    if (level >= 80) return "#f43f5e";
+    return "#6366f1";
+  };
+  const currentColor = getColorHex(throttle);
+
+  return (
+    <Card
+      className="md:col-span-8 h-90 flex flex-col justify-between relative"
+      noPadding
+    >
+      <div className="p-8 pb-0 z-20 relative">
+        <div className="flex items-center gap-3 mb-2">
+          <div
+            className="w-2 h-2 rounded-full animate-pulse"
+            style={{ backgroundColor: currentColor }}
+          />
+          <h2 className="text-xs font-bold tracking-widest text-arc-muted uppercase">
+            Live Velocity (GPU)
+          </h2>
+        </div>
+
+        <p className="text-xs text-arc-muted font-medium mt-12">
+          Lifetime Contribution:{" "}
+          <span className="font-mono text-arc-text opacity-80">
+            {completedCount.toLocaleString()}
+          </span>{" "}
+          chunks
+        </p>
+
+        <div className="flex items-center gap-2 mt-2">
+          <span
+            className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+            style={{
+              backgroundColor: `${currentColor}20`,
+              color: currentColor,
+            }}
+          >
+            {Math.round(throttle)}% Throttle
+          </span>
+        </div>
+      </div>
+
+      <canvas
+        ref={canvasRef}
+        className="absolute bottom-0 left-0 right-0 h-55 w-full pointer-events-none"
+      />
+    </Card>
+  );
+}
+</file>
+
+<file path="client/src/components/dashboard/ThrottleControl.tsx">
+import React from "react";
+import { Card } from "../ui/Card";
+import { Zap, Cpu, Globe } from "lucide-react";
+
+interface ThrottleControlProps {
+  throttle: number; // 0-100
+  setThrottle: (val: number) => void;
+  totalCores: number;
+  activeCores: number;
+  deviceCount: number;
+}
+
+export function ThrottleControl({
+  throttle,
+  setThrottle,
+  totalCores,
+  activeCores,
+  deviceCount,
+}: ThrottleControlProps) {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setThrottle(parseInt(e.target.value));
+  };
+
+  return (
+    <Card className="md:col-span-6 h-60 flex flex-col justify-center relative overflow-hidden">
+      <div
+        className="absolute right-0 top-0 w-32 h-32 bg-indigo-500/20 blur-[80px] transition-opacity duration-500 pointer-events-none"
+        style={{ opacity: throttle / 100 }}
+      />
+
+      <div className="flex justify-between items-start mb-8 relative z-10">
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-medium text-arc-text">
+              Swarm Resources
+            </h3>
+            <Globe size={14} className="text-indigo-400" />
+          </div>
+          <p className="text-sm text-arc-muted">
+            Global CPU Allocation ({deviceCount} devices)
+          </p>
+        </div>
+
+        <div className="flex flex-col items-end gap-1">
+          <div className="bg-arc-bg px-4 py-2 rounded-full border border-arc-border flex items-center gap-2">
+            <span className="text-xl font-bold text-arc-text">{throttle}%</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-2">
+            <Cpu
+              size={10}
+              className={
+                activeCores > 0 ? "text-emerald-500" : "text-arc-muted"
+              }
+            />
+            <span className="text-[10px] font-mono text-arc-muted uppercase tracking-wider">
+              {activeCores}/{totalCores} Cores Active
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="relative w-full h-12 flex items-center z-10">
+        <div className="absolute w-full h-4 bg-arc-bg rounded-full overflow-hidden border border-arc-border">
+          <div
+            className="h-full transition-all duration-200 bg-linear-to-r from-indigo-400 to-indigo-600"
+            style={{ width: `${throttle}%` }}
+          />
+        </div>
+
+        <input
+          type="range"
+          min="10"
+          max="90"
+          step="10"
+          value={throttle}
+          onChange={handleChange}
+          className="absolute w-full h-full opacity-0 cursor-pointer"
+        />
+
+        <div
+          className="absolute h-8 w-8 bg-white dark:bg-zinc-800 rounded-full border border-black/10 dark:border-white/10 shadow-lg pointer-events-none transition-all duration-200 flex items-center justify-center"
+          style={{ left: `calc(${throttle}% - 16px)` }}
+        >
+          <Zap
+            size={14}
+            className={`fill-indigo-500 transition-colors ${throttle > 50 ? "text-indigo-500" : "text-zinc-400"}`}
+          />
+        </div>
+      </div>
+
+      <div className="flex justify-between mt-6 text-xs font-medium text-arc-muted px-1 z-10">
+        <span>Quiet</span>
+        <span>Standard</span>
+        <span>Rocket</span>
+      </div>
+    </Card>
+  );
+}
+</file>
+
+<file path="client/src/utils/worker.ts">
+/// <reference lib="webworker" />
+
+// --- CONFIGURATION & LIMITS ---
+const LOGICAL_CORES = navigator.hardwareConcurrency || 4;
+
+// --- STATE MANAGEMENT ---
+// Map stores: Worker ID -> { Worker Instance, Busy Status, Current Chunk ID }
+const threadPool = new Map<
+  number,
+  {
+    worker: Worker;
+    objectUrl: string; // <--- ADDED
+    busy: boolean;
+    currentChunkId: string | null;
+  }
+>();
+
+let throttleLimit = 0.3; // Default start at 30%
+let nextWorkerId = 0;
+
+// --- SUB-WORKER FACTORY ---
+// Creates a lightweight worker that runs the actual kernels
+const createSubWorker = (_workerId: number) => {
+  const blob = new Blob(
+    [
+      `
+    // 1. Define Kernels INSIDE the blob
+    const runStressTest = (iterations) => {
+      let sum = 0;
+      const count = iterations || 1000000;
+      for (let i = 0; i < count; i++) {
+        sum += Math.sqrt(i) * Math.sin(i);
+      }
+      return sum;
+    };
+
+    const runMatrixMul = (rowA, matrixB) => {
+      if (!rowA || !matrixB) return []; 
+      if (rowA.length !== matrixB.length) return [];
+
+      const resultRow = new Array(matrixB[0].length).fill(0);
+      for (let j = 0; j < matrixB[0].length; j++) {
+        let sum = 0;
+        for (let k = 0; k < rowA.length; k++) {
+          sum += rowA[k] * matrixB[k][j];
+        }
+        resultRow[j] = sum;
+      }
+      return resultRow;
+    };
+
+    self.onmessage = (e) => {
+      try {
+        const { type, data } = e.data;
+        let result;
+
+        if (type === "MATH_STRESS") {
+          const iterations = typeof data === 'object' ? data.iterations : data;
+          result = runStressTest(iterations);
+        } 
+        else if (type === "MAT_MUL") {
+          if (data && data.size) {
+            const size = data.size;
+            const matrixB = Array(size).fill(0).map(() => Array(size).fill(0).map(() => Math.random()));
+            const rowVector = Array(size).fill(0).map(() => Math.random());
+            result = runMatrixMul(rowVector, matrixB);
+          } else if (data && data.row && data.matrixB) {
+            result = runMatrixMul(data.row, data.matrixB);
+          } else {
+             throw new Error("Invalid MAT_MUL data");
+          }
+        }
+        else {
+          throw new Error("Unknown Kernel: " + type);
+        }
+
+        self.postMessage({ success: true, result });
+      } catch (err) {
+        self.postMessage({ success: false, error: err.message || String(err) });
+      }
+    }
+  `,
+    ],
+    { type: "application/javascript" },
+  );
+
+  const objectUrl = URL.createObjectURL(blob); // <--- CAPTURE URL
+  return { worker: new Worker(objectUrl), objectUrl };
+};
+// --- THREAD POOL MANAGER ---
+const applyConfig = () => {
+  const targetThreadCount = Math.max(
+    1,
+    Math.floor(LOGICAL_CORES * throttleLimit),
+  );
+
+  const currentCount = threadPool.size;
+
+  // SCALE UP
+  if (targetThreadCount > currentCount) {
+    for (let i = currentCount; i < targetThreadCount; i++) {
+      const wId = nextWorkerId++;
+      const { worker, objectUrl } = createSubWorker(wId); // <--- DESTRUCTURE
+      threadPool.set(wId, {
+        worker,
+        objectUrl,
+        busy: false,
+        currentChunkId: null,
+      });
+    }
+  }
+
+  // SCALE DOWN
+  if (targetThreadCount < currentCount) {
+    const toRemove = currentCount - targetThreadCount;
+    let removed = 0;
+
+    for (const [id, thread] of threadPool.entries()) {
+      if (!thread.busy && removed < toRemove) {
+        thread.worker.terminate();
+        URL.revokeObjectURL(thread.objectUrl); // <--- CRITICAL FIX: FREE MEMORY
+        threadPool.delete(id);
+        removed++;
+      }
+    }
+  }
+
+  self.postMessage({
+    type: "CONFIG_APPLIED",
+    threads: threadPool.size,
+    limit: throttleLimit,
+  });
+};
+// --- INITIALIZATION ---
+applyConfig();
+
+// --- MAIN MESSAGE DISPATCHER ---
+self.onmessage = async (e: MessageEvent) => {
+  const { type, chunk, throttleLevel, workerId } = e.data;
+
+  // CONFIG UPDATE
+  if (type === "UPDATE_CONFIG") {
+    if (throttleLevel !== undefined) {
+      throttleLimit = throttleLevel;
+    }
+    applyConfig();
+    return;
+  }
+
+  // BENCHMARKING
+  if (type === "BENCHMARK") {
+    const start = performance.now();
+    let sum = 0;
+    // Quick burst calculation
+    for (let i = 0; i < 500000; i++) {
+      sum += Math.sqrt(i);
+    }
+    const duration = performance.now() - start;
+    const score = Math.round((500000 / (duration || 1)) * 1000);
+
+    self.postMessage({
+      type: "BENCHMARK_COMPLETE",
+      score: score,
+    });
+    return;
+  }
+
+  // JOB PROCESSING
+  if (type === "JOB_CHUNK") {
+    // 1. Find an idle worker
+    let selectedThreadId = -1;
+    let selectedWorker = null;
+
+    for (const [id, thread] of threadPool.entries()) {
+      if (!thread.busy) {
+        selectedThreadId = id;
+        selectedWorker = thread.worker;
+        break;
+      }
+    }
+
+    if (!selectedWorker) {
+      self.postMessage({
+        type: "JOB_ERROR",
+        chunkId: chunk.id,
+        error: "CPU_SATURATED",
+      });
+      return;
+    }
+
+    // 2. Mark thread as busy
+    const thread = threadPool.get(selectedThreadId)!;
+    thread.busy = true;
+    thread.currentChunkId = chunk.id;
+
+    // 3. Set up completion handler
+    selectedWorker.onmessage = (ev) => {
+      thread.busy = false;
+      thread.currentChunkId = null;
+
+      if (ev.data.success) {
+        self.postMessage({
+          type: "JOB_COMPLETE",
+          chunkId: chunk.id,
+          result: ev.data.result,
+          workerId: workerId,
+        });
+      } else {
+        self.postMessage({
+          type: "JOB_ERROR",
+          chunkId: chunk.id,
+          error: ev.data.error,
+        });
+      }
+    };
+
+    // 4. Dispatch to sub-worker
+    selectedWorker.postMessage({
+      type: chunk.type,
+      data: chunk.data,
+    });
+  }
+};
+
+export {};
+</file>
+
+<file path="server/src/swarm/WorkStealingScheduler.ts">
+import {
+  type JobChunk,
+  type WorkerResult,
+  type JobType,
+} from "../../../shared/types";
+import { EventEmitter } from "events";
+
+interface QueueMetrics {
+  totalJobs: number;
+  pendingJobs: number;
+  assignedJobs: number;
+  avgWaitTime: number;
+  jobsByType: Record<JobType, number>;
+}
+
+interface AssignmentRecord {
+  jobId: string;
+  deviceId: string;
+  assignedAt: number;
+  expiresAt: number;
+  retryCount: number;
+}
+
+export class WorkStealingScheduler extends EventEmitter {
+  private jobQueue: JobChunk[] = [];
+  private assignments = new Map<string, AssignmentRecord>();
+  private completedJobs = new Set<string>();
+  private failedJobs = new Map<string, { error: string; retries: number }>();
+
+  // Configuration
+  private JOB_TIMEOUT = 60000; // 60 seconds
+  private MAX_RETRIES = 3;
+
+  constructor() {
+    super();
+    this.startReaper();
+  }
+
+  public submitJob(job: JobChunk): void {
+    job.createdAt = Date.now();
+    job.status = "PENDING";
+    this.jobQueue.push(job);
+    this.emit("jobSubmitted", job);
+  }
+
+  public submitBatch(jobs: JobChunk[]): void {
+    const now = Date.now();
+    jobs.forEach((job) => {
+      job.createdAt = now;
+      job.status = "PENDING";
+    });
+    this.jobQueue.push(...jobs);
+    this.emit("batchSubmitted", jobs);
+  }
+
+  public getBatch(
+    deviceId: string,
+    count: number,
+    // capabilities could be used here to filter job types
+  ): JobChunk[] {
+    const jobs: JobChunk[] = [];
+    let remaining = count;
+
+    // Simple FIFO with status check
+    for (let i = 0; i < this.jobQueue.length && remaining > 0; i++) {
+      const job = this.jobQueue[i];
+      if (job.status === "PENDING") {
+        job.status = "ASSIGNED";
+        job.assignedTo = deviceId;
+        job.assignedAt = Date.now();
+
+        this.assignments.set(job.id, {
+          jobId: job.id,
+          deviceId,
+          assignedAt: job.assignedAt!,
+          expiresAt: Date.now() + this.JOB_TIMEOUT,
+          retryCount: this.failedJobs.get(job.id)?.retries || 0,
+        });
+
+        jobs.push(job);
+        remaining--;
+      }
+    }
+
+    if (jobs.length > 0) {
+      this.emit("batchAssigned", jobs, deviceId);
+    }
+
+    return jobs;
+  }
+
+  public completeJob(result: WorkerResult): boolean {
+    const assignment = this.assignments.get(result.chunkId);
+
+    if (!assignment) return false;
+
+    if (result.error) {
+      return this.handleFailure(result);
+    }
+
+    const job = this.jobQueue.find((j) => j.id === result.chunkId);
+    if (job) {
+      job.status = "COMPLETED";
+    }
+
+    this.completedJobs.add(result.chunkId);
+    this.assignments.delete(result.chunkId);
+    this.failedJobs.delete(result.chunkId);
+
+    this.emit("jobCompleted", result);
+    this.cleanupCompletedJobs();
+
+    return true;
+  }
+
+  private handleFailure(result: WorkerResult): boolean {
+    const jobId = result.chunkId;
+    const currentFails = this.failedJobs.get(jobId);
+    const retryCount = (currentFails?.retries || 0) + 1;
+
+    if (retryCount >= this.MAX_RETRIES) {
+      const job = this.jobQueue.find((j) => j.id === jobId);
+      if (job) job.status = "COMPLETED"; // Mark done to remove from queue effectively
+
+      this.failedJobs.set(jobId, { error: result.error!, retries: retryCount });
+      this.assignments.delete(jobId);
+      this.emit("jobFailed", result, retryCount);
+      return true;
+    }
+
+    const job = this.jobQueue.find((j) => j.id === jobId);
+    if (job) {
+      job.status = "PENDING";
+      job.assignedTo = undefined;
+    }
+
+    this.failedJobs.set(jobId, { error: result.error!, retries: retryCount });
+    this.assignments.delete(jobId);
+    return false;
+  }
+
+  public getMetrics(): QueueMetrics {
+    const pending = this.jobQueue.filter((j) => j.status === "PENDING");
+    const assigned = this.jobQueue.filter((j) => j.status === "ASSIGNED");
+
+    // Count by type
+    const jobsByType = this.jobQueue.reduce(
+      (acc, job) => {
+        acc[job.type] = (acc[job.type] || 0) + 1;
+        return acc;
+      },
+      {} as Record<JobType, number>,
+    );
+
+    return {
+      totalJobs: this.jobQueue.length,
+      pendingJobs: pending.length,
+      assignedJobs: assigned.length,
+      avgWaitTime: 0, // Simplified
+      jobsByType,
+    };
+  }
+
+  public flush(): void {
+    const pending = this.jobQueue.filter((j) => j.status === "PENDING");
+    pending.forEach((job) => {
+      job.status = "COMPLETED"; // Or delete
+    });
+    // In a real scenario, we might clear the array, but this marks them as done
+    this.jobQueue = this.jobQueue.filter((j) => j.status !== "PENDING");
+  }
+
+  private startReaper(): void {
+    setInterval(() => {
+      const now = Date.now();
+      for (const [jobId, assignment] of this.assignments.entries()) {
+        if (now > assignment.expiresAt) {
+          const job = this.jobQueue.find((j) => j.id === jobId);
+          if (job) {
+            job.status = "PENDING";
+            job.assignedTo = undefined;
+          }
+          this.assignments.delete(jobId);
+        }
+      }
+    }, 5000);
+  }
+
+  private cleanupCompletedJobs(): void {
+    if (this.completedJobs.size > 1000) {
+      this.jobQueue = this.jobQueue.filter((j) => j.status !== "COMPLETED");
+      this.completedJobs.clear();
+    }
+  }
+}
+</file>
+
+<file path="shared/types.ts">
+// --- CONSTANTS (Erasable Enums) ---
+export const SwarmRunState = {
+  IDLE: "IDLE",
+  RUNNING: "RUNNING",
+  PAUSED: "PAUSED",
+  STOPPED: "STOPPED",
+} as const;
+export type SwarmRunState = (typeof SwarmRunState)[keyof typeof SwarmRunState];
+
+export const DeviceState = {
+  ENABLED: "ENABLED",
+  DISABLED: "DISABLED",
+  BUSY: "BUSY",
+  ONLINE: "ONLINE",
+  OFFLINE: "OFFLINE",
+  ERROR: "ERROR",
+} as const;
+export type DeviceState = (typeof DeviceState)[keyof typeof DeviceState];
+
+export type DeviceType = "DESKTOP" | "MOBILE" | "COLAB" | "SERVER" | "TABLET";
+export type JobType = "MATH_STRESS" | "MAT_MUL" | "TEXT_TOKENIZE" | "CUSTOM";
+
+// --- INTERFACES ---
+
+export interface JoinCode {
+  code: string;
+  expiresAt: number;
+  maxUses: number;
+  usedCount: number;
+  createdBy: string;
+  metadata?: {
+    description?: string;
+    tags?: string[];
+  };
+}
+
+export interface DeviceCapabilities {
+  cpuCores: number;
+  memoryGB: number;
+  gpuAvailable: boolean;
+  maxConcurrency: number;
+  supportedJobs: JobType[];
+}
+
+export interface DeviceInfo {
+  id: string;
+  socketId: string;
+  name: string;
+  type: DeviceType;
+  state: DeviceState;
+  capabilities: DeviceCapabilities;
+
+  // Metrics
+  opsScore: number;
+  currentLoad: number;
+  totalJobsCompleted: number;
+  avgJobDuration: number;
+  connectedAt: number;
+  lastHeartbeat: number;
+
+  // Configuration
+  isThrottled: boolean;
+  throttleLevel: number;
+}
+
+export interface SwarmSnapshot {
+  runState: SwarmRunState;
+  globalThrottle: number;
+  devices: Record<string, DeviceInfo>;
+  stats: {
+    totalJobs: number;
+    activeJobs: number;
+    pendingJobs: number;
+  };
+}
+
+export interface JobChunk {
+  id: string;
+  type: JobType;
+  data: any;
+  status: "PENDING" | "ASSIGNED" | "COMPLETED";
+  assignedTo?: string;
+  assignedAt?: number;
+  createdAt: number;
+}
+
+export interface WorkerResult {
+  chunkId: string;
+  workerId: string;
+  deviceId?: string;
+  result?: any;
+  error?: string;
+  durationMs?: number;
+  timestamp: number;
+}
+
+export interface RegisterPayload {
+  name: string;
+  type: DeviceType;
+  capabilities?: Partial<DeviceCapabilities>;
+}
+</file>
+
+<file path="client/src/components/dashboard/SwarmDashboard.tsx">
+import { Card } from "../ui/Card";
+import {
+  Smartphone,
+  Laptop,
+  Server,
+  Cpu,
+  Activity,
+  Zap,
+  Wifi,
+  WifiOff,
+  AlertCircle,
+  Unplug,
+  type LucideIcon,
+} from "lucide-react";
+
+import {
+  type DeviceInfo,
+  type DeviceType,
+  DeviceState,
+  type SwarmSnapshot,
+} from "../../../../shared/types";
+
+interface SwarmDashboardProps {
+  devices: DeviceInfo[];
+  stats: SwarmSnapshot["stats"] & {
+    onlineDevices: number;
+    totalDevices: number;
+    globalVelocity: number;
+    totalCores: number;
+    totalMemoryGB: number;
+  };
+  onToggleDevice?: (id: string, state: boolean) => void;
+}
+
+export function SwarmDashboard({
+  devices,
+  stats,
+  onToggleDevice,
+}: SwarmDashboardProps) {
+  const getDeviceIcon = (type: DeviceType) => {
+    switch (type) {
+      case "MOBILE":
+        return Smartphone;
+      case "SERVER":
+        return Server;
+      default:
+        return Laptop;
+    }
+  };
+
+  const getStatusColor = (status: DeviceState) => {
+    switch (status) {
+      case "ONLINE":
+        return "#10b981";
+      case "BUSY":
+        return "#f59e0b";
+      case "ERROR":
+        return "#f43f5e";
+      case "DISABLED":
+        return "#52525b";
+      default:
+        return "#6b7280";
+    }
+  };
+
+  const getStatusIcon = (status: DeviceState) => {
+    switch (status) {
+      case "ONLINE":
+        return Wifi;
+      case "BUSY":
+        return Activity;
+      case "ERROR":
+        return AlertCircle;
+      case "DISABLED":
+        return Unplug;
+      default:
+        return WifiOff;
+    }
+  };
+
+  return (
+    <Card className="md:col-span-12 h-auto" noPadding>
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+              <Zap className="text-emerald-500" size={20} />
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-arc-text">
+                Swarm Overview
+              </h3>
+              <p className="text-sm text-arc-muted">
+                {stats.onlineDevices} of {stats.totalDevices} devices online
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-2xl font-bold text-arc-text">
+              {stats.globalVelocity}
+            </p>
+            <p className="text-xs text-arc-muted">jobs/sec</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <StatBox
+            label="Total Cores"
+            value={stats.totalCores}
+            icon={Cpu}
+            color="#6366f1"
+          />
+          <StatBox
+            label="Memory"
+            value={`${stats.totalMemoryGB}GB`}
+            icon={Server}
+            color="#8b5cf6"
+          />
+          <StatBox
+            label="Pending Jobs"
+            value={stats.pendingJobs}
+            icon={Activity}
+            color="#f59e0b"
+          />
+          <StatBox
+            label="Active Jobs"
+            value={stats.activeJobs}
+            icon={Zap}
+            color="#10b981"
+          />
+        </div>
+
+        <div>
+          <p className="text-xs font-medium text-arc-muted uppercase tracking-wider mb-3">
+            Connected Devices
+          </p>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {devices.map((device) => {
+              const Icon = getDeviceIcon(device.type);
+              const StatusIcon = getStatusIcon(device.state);
+              const statusColor = getStatusColor(device.state);
+              const isEnabled = device.state !== DeviceState.DISABLED;
+
+              return (
+                <div
+                  key={device.id}
+                  className={`flex items-center gap-3 p-3 rounded-xl bg-arc-bg border border-arc-border transition-all ${isEnabled ? "hover:border-indigo-500/30" : "opacity-60"}`}
+                >
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center"
+                    style={{ backgroundColor: `${statusColor}15` }}
+                  >
+                    <Icon size={18} style={{ color: statusColor }} />
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-arc-text truncate">
+                        {device.name}
+                      </span>
+                      <StatusIcon size={12} style={{ color: statusColor }} />
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-arc-muted">
+                      <span>{device.capabilities?.cpuCores} cores</span>
+                      <span>•</span>
+                      <span>{device.capabilities?.memoryGB}GB</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => onToggleDevice?.(device.id, !isEnabled)}
+                    className={`w-12 h-6 rounded-full p-1 transition-colors relative ${isEnabled ? "bg-emerald-500/20" : "bg-zinc-500/20"}`}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded-full shadow-sm transition-all duration-300 ${isEnabled ? "translate-x-6 bg-emerald-500" : "translate-x-0 bg-zinc-400"}`}
+                    />
+                  </button>
+
+                  <div className="text-right w-20">
+                    <div className="text-sm font-medium text-arc-text">
+                      {device.totalJobsCompleted}
+                    </div>
+                    <div className="text-xs text-arc-muted">jobs</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function StatBox({
+  label,
+  value,
+  icon: Icon,
+  color,
+}: {
+  label: string;
+  value: string | number;
+  icon: LucideIcon;
+  color: string;
+}) {
+  return (
+    <div className="p-4 rounded-xl bg-arc-bg border border-arc-border">
+      <div className="flex items-center gap-2 mb-2">
+        <Icon size={16} style={{ color }} />
+        <span className="text-xs text-arc-muted">{label}</span>
+      </div>
+      <p className="text-xl font-bold text-arc-text">{value}</p>
+    </div>
+  );
+}
+</file>
+
+<file path="client/src/hooks/useComputeSwarm.ts">
+import { useEffect, useRef, useState, useCallback } from "react";
+import { io, Socket } from "socket.io-client";
+import {
+  type SwarmSnapshot,
+  SwarmRunState,
+  DeviceState,
+  type JobChunk,
+  type WorkerResult,
+} from "../../../shared/types";
+import OstrichWorker from "../utils/worker?worker";
+import { usePersistentIdentity } from "./usePersistentIdentity";
+
+export const useComputeSwarm = (onLog?: (msg: string) => void) => {
+  const [snapshot, setSnapshot] = useState<SwarmSnapshot | null>(null);
+
+  // UI STATE (Throttled)
+  const [completedCount, setCompletedCount] = useState(0);
+  const [opsScore, setOpsScore] = useState(0);
+  const [joinCode, setJoinCode] = useState("LOADING...");
+
+  // HIGH-SPEED REFS (Non-rendering)
+  const completedCountRef = useRef(0);
+  const opsScoreRef = useRef(0);
+
+  const socketRef = useRef<Socket | null>(null);
+  const workerRef = useRef<Worker | null>(null);
+  const identity = usePersistentIdentity();
+
+  // --- 1. Worker Management ---
+  const initWorker = useCallback(() => {
+    if (workerRef.current) workerRef.current.terminate();
+    workerRef.current = new OstrichWorker();
+
+    workerRef.current.onmessage = (e) => {
+      const { type, chunkId, result, score, error } = e.data;
+
+      if (type === "BENCHMARK_COMPLETE") {
+        // Store in ref, don't re-render yet
+        opsScoreRef.current = score;
+        setOpsScore(score); // Benchmark is rare, safe to render immediately
+      } else if (type === "JOB_COMPLETE") {
+        // HOT PATH: ONLY Update Ref
+        completedCountRef.current += 1;
+
+        // Network IO is async/off-main-thread usually, so this is fine
+        socketRef.current?.emit("job:complete", {
+          chunkId,
+          result,
+          workerId: identity.id,
+        } as WorkerResult);
+
+        socketRef.current?.emit("job:request_batch");
+      } else if (type === "JOB_ERROR") {
+        onLog?.(`[ERR] Job failed: ${error}`);
+        socketRef.current?.emit("job:complete", {
+          chunkId,
+          error,
+          workerId: identity.id,
+        } as WorkerResult);
+      }
+    };
+  }, [identity.id, onLog]);
+
+  // --- 2. UI Sync Loop (The Fix) ---
+  useEffect(() => {
+    const uiInterval = setInterval(() => {
+      // Only trigger React Render if numbers changed
+      setCompletedCount((prev) => {
+        if (prev !== completedCountRef.current) {
+          return completedCountRef.current;
+        }
+        return prev;
+      });
+    }, 200); // Update UI 5 times per second max (Smooth but not freezing)
+
+    return () => clearInterval(uiInterval);
+  }, []);
+
+  // --- 3. Socket Connection ---
+  useEffect(() => {
+    initWorker();
+
+    const sUrl = import.meta.env.DEV
+      ? `${window.location.protocol}//${window.location.hostname}:3000`
+      : window.location.origin;
+
+    const s = io(sUrl, {
+      query: { persistentId: identity.id },
+      transports: ["websocket"],
+    });
+    socketRef.current = s;
+
+    s.on("connect", () => {
+      onLog?.(`[NET] Connected as ${identity.name}`);
+      s.emit("device:register", {
+        name: identity.name,
+        type: "DESKTOP",
+        capabilities: { cpuCores: navigator.hardwareConcurrency || 4 },
+      });
+      s.emit("REQUEST_JOIN_CODE");
+    });
+
+    s.on("swarm:snapshot", (newSnapshot: SwarmSnapshot) => {
+      setSnapshot(newSnapshot);
+    });
+
+    s.on("JOIN_CODE", (data: { code: string }) => {
+      setJoinCode(data.code);
+    });
+
+    s.on("job:batch", (jobs: JobChunk[]) => {
+      if (!workerRef.current) return;
+      jobs.forEach((job) => {
+        workerRef.current?.postMessage({ type: "JOB_CHUNK", chunk: job });
+      });
+    });
+
+    return () => {
+      s.disconnect();
+      workerRef.current?.terminate();
+    };
+  }, [identity, initWorker, onLog]);
+
+  // --- 4. Auto-Request Loop ---
+  useEffect(() => {
+    if (!snapshot) return;
+
+    const myDevice = snapshot.devices[identity.id];
+    const isSwarmRunning = snapshot.runState === SwarmRunState.RUNNING;
+    const amIEnabled =
+      myDevice?.state === DeviceState.ONLINE ||
+      myDevice?.state === DeviceState.BUSY;
+
+    if (isSwarmRunning && amIEnabled) {
+      const interval = setInterval(() => {
+        socketRef.current?.emit("job:request_batch");
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [snapshot, identity.id]);
+
+  return {
+    status: snapshot?.runState || SwarmRunState.IDLE,
+    stats: snapshot?.stats,
+    devices: Object.values(snapshot?.devices || {}),
+    myDevice: snapshot?.devices[identity.id],
+    joinCode,
+    completedCount, // This is now a throttled state
+    opsScore,
+
+    startSwarm: () =>
+      socketRef.current?.emit("cmd:set_run_state", SwarmRunState.RUNNING),
+    pauseSwarm: () =>
+      socketRef.current?.emit("cmd:set_run_state", SwarmRunState.PAUSED),
+    stopSwarm: () =>
+      socketRef.current?.emit("cmd:set_run_state", SwarmRunState.STOPPED),
+    toggleDevice: (id: string, enabled: boolean) =>
+      socketRef.current?.emit("cmd:toggle_device", { id, enabled }),
+
+    updateThrottle: (level: number) => {
+      workerRef.current?.postMessage({
+        type: "UPDATE_CONFIG",
+        throttleLevel: level / 100,
+      });
+    },
+
+    runBenchmark: () => workerRef.current?.postMessage({ type: "BENCHMARK" }),
+  };
+};
+</file>
+
+<file path="server/src/swarm/SwarmCoordinator.ts">
+import {
+  type DeviceInfo,
+  type JobChunk,
+  type WorkerResult,
+  SwarmRunState,
+  DeviceState,
+  type RegisterPayload,
+} from "../../../shared/types.js";
+import { SwarmStateStore } from "./SwarmStateStore.js";
+import { WorkStealingScheduler } from "./WorkStealingScheduler.js";
+import { JoinCodeManager } from "./JoinCodeManager.js";
+
+export class SwarmCoordinator {
+  public stateStore: SwarmStateStore;
+  public scheduler: WorkStealingScheduler;
+  public joinCodeManager: JoinCodeManager;
+
+  constructor() {
+    this.stateStore = new SwarmStateStore();
+    this.scheduler = new WorkStealingScheduler();
+    this.joinCodeManager = new JoinCodeManager();
+
+    this.scheduler.on("jobSubmitted", () => this.syncQueueStats());
+    this.scheduler.on("jobCompleted", () => this.syncQueueStats());
+    this.scheduler.on("batchSubmitted", () => this.syncQueueStats()); // Listen for batch events
+  }
+
+  public handleRegistration(
+    socketId: string,
+    persistentId: string,
+    data: RegisterPayload,
+  ): DeviceInfo {
+    const existing = this.stateStore.getDevice(persistentId);
+
+    const device: DeviceInfo = {
+      id: persistentId,
+      socketId,
+      name: data.name || `Device-${persistentId.substring(0, 4)}`,
+      type: data.type || "DESKTOP",
+      state:
+        existing?.state === DeviceState.DISABLED
+          ? DeviceState.DISABLED
+          : DeviceState.ONLINE,
+      capabilities: {
+        cpuCores: data.capabilities?.cpuCores || 2,
+        memoryGB: data.capabilities?.memoryGB || 4,
+        gpuAvailable: data.capabilities?.gpuAvailable || false,
+        maxConcurrency: data.capabilities?.maxConcurrency || 2,
+        supportedJobs: data.capabilities?.supportedJobs || [
+          "MATH_STRESS",
+          "MAT_MUL",
+        ],
+      },
+      opsScore: existing?.opsScore || 0,
+      currentLoad: 0,
+      totalJobsCompleted: existing?.totalJobsCompleted || 0,
+      avgJobDuration: existing?.avgJobDuration || 0,
+      connectedAt: Date.now(),
+      lastHeartbeat: Date.now(),
+      isThrottled: false,
+      throttleLevel: 1.0,
+    };
+
+    this.stateStore.upsertDevice(device);
+    return device;
+  }
+
+  public handleDisconnect(socketId: string) {
+    const devices = this.stateStore.getAllDevices();
+    const device = devices.find((d) => d.socketId === socketId);
+    if (device) {
+      this.stateStore.updateDeviceState(device.id, {
+        state: DeviceState.OFFLINE,
+      });
+    }
+  }
+
+  public toggleDevice(deviceId: string, enabled: boolean) {
+    const device = this.stateStore.getDevice(deviceId);
+    if (!device) return;
+
+    const newState = enabled ? DeviceState.ONLINE : DeviceState.DISABLED;
+    this.stateStore.updateDeviceState(deviceId, { state: newState });
+
+    if (!enabled) {
+      this.stateStore.updateDeviceState(deviceId, { currentLoad: 0 });
+    }
+  }
+
+  public setRunState(state: SwarmRunState) {
+    this.stateStore.updateRunState(state);
+    if (state === SwarmRunState.STOPPED) {
+      this.scheduler.flush();
+      this.syncQueueStats();
+    }
+  }
+
+  public submitJob(job: JobChunk) {
+    this.scheduler.submitJob(job);
+    this.syncQueueStats();
+  }
+
+  // --- ADDED THIS METHOD ---
+  public submitBatch(jobs: JobChunk[]) {
+    this.scheduler.submitBatch(jobs);
+    this.syncQueueStats();
+  }
+
+  public completeJob(result: WorkerResult) {
+    this.scheduler.completeJob(result);
+
+    if (result.deviceId) {
+      const device = this.stateStore.getDevice(result.deviceId);
+      if (device) {
+        this.stateStore.updateDeviceState(result.deviceId, {
+          totalJobsCompleted: device.totalJobsCompleted + 1,
+          currentLoad: Math.max(0, device.currentLoad - 1),
+          state:
+            device.currentLoad - 1 > 0 ? DeviceState.BUSY : DeviceState.ONLINE,
+        });
+      }
+    }
+    this.syncQueueStats();
+  }
+
+  private syncQueueStats() {
+    const metrics = this.scheduler.getMetrics();
+    this.stateStore.updateStats({
+      totalJobs: metrics.totalJobs,
+      activeJobs: metrics.assignedJobs,
+      pendingJobs: metrics.pendingJobs,
+    });
+  }
+
+  public getWorkForDevice(deviceId: string): JobChunk[] {
+    const device = this.stateStore.getDevice(deviceId);
+    if (
+      !device ||
+      (device.state !== DeviceState.ONLINE && device.state !== DeviceState.BUSY)
+    ) {
+      return [];
+    }
+
+    const snapshot = this.stateStore.getSnapshot();
+    if (snapshot.runState !== SwarmRunState.RUNNING) {
+      return [];
+    }
+
+    const capacity = device.capabilities.maxConcurrency - device.currentLoad;
+    if (capacity <= 0) return [];
+
+    const jobs = this.scheduler.getBatch(deviceId, Math.min(capacity, 5));
+
+    if (jobs.length > 0) {
+      this.stateStore.updateDeviceState(deviceId, {
+        currentLoad: device.currentLoad + jobs.length,
+        state: DeviceState.BUSY,
+      });
+    }
+
+    return jobs;
+  }
+}
+</file>
+
+<file path="client/src/App.tsx">
+import { useState, useCallback } from "react";
+import { Zap, Share2 } from "lucide-react";
+import { useComputeSwarm } from "./hooks/useComputeSwarm";
+
+import { DeviceHealth } from "./components/dashboard/DeviceHealth";
+import { SwarmControls } from "./components/dashboard/SwarmControls";
+import { SwarmDashboard } from "./components/dashboard/SwarmDashboard";
+import { DeviceConnector } from "./components/dashboard/DeviceConnector";
+import { GpuStatusMonitor } from "./components/dashboard/GpuStatusMonitor";
+import { ThrottleControl } from "./components/dashboard/ThrottleControl";
+import { ThemeToggle } from "./components/ui/ThemeToggle";
+import { LiveTerminal } from "./components/dashboard/LiveTerminal";
+import { SwarmRunState, DeviceState } from "../../shared/types";
+
+function App() {
+  const [showQR, setShowQR] = useState(false);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [throttle, setThrottle] = useState(30); // Local state for immediate UI feedback
+
+  const addLog = useCallback((msg: string) => {
+    setLogs((prev) => [...prev.slice(-19), `> ${msg}`]);
+  }, []);
+
+  const {
+    status,
+    devices,
+    myDevice,
+    stats,
+    joinCode,
+    completedCount,
+    opsScore,
+    startSwarm,
+    pauseSwarm,
+    stopSwarm,
+    toggleDevice,
+    runBenchmark,
+    updateThrottle,
+  } = useComputeSwarm(addLog);
+
+  const handleThrottleChange = (val: number) => {
+    setThrottle(val);
+    updateThrottle(val);
+  };
+
+  const isRunning = status === SwarmRunState.RUNNING;
+  const serverUrl = `${window.location.protocol}//${window.location.hostname}:3000`;
+
+  // Computed Stats
+  const swarmStats = {
+    runState: status,
+    globalThrottle: throttle,
+    totalDevices: devices.length,
+    onlineDevices: devices.filter(
+      (d) => d.state === DeviceState.ONLINE || d.state === DeviceState.BUSY,
+    ).length,
+    busyDevices: devices.filter((d) => d.state === DeviceState.BUSY).length,
+    totalCores: devices.reduce((acc, d) => acc + d.capabilities.cpuCores, 0),
+    totalMemoryGB: devices.reduce((acc, d) => acc + d.capabilities.memoryGB, 0),
+    pendingJobs: stats?.pendingJobs || 0,
+    activeJobs: stats?.activeJobs || 0,
+    completedJobs: devices.reduce((acc, d) => acc + d.totalJobsCompleted, 0),
+    globalVelocity: 0,
+    devicesByType: {},
+  };
+  // If we have 3 cores and 20% throttle, we use ceil(3 * 0.2) = 1 core.
+  const calculatedActiveCores = Math.ceil(
+    swarmStats.totalCores * (throttle / 100),
+  );
+
+  return (
+    <div className="min-h-screen relative bg-grain p-6 md:p-12 transition-colors duration-500">
+      <header className="flex justify-between items-center mb-12 relative z-10 max-w-7xl mx-auto">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+            <Zap className="text-white fill-white" size={24} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-arc-text">
+              Ostrich Legs
+            </h1>
+            <div className="flex items-center gap-2">
+              <span
+                className={`flex h-2 w-2 rounded-full ${isRunning ? "bg-emerald-500 animate-pulse" : "bg-zinc-500"}`}
+              />
+              <p className="text-arc-muted text-xs font-medium uppercase tracking-wider">
+                {status}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <ThemeToggle />
+          <button
+            onClick={() => setShowQR(true)}
+            className="group flex items-center gap-2 px-5 py-2.5 rounded-full bg-arc-card border border-arc-border hover:border-indigo-500/30 transition-all"
+          >
+            <Share2
+              size={16}
+              className="text-arc-muted group-hover:text-indigo-500"
+            />
+            <span className="text-sm font-semibold text-arc-text group-hover:text-indigo-500">
+              Connect
+            </span>
+          </button>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-7xl mx-auto relative z-10">
+        {/* ROW 1: GPU Monitor & Controls */}
+        <GpuStatusMonitor completedCount={completedCount} throttle={throttle} />
+
+        <div className="md:col-span-4 h-90 flex gap-4">
+          <DeviceHealth
+            className="flex-1 h-full"
+            status={myDevice?.state || DeviceState.OFFLINE}
+            opsScore={opsScore}
+            workerId={myDevice?.id || "..."}
+            onRunBenchmark={runBenchmark}
+          />
+          <SwarmControls
+            isRunning={isRunning}
+            status={status}
+            onStart={startSwarm}
+            onPause={pauseSwarm}
+            onStop={stopSwarm}
+          />
+        </div>
+
+        {/* ROW 2: Throttle & Terminal */}
+        <ThrottleControl
+          throttle={throttle}
+          setThrottle={handleThrottleChange}
+          totalCores={swarmStats.totalCores}
+          activeCores={Math.min(calculatedActiveCores, swarmStats.totalCores)}
+          deviceCount={swarmStats.totalDevices}
+        />
+
+        <LiveTerminal logs={logs} status={status} />
+
+        {/* ROW 3: Detailed Dashboard */}
+        <SwarmDashboard
+          devices={devices}
+          stats={swarmStats as any}
+          onToggleDevice={toggleDevice}
+        />
+      </div>
+
+      <DeviceConnector
+        isOpen={showQR}
+        joinCode={joinCode}
+        serverUrl={serverUrl}
+        onClose={() => setShowQR(false)}
+      />
+    </div>
+  );
+}
+
+export default App;
+</file>
+
+<file path="server/src/index.ts">
+import express from "express";
+import { createServer } from "http";
+import { Server } from "socket.io";
+import cors from "cors";
+import { SwarmCoordinator } from "./swarm/SwarmCoordinator";
+import { SwarmSocketHandler } from "./socket/SwarmSocketHandler";
+import { JobGenerator } from "./swarm/JobGenerator";
+console.log("Starting Ostrich Swarm Server...");
+
+const PORT = Number(process.env.PORT) || 3000;
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const httpServer = createServer(app);
+
+const io = new Server(httpServer, {
+  cors: { origin: "*", methods: ["GET", "POST"] },
+  transports: ["websocket", "polling"],
+  maxHttpBufferSize: 1e8,
+  pingTimeout: 60000,
+});
+
+const swarmCoordinator = new SwarmCoordinator();
+new SwarmSocketHandler(io, swarmCoordinator);
+new JobGenerator(swarmCoordinator);
+
+// Optional API access to state
+app.get("/api/stats", (_, res) => {
+  res.json(swarmCoordinator.stateStore.getSnapshot());
+});
+
+httpServer.listen(PORT, "0.0.0.0", () => {
+  console.log(`[Server] Ostrich Swarm Coordinator running on port: ${PORT}`);
+});
+</file>
+
+</files>

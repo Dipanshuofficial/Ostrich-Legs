@@ -120,9 +120,15 @@ export class SwarmCoordinator {
         });
       }
     }
+
+    // --- FIX: Increment Global Completed Count ---
+    const currentStats = this.stateStore.getSnapshot().stats;
+    this.stateStore.updateStats({
+      completedJobs: (currentStats.completedJobs || 0) + 1,
+    });
+
     this.syncQueueStats();
   }
-
   private syncQueueStats() {
     const metrics = this.scheduler.getMetrics();
     this.stateStore.updateStats({
@@ -159,5 +165,11 @@ export class SwarmCoordinator {
     }
 
     return jobs;
+  }
+  public handleBenchmarkResult(deviceId: string, score: number) {
+    const device = this.stateStore.getDevice(deviceId);
+    if (device) {
+      this.stateStore.updateDeviceState(deviceId, { opsScore: score });
+    }
   }
 }

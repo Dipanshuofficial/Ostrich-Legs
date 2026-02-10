@@ -2,12 +2,11 @@ import { SwarmCoordinator } from "./SwarmCoordinator.js";
 import { type JobChunk, SwarmRunState } from "../../../shared/types.js";
 
 export class JobGenerator {
-  // Explicit property declarations required for Erasable Syntax
   private coordinator: SwarmCoordinator;
   private interval: NodeJS.Timeout | null = null;
 
   constructor(coordinator: SwarmCoordinator) {
-    this.coordinator = coordinator; // Explicit assignment
+    this.coordinator = coordinator;
 
     this.coordinator.stateStore.on("change", (snapshot) => {
       if (snapshot.runState === SwarmRunState.RUNNING) {
@@ -20,13 +19,13 @@ export class JobGenerator {
 
   private start() {
     if (this.interval) return;
-    console.log("[Generator] Swarm RUNNING -> Starting job stream...");
+    console.log("[Generator] Swarm RUNNING -> Starting heavy job stream...");
 
     this.fillQueue();
 
     this.interval = setInterval(() => {
       this.fillQueue();
-    }, 1000);
+    }, 2000); // Check every 2 seconds (Slower check is fine)
   }
 
   private stop() {
@@ -40,15 +39,17 @@ export class JobGenerator {
   private fillQueue() {
     const metrics = this.coordinator.scheduler.getMetrics();
 
-    if (metrics.pendingJobs < 100) {
-      const batchSize = 50;
+    // INCREASED BUFFER: Keep 2000 jobs pending to prevent starvation
+    if (metrics.pendingJobs < 2000) {
+      const batchSize = 200; // Generate big batches
       const jobs: JobChunk[] = [];
 
       for (let i = 0; i < batchSize; i++) {
+        const isMatrix = Math.random() > 0.5;
         jobs.push({
           id: `job-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-          type: Math.random() > 0.5 ? "MAT_MUL" : "MATH_STRESS",
-          data: { size: 30, iterations: 50000 },
+          type: isMatrix ? "MAT_MUL" : "MATH_STRESS",
+          data: isMatrix ? { size: 300 } : { iterations: 5000000 },
           status: "PENDING",
           createdAt: Date.now(),
         });

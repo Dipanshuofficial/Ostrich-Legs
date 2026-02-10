@@ -71,6 +71,7 @@ export interface SwarmSnapshot {
     totalJobs: number;
     activeJobs: number;
     pendingJobs: number;
+    completedJobs: number;
   };
 }
 

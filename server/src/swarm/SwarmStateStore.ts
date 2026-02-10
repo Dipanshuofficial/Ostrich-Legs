@@ -18,6 +18,7 @@ export class SwarmStateStore extends EventEmitter {
         totalJobs: 0,
         activeJobs: 0,
         pendingJobs: 0,
+        completedJobs: 0,
       },
     };
   }

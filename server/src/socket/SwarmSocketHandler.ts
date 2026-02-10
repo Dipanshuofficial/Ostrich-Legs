@@ -7,14 +7,12 @@ import {
 } from "../../../shared/types.js";
 
 export class SwarmSocketHandler {
-  // Explicit properties required for erasable syntax
   private io: Server;
   private coordinator: SwarmCoordinator;
 
   constructor(io: Server, coordinator: SwarmCoordinator) {
     this.io = io;
     this.coordinator = coordinator;
-
     this.setupStateBroadcasting();
     this.io.on("connection", (s) => this.handleConnection(s));
   }
@@ -44,6 +42,17 @@ export class SwarmSocketHandler {
 
     socket.on("cmd:toggle_device", (data: { id: string; enabled: boolean }) => {
       this.coordinator.toggleDevice(data.id, data.enabled);
+    });
+
+    // --- NEW: Global Benchmark Trigger ---
+    socket.on("cmd:trigger_benchmark", () => {
+      // Broadcast to ALL clients to start their benchmarks
+      this.io.emit("cmd:run_benchmark");
+    });
+
+    // --- NEW: Receive Result ---
+    socket.on("benchmark:result", (data: { score: number }) => {
+      this.coordinator.handleBenchmarkResult(persistentId, data.score);
     });
 
     socket.on("job:request_batch", () => {

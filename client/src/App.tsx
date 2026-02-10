@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, memo } from "react";
 import { Zap, Share2 } from "lucide-react";
 import { useComputeSwarm } from "./hooks/useComputeSwarm";
 
@@ -12,10 +12,18 @@ import { ThemeToggle } from "./components/ui/ThemeToggle";
 import { LiveTerminal } from "./components/dashboard/LiveTerminal";
 import { SwarmRunState, DeviceState } from "../../shared/types";
 
+// --- MEMOIZED COMPONENTS (Prevents re-renders on every tick) ---
+const MemoSwarmDashboard = memo(SwarmDashboard);
+const MemoGpuStatusMonitor = memo(GpuStatusMonitor);
+const MemoThrottleControl = memo(ThrottleControl);
+const MemoDeviceHealth = memo(DeviceHealth);
+const MemoSwarmControls = memo(SwarmControls);
+const MemoLiveTerminal = memo(LiveTerminal);
+
 function App() {
   const [showQR, setShowQR] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
-  const [throttle, setThrottle] = useState(30); // Local state for immediate UI feedback
+  const [throttle, setThrottle] = useState(30);
 
   const addLog = useCallback((msg: string) => {
     setLogs((prev) => [...prev.slice(-19), `> ${msg}`]);
@@ -24,11 +32,10 @@ function App() {
   const {
     status,
     devices,
-    myDevice,
+
     stats,
     joinCode,
-    completedCount,
-    opsScore,
+
     startSwarm,
     pauseSwarm,
     stopSwarm,
@@ -37,32 +44,57 @@ function App() {
     updateThrottle,
   } = useComputeSwarm(addLog);
 
-  const handleThrottleChange = (val: number) => {
-    setThrottle(val);
-    updateThrottle(val);
-  };
+  const handleThrottleChange = useCallback(
+    (val: number) => {
+      setThrottle(val);
+      updateThrottle(val);
+    },
+    [updateThrottle],
+  );
 
   const isRunning = status === SwarmRunState.RUNNING;
   const serverUrl = `${window.location.protocol}//${window.location.hostname}:3000`;
 
-  // Computed Stats
-  const swarmStats = {
-    runState: status,
-    globalThrottle: throttle,
-    totalDevices: devices.length,
-    onlineDevices: devices.filter(
+  // --- BUG 4 FIX: Math Calculation ---
+  const swarmStats = useMemo(() => {
+    // Only count enabled devices (ONLINE or BUSY)
+    const activeDevicesList = devices.filter(
       (d) => d.state === DeviceState.ONLINE || d.state === DeviceState.BUSY,
-    ).length,
-    busyDevices: devices.filter((d) => d.state === DeviceState.BUSY).length,
-    totalCores: devices.reduce((acc, d) => acc + d.capabilities.cpuCores, 0),
-    totalMemoryGB: devices.reduce((acc, d) => acc + d.capabilities.memoryGB, 0),
-    pendingJobs: stats?.pendingJobs || 0,
-    activeJobs: stats?.activeJobs || 0,
-    completedJobs: devices.reduce((acc, d) => acc + d.totalJobsCompleted, 0),
-    globalVelocity: 0,
-    devicesByType: {},
-  };
-  // If we have 3 cores and 20% throttle, we use ceil(3 * 0.2) = 1 core.
+    );
+
+    return {
+      runState: status,
+      globalThrottle: throttle,
+      totalDevices: devices.length,
+      onlineDevices: activeDevicesList.length,
+      busyDevices: devices.filter((d) => d.state === DeviceState.BUSY).length,
+
+      totalCores: activeDevicesList.reduce(
+        (acc, d) => acc + d.capabilities.cpuCores,
+        0,
+      ),
+      totalMemoryGB: activeDevicesList.reduce(
+        (acc, d) => acc + d.capabilities.memoryGB,
+        0,
+      ),
+
+      pendingJobs: stats?.pendingJobs || 0,
+      activeJobs: stats?.activeJobs || 0,
+      completedJobs: devices.reduce((acc, d) => acc + d.totalJobsCompleted, 0),
+      globalVelocity: 0,
+
+      // FIX: Correctly count devices by type
+      devicesByType: devices.reduce(
+        (acc, device) => {
+          const type = device.type || "DESKTOP";
+          acc[type] = (acc[type] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
+    };
+  }, [devices, status, throttle, stats]);
+
   const calculatedActiveCores = Math.ceil(
     swarmStats.totalCores * (throttle / 100),
   );
@@ -107,18 +139,20 @@ function App() {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-7xl mx-auto relative z-10">
-        {/* ROW 1: GPU Monitor & Controls */}
-        <GpuStatusMonitor completedCount={completedCount} throttle={throttle} />
+        {/* ROW 1: GPU Monitor */}
+        {/* BUG 1 FIX: Memoized component handles high-frequency updates without re-rendering parent layout */}
+        <MemoGpuStatusMonitor
+          completedCount={swarmStats.completedJobs}
+          throttle={throttle}
+        />
 
         <div className="md:col-span-4 h-90 flex gap-4">
-          <DeviceHealth
+          <MemoDeviceHealth
             className="flex-1 h-full"
-            status={myDevice?.state || DeviceState.OFFLINE}
-            opsScore={opsScore}
-            workerId={myDevice?.id || "..."}
+            devices={devices}
             onRunBenchmark={runBenchmark}
           />
-          <SwarmControls
+          <MemoSwarmControls
             isRunning={isRunning}
             status={status}
             onStart={startSwarm}
@@ -128,7 +162,7 @@ function App() {
         </div>
 
         {/* ROW 2: Throttle & Terminal */}
-        <ThrottleControl
+        <MemoThrottleControl
           throttle={throttle}
           setThrottle={handleThrottleChange}
           totalCores={swarmStats.totalCores}
@@ -136,10 +170,10 @@ function App() {
           deviceCount={swarmStats.totalDevices}
         />
 
-        <LiveTerminal logs={logs} status={status} />
+        <MemoLiveTerminal logs={logs} status={status} />
 
         {/* ROW 3: Detailed Dashboard */}
-        <SwarmDashboard
+        <MemoSwarmDashboard
           devices={devices}
           stats={swarmStats as any}
           onToggleDevice={toggleDevice}
