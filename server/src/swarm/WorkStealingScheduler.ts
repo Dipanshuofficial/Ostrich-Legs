@@ -28,24 +28,22 @@ export class WorkStealingScheduler extends EventEmitter {
   private failedJobs = new Map<string, { error: string; retries: number }>();
 
   // Configuration
-  private readonly JOB_TIMEOUT = 60000; // 60 seconds
-  private readonly MAX_RETRIES = 3;
-  private readonly STEAL_THRESHOLD = 5; // Steal if device has 5+ jobs pending
-  private readonly STEAL_BATCH_SIZE = 3;
+  private JOB_TIMEOUT = 60000; // 60 seconds
+  private MAX_RETRIES = 3;
 
   constructor() {
     super();
     this.startReaper();
   }
 
-  submitJob(job: JobChunk): void {
+  public submitJob(job: JobChunk): void {
     job.createdAt = Date.now();
     job.status = "PENDING";
     this.jobQueue.push(job);
     this.emit("jobSubmitted", job);
   }
 
-  submitBatch(jobs: JobChunk[]): void {
+  public submitBatch(jobs: JobChunk[]): void {
     const now = Date.now();
     jobs.forEach((job) => {
       job.createdAt = now;
@@ -55,48 +53,18 @@ export class WorkStealingScheduler extends EventEmitter {
     this.emit("batchSubmitted", jobs);
   }
 
-  getNextJob(deviceId: string, capabilities?: JobType[]): JobChunk | null {
-    // Find first compatible job
-    const index = this.jobQueue.findIndex(
-      (job) =>
-        job.status === "PENDING" &&
-        (!capabilities || capabilities.includes(job.type)),
-    );
-
-    if (index === -1) return null;
-
-    const job = this.jobQueue[index];
-    job.status = "ASSIGNED";
-    job.assignedTo = deviceId;
-    job.assignedAt = Date.now();
-
-    // Track assignment
-    this.assignments.set(job.id, {
-      jobId: job.id,
-      deviceId,
-      assignedAt: job.assignedAt,
-      expiresAt: job.assignedAt + this.JOB_TIMEOUT,
-      retryCount: this.failedJobs.get(job.id)?.retries || 0,
-    });
-
-    this.emit("jobAssigned", job, deviceId);
-    return job;
-  }
-
-  getBatch(
+  public getBatch(
     deviceId: string,
     count: number,
-    capabilities?: JobType[],
+    // capabilities could be used here to filter job types
   ): JobChunk[] {
     const jobs: JobChunk[] = [];
     let remaining = count;
 
+    // Simple FIFO with status check
     for (let i = 0; i < this.jobQueue.length && remaining > 0; i++) {
       const job = this.jobQueue[i];
-      if (
-        job.status === "PENDING" &&
-        (!capabilities || capabilities.includes(job.type))
-      ) {
+      if (job.status === "PENDING") {
         job.status = "ASSIGNED";
         job.assignedTo = deviceId;
         job.assignedAt = Date.now();
@@ -104,8 +72,8 @@ export class WorkStealingScheduler extends EventEmitter {
         this.assignments.set(job.id, {
           jobId: job.id,
           deviceId,
-          assignedAt: job.assignedAt,
-          expiresAt: job.assignedAt + this.JOB_TIMEOUT,
+          assignedAt: job.assignedAt!,
+          expiresAt: Date.now() + this.JOB_TIMEOUT,
           retryCount: this.failedJobs.get(job.id)?.retries || 0,
         });
 
@@ -121,20 +89,15 @@ export class WorkStealingScheduler extends EventEmitter {
     return jobs;
   }
 
-  completeJob(result: WorkerResult): boolean {
+  public completeJob(result: WorkerResult): boolean {
     const assignment = this.assignments.get(result.chunkId);
 
-    if (!assignment) {
-      console.warn(`[Scheduler] Completion for unknown job: ${result.chunkId}`);
-      return false;
-    }
+    if (!assignment) return false;
 
     if (result.error) {
-      // Handle failure
       return this.handleFailure(result);
     }
 
-    // Success - mark as completed
     const job = this.jobQueue.find((j) => j.id === result.chunkId);
     if (job) {
       job.status = "COMPLETED";
@@ -156,109 +119,31 @@ export class WorkStealingScheduler extends EventEmitter {
     const retryCount = (currentFails?.retries || 0) + 1;
 
     if (retryCount >= this.MAX_RETRIES) {
-      // Max retries reached - permanently fail
       const job = this.jobQueue.find((j) => j.id === jobId);
-      if (job) {
-        job.status = "COMPLETED"; // Mark as completed to remove from queue
-      }
+      if (job) job.status = "COMPLETED"; // Mark done to remove from queue effectively
 
-      this.failedJobs.set(jobId, {
-        error: result.error!,
-        retries: retryCount,
-      });
+      this.failedJobs.set(jobId, { error: result.error!, retries: retryCount });
       this.assignments.delete(jobId);
-
       this.emit("jobFailed", result, retryCount);
       return true;
     }
 
-    // Retry - reset to pending
     const job = this.jobQueue.find((j) => j.id === jobId);
     if (job) {
       job.status = "PENDING";
       job.assignedTo = undefined;
-      job.assignedAt = undefined;
     }
 
-    this.failedJobs.set(jobId, {
-      error: result.error!,
-      retries: retryCount,
-    });
+    this.failedJobs.set(jobId, { error: result.error!, retries: retryCount });
     this.assignments.delete(jobId);
-
-    this.emit("jobRetry", result, retryCount);
     return false;
   }
 
-  // Work Stealing - called when a device is idle but has no work
-  stealWork(
-    thiefId: string,
-    maxJobs: number = this.STEAL_BATCH_SIZE,
-  ): JobChunk[] {
-    // Find jobs assigned to busy devices that can be stolen
-    const stealable: JobChunk[] = [];
-
-    for (const [jobId, assignment] of this.assignments.entries()) {
-      if (
-        assignment.deviceId !== thiefId &&
-        Date.now() - assignment.assignedAt > 5000
-      ) {
-        // Only steal jobs assigned >5s ago
-        const job = this.jobQueue.find((j) => j.id === jobId);
-        if (job && job.status === "ASSIGNED") {
-          stealable.push(job);
-        }
-      }
-
-      if (stealable.length >= maxJobs) break;
-    }
-
-    // Reassign stolen jobs
-    stealable.forEach((job) => {
-      const oldDevice = this.assignments.get(job.id)?.deviceId;
-
-      job.assignedTo = thiefId;
-      job.assignedAt = Date.now();
-
-      this.assignments.set(job.id, {
-        jobId: job.id,
-        deviceId: thiefId,
-        assignedAt: job.assignedAt,
-        expiresAt: job.assignedAt + this.JOB_TIMEOUT,
-        retryCount: this.assignments.get(job.id)?.retryCount || 0,
-      });
-
-      this.emit("workStolen", job, oldDevice, thiefId);
-    });
-
-    return stealable;
-  }
-
-  // Check if a device should offer work to steal
-  shouldOfferWork(deviceId: string): boolean {
-    const deviceJobs = Array.from(this.assignments.values()).filter(
-      (a) => a.deviceId === deviceId,
-    ).length;
-
-    return deviceJobs >= this.STEAL_THRESHOLD;
-  }
-
-  getWorkForDevice(deviceId: string): JobChunk[] {
-    return this.jobQueue.filter(
-      (job) => job.assignedTo === deviceId && job.status === "ASSIGNED",
-    );
-  }
-
-  // Metrics
-  getMetrics(): QueueMetrics {
-    const now = Date.now();
+  public getMetrics(): QueueMetrics {
     const pending = this.jobQueue.filter((j) => j.status === "PENDING");
     const assigned = this.jobQueue.filter((j) => j.status === "ASSIGNED");
 
-    const waitTimes = pending
-      .filter((j) => j.createdAt)
-      .map((j) => now - j.createdAt);
-
+    // Count by type
     const jobsByType = this.jobQueue.reduce(
       (acc, job) => {
         acc[job.type] = (acc[job.type] || 0) + 1;
@@ -271,97 +156,40 @@ export class WorkStealingScheduler extends EventEmitter {
       totalJobs: this.jobQueue.length,
       pendingJobs: pending.length,
       assignedJobs: assigned.length,
-      avgWaitTime:
-        waitTimes.length > 0
-          ? waitTimes.reduce((a, b) => a + b, 0) / waitTimes.length
-          : 0,
+      avgWaitTime: 0, // Simplified
       jobsByType,
     };
   }
 
-  getPendingCount(): number {
-    return this.jobQueue.filter((j) => j.status === "PENDING").length;
+  public flush(): void {
+    const pending = this.jobQueue.filter((j) => j.status === "PENDING");
+    pending.forEach((job) => {
+      job.status = "COMPLETED"; // Or delete
+    });
+    // In a real scenario, we might clear the array, but this marks them as done
+    this.jobQueue = this.jobQueue.filter((j) => j.status !== "PENDING");
   }
 
-  getAssignedCount(): number {
-    return this.assignments.size;
-  }
-
-  getFailedCount(): number {
-    return this.failedJobs.size;
-  }
-
-  // Reaper - handles timeouts and cleanup
   private startReaper(): void {
     setInterval(() => {
       const now = Date.now();
-
-      // Check for timed out assignments
       for (const [jobId, assignment] of this.assignments.entries()) {
         if (now > assignment.expiresAt) {
-          console.log(`[Scheduler] Job ${jobId} timed out, retrying...`);
-
           const job = this.jobQueue.find((j) => j.id === jobId);
           if (job) {
             job.status = "PENDING";
             job.assignedTo = undefined;
-            job.assignedAt = undefined;
           }
-
           this.assignments.delete(jobId);
-          this.emit("jobTimeout", jobId);
         }
       }
-    }, 5000); // Check every 5 seconds
+    }, 5000);
   }
 
   private cleanupCompletedJobs(): void {
-    const MAX_HISTORY = 1000;
-
-    // If we are under the limit, do nothing (Optimization)
-    if (this.completedJobs.size <= MAX_HISTORY) return;
-
-    // 1. Calculate how many to remove
-    const removeCount = this.completedJobs.size - MAX_HISTORY;
-
-    // 2. Identify IDs to remove (The Set iterates in insertion order)
-    const toRemoveIds = new Set<string>();
-    let count = 0;
-    for (const id of this.completedJobs) {
-      if (count >= removeCount) break;
-      toRemoveIds.add(id);
-      count++;
+    if (this.completedJobs.size > 1000) {
+      this.jobQueue = this.jobQueue.filter((j) => j.status !== "COMPLETED");
+      this.completedJobs.clear();
     }
-
-    // 3. Remove from the Set tracking
-    for (const id of toRemoveIds) {
-      this.completedJobs.delete(id);
-    }
-
-    // 4. Optimized Batch Removal from Queue (O(N) pass)
-    // Instead of splicing one by one (which is O(N^2)), we filter once.
-    if (toRemoveIds.size > 0) {
-      this.jobQueue = this.jobQueue.filter((job) => !toRemoveIds.has(job.id));
-    }
-
-    console.log(`[Scheduler] Cleaned up ${toRemoveIds.size} old jobs.`);
-  }
-
-  // Emergency flush - clear all pending jobs
-  flush(): JobChunk[] {
-    const pending = this.jobQueue.filter((j) => j.status === "PENDING");
-    pending.forEach((job) => {
-      job.status = "COMPLETED";
-      this.emit("jobFlushed", job);
-    });
-    return pending;
-  }
-
-  dispose(): void {
-    this.jobQueue = [];
-    this.assignments.clear();
-    this.completedJobs.clear();
-    this.failedJobs.clear();
-    this.removeAllListeners();
   }
 }
