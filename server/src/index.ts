@@ -1,3 +1,5 @@
+// server/src/index.ts
+
 console.log("Starting Ostrich Swarm Coordinator...");
 
 import express from "express";
@@ -18,9 +20,17 @@ app.use(cors());
 app.use(express.json());
 
 const httpServer = createServer(app);
+// Find this section around line 23
+// Replace the io initialization block:
+
 const io = new Server(httpServer, {
   cors: { origin: "*", methods: ["GET", "POST"] },
   transports: ["websocket", "polling"],
+
+  // FIX 2: Connection Hardening
+  maxHttpBufferSize: 1e8, // 100 MB (Cloudflare limit usually around 100MB)
+  pingTimeout: 120000, // 2 minutes (Account for slow tunnel latencies)
+  pingInterval: 25000, // 25 seconds
 });
 
 const swarm = new SwarmCoordinator(io, {
@@ -35,7 +45,7 @@ const initialJoinCode = swarm.generateJoinCode({
 });
 console.log(`[Server] Initial join code: ${initialJoinCode}`);
 
-// REST API Endpoints
+// --- REST API Endpoints ---
 
 // Get swarm statistics
 app.get("/api/stats", (_, res) => res.json(swarm.getStats()));
@@ -58,7 +68,7 @@ app.get("/api/join-codes/:code", (req, res) => {
   res.json(result);
 });
 
-// Submit jobs via REST API (for Colab/batch processing)
+// Submit jobs via REST API
 app.post("/api/jobs", (req, res) => {
   const jobs: JobChunk[] = req.body.jobs;
 
@@ -82,7 +92,6 @@ app.post("/api/jobs", (req, res) => {
 
 // Get job queue status
 app.get("/api/jobs/status", (_, res) => {
-  // Access scheduler metrics through coordinator
   const stats = swarm.getStats();
   res.json({
     pending: stats.pendingJobs,
@@ -92,7 +101,8 @@ app.get("/api/jobs/status", (_, res) => {
   });
 });
 
-// Socket.IO Handlers
+// --- Socket.IO Handlers ---
+
 io.on("connection", (socket) => {
   console.log(`[Socket] New connection: ${socket.id}`);
 
@@ -106,7 +116,7 @@ io.on("connection", (socket) => {
   socket.on(
     "REGISTER_DEVICE",
     (data: {
-      id: string; // <--- ADDED THIS
+      id: string;
       name?: string;
       type?: DeviceType;
       capabilities?: DeviceCapabilities;
@@ -123,9 +133,8 @@ io.on("connection", (socket) => {
         swarm.useJoinCode(data.joinCode);
       }
 
-      // 2. FIX: Pass the ID to the coordinator
       const device = swarm.registerDevice(socket.id, {
-        id: data.id, // <--- CRITICAL FIX: Pass persistent ID
+        id: data.id,
         name: data.name,
         type: data.type || "DESKTOP",
         capabilities: data.capabilities,
@@ -139,18 +148,15 @@ io.on("connection", (socket) => {
         swarmStats: swarm.getStats(),
       });
 
-      // Broadcast to everyone so dashboards update immediately
       io.emit("CURRENT_DEVICES", swarm.getDevices());
     },
   );
 
-  // Work Requests
   socket.on("REQUEST_WORK", () => {
     if (!deviceId) {
       socket.emit("ERROR", { message: "Device not registered" });
       return;
     }
-
     const job = swarm.requestWork(deviceId);
     if (job) {
       socket.emit("JOB_DISPATCH", job);
@@ -164,7 +170,6 @@ io.on("connection", (socket) => {
       socket.emit("ERROR", { message: "Device not registered" });
       return;
     }
-
     const jobs = swarm.requestBatch(deviceId, count);
     if (jobs.length > 0) {
       socket.emit("BATCH_DISPATCH", jobs);
@@ -173,21 +178,16 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Job Completion
   socket.on("JOB_COMPLETE", (result: WorkerResult) => {
     if (!deviceId) return;
-
     result.deviceId = deviceId;
     result.timestamp = Date.now();
-
     swarm.completeJob(result);
     socket.emit("WORK_ACK", { chunkId: result.chunkId });
   });
 
-  // Work Stealing
   socket.on("STEAL_WORK", () => {
     if (!deviceId) return;
-
     const stolen = swarm.stealWork(deviceId);
     if (stolen.length > 0) {
       socket.emit("BATCH_DISPATCH", stolen);
@@ -196,30 +196,40 @@ io.on("connection", (socket) => {
 
   socket.on("OFFER_WORK", () => {
     if (!deviceId) return;
-
     const jobs = swarm.offerWork(deviceId);
     if (jobs.length > 0) {
       socket.emit("WORK_OFFLOADED", jobs);
     }
   });
-  // NEW: Handle Device Toggling
+
   socket.on("TOGGLE_DEVICE", (data: { deviceId: string; enabled: boolean }) => {
     const device = swarm.getDevice(data.deviceId);
     if (device) {
-      // @ts-ignore - Accessing registry directly for speed, or add method to SwarmCoordinator
-      swarm["registry"].toggleDevice(data.deviceId, data.enabled);
+      // Fix: Use public method (added below in SwarmCoordinator fix)
+      swarm.toggleDevice(data.deviceId, data.enabled);
 
-      // Broadcast update to everyone immediately
       io.emit("DEVICE_UPDATED", device);
-      io.emit("CURRENT_DEVICES", swarm.getDevices()); // Refresh lists
+      io.emit("CURRENT_DEVICES", swarm.getDevices());
 
       console.log(
-        `[Swarm] Device ${device.name} ${data.enabled ? "ENABLED" : "DISABLED"}`,
+        `[Swarm] Device ${device.name} [${device.type}] ${data.enabled ? "ENABLED" : "DISABLED"}`,
       );
+
+      // Trigger redistribution if disabling a busy device
+      if (!data.enabled && device.currentLoad > 0) {
+        // Fix: Use public method
+        setImmediate(() => swarm.triggerJobAssignment());
+      }
     }
   });
 
-  // Health & Monitoring
+  socket.on("UPDATE_SWARM_THROTTLE", (data: { throttleLevel: number }) => {
+    console.log(
+      `[Swarm] Global throttle updated to ${Math.round(data.throttleLevel * 100)}%`,
+    );
+    io.emit("SWARM_THROTTLE_UPDATE", { throttleLevel: data.throttleLevel });
+  });
+
   socket.on(
     "HEARTBEAT",
     (health: {
@@ -230,7 +240,6 @@ io.on("connection", (socket) => {
       currentLoad: number;
     }) => {
       if (!deviceId) return;
-
       swarm.recordHeartbeat(deviceId, {
         deviceId,
         timestamp: Date.now(),
@@ -240,22 +249,17 @@ io.on("connection", (socket) => {
         networkLatency: health.networkLatency,
         isHealthy: health.cpuUsage < 95 && health.memoryUsage < 90,
       });
-
-      // Update load
-      swarm["registry"].updateLoad(deviceId, health.currentLoad);
+      swarm.updateDeviceLoad(deviceId, health.currentLoad);
     },
   );
 
   socket.on("BENCHMARK_RESULT", (data: { opsScore: number }) => {
     if (!deviceId) return;
-
     swarm.updateDeviceStats(deviceId, { opsScore: data.opsScore });
   });
 
-  // Throttling
   socket.on("UPDATE_THROTTLE", (data: { level: number }) => {
     if (!deviceId) return;
-
     const device = swarm.getDevice(deviceId);
     if (device) {
       device.throttleLevel = data.level;
@@ -263,16 +267,15 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Disconnection
-  socket.on("disconnect", () => {
-    if (deviceId) {
-      swarm.unregisterDevice(deviceId);
-      console.log(`[Socket] Device disconnected: ${deviceId}`);
-    }
+  // Pass ONLY the socket.id. Do NOT rely on a local closure 'deviceId' variable.
+  socket.on("disconnect", (reason) => {
+    swarm.unregisterDevice(socket.id);
+    console.log(`[Socket] Disconnected: ${socket.id} | Reason: ${reason}`);
   });
 });
 
-// Swarm Event Listeners
+// --- Swarm Event Listeners ---
+
 swarm.on("deviceJoined", (device: DeviceInfo) => {
   io.emit("DEVICE_JOINED", device);
 });
@@ -289,7 +292,8 @@ swarm.on("workStolen", (jobs: JobChunk[], from: string, to: string) => {
   console.log(`[Swarm] Work stolen: ${jobs.length} jobs from ${from} to ${to}`);
 });
 
-// Job Generator - Keep the queue full with sample jobs
+// --- Job Generator ---
+
 function generateSampleJobs(count: number = 50): void {
   const jobs: JobChunk[] = [];
 
@@ -297,38 +301,29 @@ function generateSampleJobs(count: number = 50): void {
     const isMatrix = Math.random() > 0.5;
 
     if (isMatrix) {
-      // FIX: Generate a proper Matrix Multiplication Job (Row x Matrix)
-      // The worker expects 'row' (1D array) and 'matrixB' (2D array)
-      const size = 100; // Keep size manageable for demo
-      const matrixB = Array(size)
-        .fill(0)
-        .map(() => Array(size).fill(Math.random()));
-      const row = Array(size).fill(Math.random());
-
+      // REDUCE SIZE: Was 50 or 300, try 30 for stability
+      const size = 30;
       jobs.push({
         id: `mat-${Date.now()}-${i}`,
         type: "MAT_MUL",
-        data: {
-          row: row, // <--- Passed correctly as a single row
-          matrixB: matrixB,
-        },
+        data: { size },
         status: "PENDING",
         createdAt: Date.now(),
       });
     } else {
-      // Math stress job
       jobs.push({
         id: `stress-${Date.now()}-${i}`,
         type: "MATH_STRESS",
         data: {
-          // Keep iterations lower to prevent browser lockup during stress test
-          iterations: 1000000 + Math.floor(Math.random() * 500000),
+          // REDUCE ITERATIONS: Was 200k+, try 50k
+          iterations: 50000,
         },
         status: "PENDING",
         createdAt: Date.now(),
       });
     }
   }
+  // ...
 
   swarm.submitBatch(jobs);
   console.log(`[Generator] Generated ${count} sample jobs`);
@@ -337,19 +332,17 @@ function generateSampleJobs(count: number = 50): void {
 // Generate initial jobs
 setTimeout(() => generateSampleJobs(100), 1000);
 
-// Auto-refill jobs when queue is low
+// Auto-refill jobs
 setInterval(() => {
   const stats = swarm.getStats();
-  if (stats.pendingJobs < 50) {
-    generateSampleJobs(50);
+  if (stats.pendingJobs < 100) {
+    generateSampleJobs(200);
   }
-}, 30000);
+}, 5000);
 
 // Start server
 try {
   const PORT = Number(process.env.PORT) || 3000;
-
-  // CHANGE: Added "0.0.0.0" as the second argument
   httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`[Server] Ostrich Swarm Coordinator running on port: ${PORT}`);
     console.log(`[Server] Local: http://localhost:${PORT}`);

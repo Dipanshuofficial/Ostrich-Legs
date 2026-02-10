@@ -40,41 +40,61 @@ export class SwarmCoordinator extends EventEmitter {
     this.setupEventHandlers();
     this.startAutoRebalancing();
   }
+  // 1. New Public method to replace swarm["registry"].toggleDevice
+  public toggleDevice(deviceId: string, enabled: boolean): void {
+    this.registry.toggleDevice(deviceId, enabled);
+  }
 
+  // 2. New Public method to replace swarm["registry"].updateLoad
+  public updateDeviceLoad(deviceId: string, load: number): void {
+    this.registry.updateLoad(deviceId, load);
+  }
+
+  // 3. Expose assignment logic publicly for the "Force Redistribution" feature
+  public triggerJobAssignment(): void {
+    this.tryAssignPendingJobs();
+  }
   // Device Management
   registerDevice(
     socketId: string,
     deviceInfo: Partial<DeviceInfo>,
   ): DeviceInfo {
-    // 1. CRITICAL FIX: Check for existing device by Persistent ID first
-    // The client sends 'id' which is the persistent localStorage ID.
+    // 1. Check for existing device by Persistent ID
     let device = deviceInfo.id ? this.registry.get(deviceInfo.id) : undefined;
 
     if (device) {
-      // 2. RECONNECT: Update existing device record
-      console.log(`[Swarm] Device reconnected: ${device.name} (${device.id})`);
-
-      // Update the socket mapping in registry
-      // We need to access the private map or add a method in DeviceRegistry
-      // For now, assuming we can update the device object directly:
+      // UPDATING EXISTING DEVICE (The Reconnect Path)
       device.socketId = socketId;
-      device.status = "ONLINE";
+
+      // FIX: Don't force "ONLINE" if the user disabled it
+      if (device.isEnabled) {
+        device.status = "ONLINE";
+      } else {
+        device.status = "DISABLED";
+      }
+
       device.lastHeartbeat = Date.now();
 
-      // Update registry internal mappings (You might need to add a method to DeviceRegistry for this)
-      this.registry["socketToDevice"].set(socketId, device.id);
+      this.registry.updateSocketId(device.id, socketId);
+      // Update status in registry to match what we just set
+      this.registry.updateStatus(device.id, device.status);
 
-      // Do NOT emit "deviceJoined" for reconnects to prevent log spam
-      this.emit("deviceReconnect", device);
+      console.log(
+        `[Swarm] Device RECONNECTED: ${device.name} (${device.id.slice(0, 4)}) [${device.status}]`,
+      );
+      this.emit("deviceUpdated", device);
+      this.broadcastStats();
       return device;
     }
 
-    // 3. NEW REGISTRATION: Only if no ID found
+    // 2. NEW REGISTRATION (The "First Time" Path)
     const newId = deviceInfo.id || this.generateDeviceId();
+    // ... (keep your existing newDevice object creation here)
 
-    device = {
+    const newDevice: DeviceInfo = {
       id: newId,
       socketId,
+      isEnabled: true,
       name: deviceInfo.name || `Device-${newId.slice(0, 4)}`,
       type: deviceInfo.type || "DESKTOP",
       status: "ONLINE",
@@ -95,31 +115,42 @@ export class SwarmCoordinator extends EventEmitter {
       isThrottled: false,
     };
 
-    this.registry.register(device);
-    console.log(`[Swarm] New Device joined: ${device.name}`);
-    this.emit("deviceJoined", device);
+    this.registry.register(newDevice);
     this.broadcastStats();
-
-    return device;
+    return newDevice;
   }
 
-  unregisterDevice(deviceId: string): void {
-    const device = this.registry.unregister(deviceId);
-    if (device) {
-      // Reassign any pending jobs from this device
-      const jobs = this.scheduler.getWorkForDevice(deviceId);
-      jobs.forEach((job) => {
-        job.status = "PENDING";
-        job.assignedTo = undefined;
-        job.assignedAt = undefined;
-      });
+  unregisterDevice(socketId: string): void {
+    // 1. Find which device this specific socket belonged to
+    const device = this.registry.getBySocketId(socketId);
 
-      console.log(`[Swarm] Device left: ${device.name}`);
-      this.emit("deviceLeft", deviceId);
-      this.broadcastStats();
+    if (device) {
+      // 2. CRITICAL FIX: Only unregister if the device's CURRENT socket matches the one that died.
+      // This stops a reconnection's cleanup from killing the new active session.
+      if (device.socketId === socketId) {
+        this.registry.unregister(device.id);
+
+        // Reclaim jobs so they don't hang in "ASSIGNED" state forever
+        const jobs = this.scheduler.getWorkForDevice(device.id);
+        jobs.forEach((job) => {
+          job.status = "PENDING";
+          job.assignedTo = undefined;
+          job.assignedAt = undefined;
+        });
+
+        console.log(
+          `[Swarm] Device left: ${device.name} (${device.id.slice(0, 4)})`,
+        );
+        this.emit("deviceLeft", device.id);
+        this.broadcastStats();
+      } else {
+        // This log confirms the fix is working when Colab flickers
+        console.log(
+          `[Swarm] Ignoring stale disconnect for ${device.name}. New socket ${device.socketId} is already active.`,
+        );
+      }
     }
   }
-
   // Job Management
   submitJob(job: JobChunk): void {
     this.scheduler.submitJob(job);
@@ -131,9 +162,18 @@ export class SwarmCoordinator extends EventEmitter {
     this.tryAssignPendingJobs();
   }
 
+  // In server/src/swarm/SwarmCoordinator.ts
+
   requestWork(deviceId: string): JobChunk | null {
     const device = this.registry.get(deviceId);
-    if (!device || device.status === "OFFLINE" || device.status === "ERROR") {
+
+    // FIX: Block access if DISABLED
+    if (
+      !device ||
+      device.status === "OFFLINE" ||
+      device.status === "ERROR" ||
+      device.status === "DISABLED"
+    ) {
       return null;
     }
 
@@ -152,7 +192,14 @@ export class SwarmCoordinator extends EventEmitter {
 
   requestBatch(deviceId: string, count: number): JobChunk[] {
     const device = this.registry.get(deviceId);
-    if (!device || device.status === "OFFLINE" || device.status === "ERROR") {
+
+    // FIX: Block access if DISABLED
+    if (
+      !device ||
+      device.status === "OFFLINE" ||
+      device.status === "ERROR" ||
+      device.status === "DISABLED"
+    ) {
       return [];
     }
 
@@ -164,7 +211,7 @@ export class SwarmCoordinator extends EventEmitter {
 
     if (jobs.length > 0) {
       this.registry.updateLoad(deviceId, device.currentLoad + jobs.length);
-      this.emit("batchAssigned", jobs, deviceId);
+      this.emit("batchAssigned", jobs, device.id);
     }
 
     return jobs;
@@ -310,21 +357,44 @@ export class SwarmCoordinator extends EventEmitter {
     });
   }
 
+  // Find the tryAssignPendingJobs method and replace it with this version.
+  // We are adding a check to preventing pushing to COLAB/SERVER types proactively.
+
   private tryAssignPendingJobs(): void {
     const pendingCount = this.scheduler.getPendingCount();
     if (pendingCount === 0) return;
 
-    const available = this.registry.getAvailable();
-    console.log(`[Swarm] Job assignment: ${pendingCount} pending, ${available.length} available devices`);
+    let available = this.registry.getAvailable();
+
+    // Prioritize Cloud Devices
+    available = available.sort((a, b) => {
+      const aIsCloud = a.type === "COLAB" || a.type === "SERVER";
+      const bIsCloud = b.type === "COLAB" || b.type === "SERVER";
+      return aIsCloud === bIsCloud ? 0 : aIsCloud ? -1 : 1;
+    });
 
     for (const device of available) {
-      const capacity = device.capabilities.maxConcurrency - device.currentLoad;
-      if (capacity <= 0) continue;
+      // FIX 1: DISABLE PUSH FOR CLOUD/COLAB
+      // Cloud connections via tunnels are fragile. Let them 'Pull' work via REQUEST_BATCH instead.
+      // pushing large payloads immediately often causes 'transport close'.
+      if (device.type === "COLAB" || device.type === "SERVER") {
+        continue;
+      }
 
-      // OVERPROVISIONING: Request 3x capacity for better pipeline utilization
+      // 1. Check raw CPU slot availability
+      const cpuCapacity =
+        device.capabilities.maxConcurrency - device.currentLoad;
+      if (cpuCapacity <= 0) continue;
+
+      // 2. SAFETY CAP (The Fix)
+      // Cap batch size to prevent socket timeouts
+      const batchSize = Math.min(cpuCapacity, 2);
+
+      if (batchSize <= 0) continue;
+
       const jobs = this.scheduler.getBatch(
         device.id,
-        capacity * 3,
+        batchSize,
         device.capabilities.supportedJobs,
       );
 
@@ -332,13 +402,9 @@ export class SwarmCoordinator extends EventEmitter {
         this.registry.updateLoad(device.id, device.currentLoad + jobs.length);
         this.emit("batchAssigned", jobs, device.id);
 
-        // Send jobs to device
         const socket = this.io.sockets.sockets.get(device.socketId);
         if (socket) {
           socket.emit("BATCH_DISPATCH", jobs);
-          console.log(`[Swarm] Sent ${jobs.length} jobs to ${device.name} (${device.id.slice(0, 4)})`);
-        } else {
-          console.log(`[Swarm] WARNING: Socket not found for device ${device.name} (${device.id.slice(0, 4)})`);
         }
       }
     }

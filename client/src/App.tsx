@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Zap, Share2 } from "lucide-react";
 import { useComputeSwarm } from "./hooks/useComputeSwarm";
 
@@ -20,26 +20,60 @@ function App() {
 
   // Swarm state
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
-  const [swarmStats, setSwarmStats] = useState<SwarmStats>({
-    totalDevices: 0,
-    onlineDevices: 0,
-    busyDevices: 0,
-    totalCores: 0,
-    totalMemoryGB: 0,
-    pendingJobs: 0,
-    activeJobs: 0,
-    completedJobs: 0,
-    failedJobs: 0,
-    globalVelocity: 0,
-    avgLatency: 0,
-    devicesByType: {
-      DESKTOP: 0,
-      MOBILE: 0,
-      COLAB: 0,
-      SERVER: 0,
-      TABLET: 0,
-    },
-  });
+
+  // Calculate swarm resources for ThrottleControl
+  const swarmResources = useMemo<{
+    totalCores: number;
+    activeCores: number;
+    deviceCount: number;
+  }>(() => {
+    const totalCores = devices.reduce(
+      (sum, d) => sum + (d.capabilities?.cpuCores || 0),
+      0,
+    );
+
+    const activeCores = devices
+      .filter((d) => d.isEnabled !== false)
+      .reduce((sum, d) => sum + (d.capabilities?.cpuCores || 0), 0);
+
+    return { totalCores, activeCores, deviceCount: devices.length };
+  }, [devices]);
+
+  // Calculate total swarm stats for SwarmDashboard
+  const swarmStats = useMemo<SwarmStats>(() => {
+    const totalCores = swarmResources.totalCores;
+    const totalMemoryGB = devices.reduce(
+      (sum, d) => sum + (d.capabilities?.memoryGB || 0),
+      0,
+    );
+    const onlineDevices = devices.filter(
+      (d) => d.status === "ONLINE" || d.status === "BUSY",
+    ).length;
+    const busyDevices = devices.filter((d) => d.currentLoad > 0).length;
+
+    const devicesByType = {
+      DESKTOP: devices.filter((d) => d.type === "DESKTOP").length,
+      MOBILE: devices.filter((d) => d.type === "MOBILE").length,
+      COLAB: devices.filter((d) => d.type === "COLAB").length,
+      SERVER: devices.filter((d) => d.type === "SERVER").length,
+      TABLET: devices.filter((d) => d.type === "TABLET").length,
+    };
+
+    return {
+      totalDevices: devices.length,
+      onlineDevices,
+      busyDevices,
+      totalCores,
+      totalMemoryGB,
+      pendingJobs: 0, // These would need to come from server
+      activeJobs: devices.reduce((sum, d) => sum + d.currentLoad, 0),
+      completedJobs: devices.reduce((sum, d) => sum + d.totalJobsCompleted, 0),
+      failedJobs: 0,
+      globalVelocity: 0,
+      avgLatency: 0,
+      devicesByType,
+    };
+  }, [devices, swarmResources.totalCores]);
 
   // 1. Create a stable log function
   const addLog = useCallback((msg: string) => {
@@ -63,7 +97,7 @@ function App() {
     opsScore,
     updateThrottle,
     throttle,
-    activeThreads,
+    // activeThreads - local threads not used for global control
     socket,
     isRunning,
     startSwarm,
@@ -73,96 +107,62 @@ function App() {
     toggleDevice,
     runBenchmark, // New export
   } = useComputeSwarm(addLog, amIEnabled); // <--- PASS HERE
+  // 5. Real-time Listeners & Initial Data
+  const serverUrl = `${window.location.protocol}//${window.location.hostname}:3000`;
+
   useEffect(() => {
     if (!socket) return;
-    const serverUrl = `${window.location.protocol}//${window.location.hostname}:3000`; // Use hostname for local network support
-    // 1. Fetch the initial list of connected devices via REST
-    const fetchDevices = () => {
-      fetch(`${serverUrl}/api/devices`)
-        .then((res) => res.json())
-        .then((data) => setDevices(data))
-        .catch((err) => console.error("Fetch error:", err));
-    };
 
-    // 3. Initial Fetch (Get data immediately upon connection)
-    fetchDevices();
-    // 4. Polling Fallback (Refresh every 5 seconds)
-    // This guarantees the list fixes itself even if an event is missed
-    const interval = setInterval(fetchDevices, 5000);
-    socket.on("connect", () => {
-      // Request code immediately upon successful connection
-      socket.emit("REQUEST_JOIN_CODE");
-    });
-
-    if (socket.connected) {
-      socket.emit("REQUEST_JOIN_CODE");
-    }
-    // 5. Real-time Listeners
-    socket.on("DEVICE_JOINED", fetchDevices); // Just re-fetch to be safe
-    socket.on("DEVICE_LEFT", fetchDevices);
-    socket.on("CURRENT_DEVICES", (data) => setDevices(data));
-    socket.on("DEVICE_UPDATED", fetchDevices);
-    // 2. Fetch initial stats
-    fetch(`${serverUrl}/api/stats`)
-      .then((res) => res.json())
-      .then((data) => {
-        setSwarmStats(data);
-      })
-      .catch((err) => console.error("Failed to fetch stats:", err));
-
-    // Request initial join code
-
-    socket.on("SWARM_STATS", (stats: SwarmStats) => {
-      setSwarmStats(stats);
-    });
-
-    socket.on("DEVICE_JOINED", (device: DeviceInfo) => {
-      // 1. Update the Device List (Deduplicate)
+    // 1. Define handlers (to allow removal later)
+    const handleDeviceJoined = (device: DeviceInfo) => {
       setDevices((prev) => {
-        // If we already have this device ID, just update it (don't add duplicates)
         const exists = prev.some((d) => d.id === device.id);
-
-        // ONLY log if this is actually a new device
         if (!exists) {
           setLogs((currentLogs) => [
-            ...currentLogs.slice(-8),
+            ...currentLogs.slice(-19), // Keep logs trimmed
             `> [${new Date().toLocaleTimeString()}] Device joined: ${device.name}`,
           ]);
+          return [...prev, device];
         }
-
-        // Return the updated list (filter out old version, add new)
-        return [...prev.filter((d) => d.id !== device.id), device];
+        return prev;
       });
-    });
-    // New listener for the direct update from server
-    socket.on("CURRENT_DEVICES", (currentDevices: DeviceInfo[]) => {
-      setDevices(currentDevices);
-    });
-    socket.on("DEVICE_LEFT", (data: { deviceId: string }) => {
+    };
+
+    const handleDeviceLeft = (data: { deviceId: string }) => {
       setDevices((prev) => {
         const device = prev.find((d) => d.id === data.deviceId);
         if (device) {
           setLogs((logs) => [
-            ...logs.slice(-8),
+            ...logs.slice(-19),
             `> [${new Date().toLocaleTimeString()}] Device left: ${device.name}`,
           ]);
         }
         return prev.filter((d) => d.id !== data.deviceId);
       });
-    });
-
-    return () => {
-      socket.off("SWARM_STATS");
-      clearInterval(interval);
-      socket.off("DEVICE_JOINED");
-      socket.off("DEVICE_LEFT");
-      socket.off("CURRENT_DEVICES");
-      socket.off("DEVICE_UPDATED");
     };
-  }, [socket]);
 
-  const serverUrl = `${window.location.protocol}//${window.location.hostname}:3000`;
+    // Use named functions so we can clean them up properly
+    const onJoined = (d: DeviceInfo) => handleDeviceJoined(d);
+    const onLeft = (data: { deviceId: string }) => handleDeviceLeft(data);
+    const onCurrent = (list: DeviceInfo[]) => setDevices(list);
+    const onUpdate = () =>
+      fetch(`${serverUrl}/api/devices`)
+        .then((r) => r.json())
+        .then(setDevices);
 
+    socket.on("DEVICE_JOINED", onJoined);
+    socket.on("DEVICE_LEFT", onLeft);
+    socket.on("CURRENT_DEVICES", onCurrent);
+    socket.on("DEVICE_UPDATED", onUpdate);
+
+    // CLEANUP: If you skip this, the server WILL eventually refuse your connection.
+    return () => {
+      socket.off("DEVICE_JOINED", onJoined);
+      socket.off("DEVICE_LEFT", onLeft);
+      socket.off("CURRENT_DEVICES", onCurrent);
+      socket.off("DEVICE_UPDATED", onUpdate);
+    };
+  }, [socket, serverUrl]);
   return (
     <div className="min-h-screen relative bg-grain p-6 md:p-12 transition-colors duration-500">
       {/* HEADER */}
@@ -234,13 +234,21 @@ function App() {
           />
         </div>
 
-        {/* Control Row */}
+        {/* Control Row - GLOBAL SWARM CONTROL */}
         <ThrottleControl
           throttle={throttle}
-          setThrottle={updateThrottle} // Wiring fixed
-          activeThreads={activeThreads}
-          isSystemEnabled={amIEnabled}
-          onToggleSystem={(enabled: boolean) => toggleDevice(persistentIdentity.id, enabled)}
+          setThrottle={(val) => {
+            updateThrottle(val);
+            // Broadcast to all devices in swarm
+            socket?.emit("UPDATE_SWARM_THROTTLE", { throttleLevel: val / 100 });
+          }}
+          totalCores={swarmResources.totalCores}
+          activeCores={swarmResources.activeCores}
+          isLocalhostEnabled={amIEnabled}
+          onToggleLocalhost={(enabled: boolean) =>
+            toggleDevice(persistentIdentity.id, enabled)
+          }
+          deviceCount={swarmResources.deviceCount}
         />
         <LiveTerminal logs={logs} status={status} />
 

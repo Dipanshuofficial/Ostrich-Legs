@@ -9,6 +9,7 @@ import {
   Smartphone,
   Laptop,
   Server,
+  type LucideIcon,
 } from "lucide-react";
 import type { DeviceType } from "../../../../shared/types";
 
@@ -36,7 +37,7 @@ export function DeviceConnector({
 
   const deviceTypes: Array<{
     type: DeviceType;
-    icon: any;
+    icon: LucideIcon;
     label: string;
     color: string;
   }> = [

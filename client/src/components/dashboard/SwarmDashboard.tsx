@@ -10,6 +10,7 @@ import {
   WifiOff,
   AlertCircle,
   Unplug,
+  type LucideIcon,
 } from "lucide-react";
 
 import type {
@@ -281,7 +282,7 @@ export function SwarmDashboard({
 interface StatBoxProps {
   label: string;
   value: string | number;
-  icon: any;
+  icon: LucideIcon;
   color: string;
 }
 

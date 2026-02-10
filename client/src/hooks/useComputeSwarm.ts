@@ -32,12 +32,14 @@ export const useComputeSwarm = (
   const identity = usePersistentIdentity();
 
   // --- CORE LOOP ---
+  // Replace the processQueue function with this robust version:
+
   const processQueue = useCallback(() => {
-    if (!workerRef.current || !isRunningRef.current) return;
-    if (!isDeviceEnabled) return;
+    if (!workerRef.current || !isRunningRef.current || !isDeviceEnabled) return;
 
     const maxConcurrency = activeThreads || 1;
 
+    // 1. Feed Worker
     while (
       jobBuffer.current.length > 0 &&
       activeJobs.current < maxConcurrency
@@ -53,19 +55,23 @@ export const useComputeSwarm = (
       }
     }
 
-    const desiredBuffer = maxConcurrency * 3;
+    // 2. Request More Work (The Pull)
     const currentSupply =
       activeJobs.current + jobBuffer.current.length + inFlightRequests.current;
 
-    if (currentSupply < desiredBuffer && socketRef.current?.connected) {
-      const deficit = desiredBuffer - currentSupply;
+    // FIX 5: Lower threshold and ensure socket is open
+    // Only ask for 2x concurrency to prevent buffering too much RAM
+    const bufferThreshold = maxConcurrency * 2;
+
+    if (
+      currentSupply < bufferThreshold &&
+      socketRef.current?.connected &&
+      inFlightRequests.current === 0 // Strict sequencing: finish asking before asking again
+    ) {
+      const deficit = Math.min(bufferThreshold - currentSupply, 5); // Cap batch at 5
       if (deficit > 0) {
-        inFlightRequests.current += deficit;
-        if (deficit >= 5) {
-          socketRef.current.emit("REQUEST_BATCH", Math.min(deficit, 20));
-        } else {
-          socketRef.current.emit("REQUEST_WORK");
-        }
+        inFlightRequests.current += deficit; // Mark in flight
+        socketRef.current.emit("REQUEST_BATCH", deficit);
       }
     }
   }, [activeThreads, isDeviceEnabled]);
@@ -129,7 +135,7 @@ export const useComputeSwarm = (
 
     // 1. INIT WORKER
     workerRef.current = new OstrichWorker();
-    
+
     // Attach listeners
     workerRef.current.onmessage = (e) => {
       const msg = e.data;
@@ -171,21 +177,29 @@ export const useComputeSwarm = (
       transports: ["websocket", "polling"],
     });
 
-    // eslint-disable-next-line react-hooks/call-set-state-in-effect-trigger
     setSocket(newSocket);
     socketRef.current = newSocket;
 
     // --- SOCKET EVENTS ---
+    // --- SOCKET EVENTS ---
     newSocket.on("connect", () => {
       setWorkerId(newSocket.id || "...");
+
+      // FIX 3: Reset State on Connect
+      // Ensure we don't think we have pending requests from a dead session
+      inFlightRequests.current = 0;
+      activeJobs.current = 0;
+      jobBuffer.current = [];
+
       onLog?.(`[NET] Connected! Registering...`);
 
       newSocket.emit("REQUEST_JOIN_CODE");
 
+      // ... rest of your registration logic
       newSocket.emit("REGISTER_DEVICE", {
         id: identity.id,
         name: identity.name,
-        type: "DESKTOP",
+        type: "DESKTOP", // Or whatever type this client is
         capabilities: {
           cpuCores: navigator.hardwareConcurrency || 4,
           memoryGB: (navigator as any).deviceMemory || 8,
@@ -204,6 +218,12 @@ export const useComputeSwarm = (
       jobBuffer.current.push(job);
       processQueue();
     });
+    newSocket.on("disconnect", (reason) => {
+      onLog?.(`[NET] Disconnected: ${reason}`);
+      // FIX 4: Clear flight flag so we resume asking when we reconnect
+      inFlightRequests.current = 0;
+      setStatus("IDLE");
+    });
 
     newSocket.on("BATCH_DISPATCH", (jobs) => {
       inFlightRequests.current = Math.max(0, inFlightRequests.current - 1);
@@ -215,6 +235,17 @@ export const useComputeSwarm = (
       inFlightRequests.current = Math.max(0, inFlightRequests.current - 1);
     });
 
+    // Listen for global swarm throttle updates
+    newSocket.on("SWARM_THROTTLE_UPDATE", (data: { throttleLevel: number }) => {
+      const newThrottle = Math.round(data.throttleLevel * 100);
+      setCurrentThrottle(newThrottle);
+      workerRef.current?.postMessage({
+        type: "UPDATE_CONFIG",
+        throttleLevel: data.throttleLevel,
+      });
+      onLog?.(`[CFG] Global swarm throttle updated to ${newThrottle}%`);
+    });
+
     const pump = setInterval(processQueue, 100);
 
     return () => {
@@ -222,7 +253,7 @@ export const useComputeSwarm = (
       newSocket.disconnect();
       workerRef.current?.terminate();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity]);
 
   useEffect(() => {
@@ -232,7 +263,6 @@ export const useComputeSwarm = (
     );
     return () => clearInterval(i);
   }, []);
-
 
   const runBenchmark = useCallback(() => {
     workerRef.current?.postMessage({ type: "BENCHMARK" });

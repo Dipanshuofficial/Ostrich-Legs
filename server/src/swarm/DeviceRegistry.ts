@@ -79,7 +79,19 @@ export class DeviceRegistry extends EventEmitter {
   getByType(type: DeviceType): DeviceInfo[] {
     return this.getAll().filter((d) => d.type === type);
   }
-
+  public updateSocketId(deviceId: string, newSocketId: string): boolean {
+    const device = this.devices.get(deviceId);
+    if (device) {
+      // Remove old mapping
+      this.socketToDevice.delete(device.socketId);
+      // Update device
+      device.socketId = newSocketId;
+      // Add new mapping
+      this.socketToDevice.set(newSocketId, deviceId);
+      return true;
+    }
+    return false;
+  }
   updateStatus(deviceId: string, status: DeviceStatus): boolean {
     const device = this.devices.get(deviceId);
     if (device) {

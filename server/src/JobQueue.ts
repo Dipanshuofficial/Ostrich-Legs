@@ -33,40 +33,26 @@ export class JobQueue {
   }
 
   /**
-   * GENERATOR 1: Matrix Multiplication (ML)
-   * A 300x300 Matrix * 300 vectors = 300 Jobs.
+   * GENERATOR 1: Matrix Multiplication (Lightweight Mode)
+   * Fix: Send { size: 300 } instead of the full matrix data.
+   * This prevents the 1MB Socket.IO limit from killing the connection.
    */
   private generateMatrixBatch(count: number) {
-    const size = 300;
-
-    // The "Weights" Matrix (Constant for this batch)
-    const matrixB = Array(size)
-      .fill(0)
-      .map(() =>
-        Array(size)
-          .fill(0)
-          .map(() => Math.random()),
-      );
+    const size = 300; // Keep the heavy compute size
 
     for (let i = 0; i < count; i++) {
-      const rowA = Array(size)
-        .fill(0)
-        .map(() => Math.random());
-
       this.queue.push({
         id: `mx_${Date.now()}_${i}`,
-
         createdAt: Date.now(),
         type: "MAT_MUL",
+        // CRITICAL CHANGE: Send metadata, not the full matrix
         data: {
-          row: rowA,
-          matrixB: matrixB,
+          size: size,
         },
         status: "PENDING",
       });
     }
   }
-
   /**
    * GENERATOR 2: CPU Stress (Maintenance)
    */

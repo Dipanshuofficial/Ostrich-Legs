@@ -316,20 +316,35 @@ export class WorkStealingScheduler extends EventEmitter {
   }
 
   private cleanupCompletedJobs(): void {
-    // Keep only last 1000 completed jobs to prevent memory bloat
-    if (this.completedJobs.size > 1000) {
-      const toDelete = Array.from(this.completedJobs).slice(
-        0,
-        this.completedJobs.size - 1000,
-      );
-      toDelete.forEach((id) => {
-        this.completedJobs.delete(id);
-        const index = this.jobQueue.findIndex((j) => j.id === id);
-        if (index !== -1) {
-          this.jobQueue.splice(index, 1);
-        }
-      });
+    const MAX_HISTORY = 1000;
+
+    // If we are under the limit, do nothing (Optimization)
+    if (this.completedJobs.size <= MAX_HISTORY) return;
+
+    // 1. Calculate how many to remove
+    const removeCount = this.completedJobs.size - MAX_HISTORY;
+
+    // 2. Identify IDs to remove (The Set iterates in insertion order)
+    const toRemoveIds = new Set<string>();
+    let count = 0;
+    for (const id of this.completedJobs) {
+      if (count >= removeCount) break;
+      toRemoveIds.add(id);
+      count++;
     }
+
+    // 3. Remove from the Set tracking
+    for (const id of toRemoveIds) {
+      this.completedJobs.delete(id);
+    }
+
+    // 4. Optimized Batch Removal from Queue (O(N) pass)
+    // Instead of splicing one by one (which is O(N^2)), we filter once.
+    if (toRemoveIds.size > 0) {
+      this.jobQueue = this.jobQueue.filter((job) => !toRemoveIds.has(job.id));
+    }
+
+    console.log(`[Scheduler] Cleaned up ${toRemoveIds.size} old jobs.`);
   }
 
   // Emergency flush - clear all pending jobs
