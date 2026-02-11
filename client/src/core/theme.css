@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@theme {
+  /* Neuronix Color Palette */
+  --color-brand-orange: #ff7d54;
+  --color-brand-peach: #ffb09c;
+  --color-surface-white: #fcfcfd;
+  --color-surface-muted: #f3f4f6;
+  --color-text-main: #1a1a1e;
+  --color-text-muted: #6b7280;
+  --color-border-soft: rgba(0, 0, 0, 0.05);
+
+  /* Elevation (Neumorphism) */
+  --shadow-soft-depth:
+    0 10px 25px -5px rgba(0, 0, 0, 0.03), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
+  --shadow-card: 0 20px 40px -12px rgba(0, 0, 0, 0.05);
+  --shadow-inset: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+
+  /* Radii */
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
+}
+
+:root {
+  background-color: var(--color-surface-muted);
+  color: var(--color-text-main);
+  font-family: "Inter", sans-serif;
+}
+
+@layer components {
+  /* The Neuronix Soft Card */
+  .soft-card {
+    @apply bg-surface-white border border-border-soft shadow-card rounded-2xl p-6 transition-all;
+  }
+
+  /* Modern Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-200 rounded-full hover:bg-gray-300;
+  }
+}

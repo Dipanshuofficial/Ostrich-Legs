@@ -1,193 +1,161 @@
-import { useState, useCallback, useMemo, memo } from "react";
-import { Zap, Share2 } from "lucide-react";
-import { useComputeSwarm } from "./hooks/useComputeSwarm";
+import { useState } from "react";
+import { Zap, Settings, Wifi, WifiOff } from "lucide-react";
+import { useSwarmEngine } from "./hooks/useSwarmEngine";
+import { useSwarmExecution } from "./hooks/useSwarmExecution";
+import { type SwarmResources, type SwarmSnapshot } from "./core/types";
 
-import { DeviceHealth } from "./components/dashboard/DeviceHealth";
-import { SwarmControls } from "./components/dashboard/SwarmControls";
-import { SwarmDashboard } from "./components/dashboard/SwarmDashboard";
-import { DeviceConnector } from "./components/dashboard/DeviceConnector";
-import { GpuStatusMonitor } from "./components/dashboard/GpuStatusMonitor";
-import { ThrottleControl } from "./components/dashboard/ThrottleControl";
-import { ThemeToggle } from "./components/ui/ThemeToggle";
-import { LiveTerminal } from "./components/dashboard/LiveTerminal";
-import { SwarmRunState, DeviceState } from "../../shared/types";
+// Features
+import { VelocityMonitor } from "./features/dashboard/VelocityMonitor";
+import { ActiveSwarm } from "./features/dashboard/ActiveSwarm";
+import { ResourceStats } from "./features/dashboard/ResourceStats";
+import { JobGauge } from "./features/dashboard/JobGauge";
+import { ThrottleControl } from "./features/dashboard/ThrottleControl";
+import { LiveTerminal } from "./features/terminal/LiveTerminal";
+import { DeviceConnector } from "./features/connection/DeviceConnector";
+import { SwarmControls } from "./features/dashboard/SwarmControls";
 
-// --- MEMOIZED COMPONENTS (Prevents re-renders on every tick) ---
-const MemoSwarmDashboard = memo(SwarmDashboard);
-const MemoGpuStatusMonitor = memo(GpuStatusMonitor);
-const MemoThrottleControl = memo(ThrottleControl);
-const MemoDeviceHealth = memo(DeviceHealth);
-const MemoSwarmControls = memo(SwarmControls);
-const MemoLiveTerminal = memo(LiveTerminal);
+const EMPTY_SNAPSHOT: SwarmSnapshot = {
+  runState: "STOPPED",
+  devices: {},
+  resources: {
+    totalCores: 0,
+    totalMemory: 0,
+    totalGPUs: 0,
+    onlineCount: 0,
+  } as SwarmResources,
+  stats: {
+    totalJobs: 0,
+    activeJobs: 0,
+    pendingJobs: 0,
+    completedJobs: 0,
+    globalVelocity: 0,
+  },
+};
 
-function App() {
-  const [showQR, setShowQR] = useState(false);
-  const [logs, setLogs] = useState<string[]>([]);
-  const [throttle, setThrottle] = useState(30);
+export default function App() {
+  const [activeTab, setActiveTab] = useState("Dashboard");
+  const [throttle, setThrottle] = useState(40);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const addLog = useCallback((msg: string) => {
-    setLogs((prev) => [...prev.slice(-19), `> ${msg}`]);
-  }, []);
-
+  // 1. Get Real Data & Logs
   const {
-    status,
+    snapshot: serverSnapshot,
     devices,
-
-    stats,
-    joinCode,
-
-    startSwarm,
-    pauseSwarm,
-    stopSwarm,
+    setRunState,
+    runLocalBenchmark,
+    isConnected,
     toggleDevice,
-    runBenchmark,
-    updateThrottle,
-  } = useComputeSwarm(addLog);
+    totalResources,
+    logs,
+  } = useSwarmEngine("local-ostrich-01");
 
-  const handleThrottleChange = useCallback(
-    (val: number) => {
-      setThrottle(val);
-      updateThrottle(val);
-    },
-    [updateThrottle],
-  );
+  const snapshot = serverSnapshot || EMPTY_SNAPSHOT;
+  const isRunning = snapshot.runState === "RUNNING";
 
-  const isRunning = status === SwarmRunState.RUNNING;
-  const serverUrl = `${window.location.protocol}//${window.location.hostname}:3000`;
-
-  // --- BUG 4 FIX: Math Calculation ---
-  const swarmStats = useMemo(() => {
-    // Only count enabled devices (ONLINE or BUSY)
-    const activeDevicesList = devices.filter(
-      (d) => d.state === DeviceState.ONLINE || d.state === DeviceState.BUSY,
-    );
-
-    return {
-      runState: status,
-      globalThrottle: throttle,
-      totalDevices: devices.length,
-      onlineDevices: activeDevicesList.length,
-      busyDevices: devices.filter((d) => d.state === DeviceState.BUSY).length,
-
-      totalCores: activeDevicesList.reduce(
-        (acc, d) => acc + d.capabilities.cpuCores,
-        0,
-      ),
-      totalMemoryGB: activeDevicesList.reduce(
-        (acc, d) => acc + d.capabilities.memoryGB,
-        0,
-      ),
-
-      pendingJobs: stats?.pendingJobs || 0,
-      activeJobs: stats?.activeJobs || 0,
-      completedJobs: devices.reduce((acc, d) => acc + d.totalJobsCompleted, 0),
-      globalVelocity: 0,
-
-      // FIX: Correctly count devices by type
-      devicesByType: devices.reduce(
-        (acc, device) => {
-          const type = device.type || "DESKTOP";
-          acc[type] = (acc[type] || 0) + 1;
-          return acc;
-        },
-        {} as Record<string, number>,
-      ),
-    };
-  }, [devices, status, throttle, stats]);
-
-  const calculatedActiveCores = Math.ceil(
-    swarmStats.totalCores * (throttle / 100),
-  );
+  useSwarmExecution(throttle, isRunning);
 
   return (
-    <div className="min-h-screen relative bg-grain p-6 md:p-12 transition-colors duration-500">
-      <header className="flex justify-between items-center mb-12 relative z-10 max-w-7xl mx-auto">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-            <Zap className="text-white fill-white" size={24} />
+    <div className="min-h-screen bg-surface-muted p-4 md:p-8 font-sans antialiased text-text-main selection:bg-brand-orange/20">
+      {/* Header */}
+      <header className="max-w-7xl mx-auto flex items-center justify-between mb-8 bg-surface-white/90 backdrop-blur-md px-6 py-4 rounded-[28px] border border-white shadow-lg shadow-gray-200/50 sticky top-4 z-50">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-linear-to-br from-brand-orange to-[#ff9f7c] rounded-xl flex items-center justify-center shadow-lg shadow-brand-orange/30 border-t border-white/20">
+            <Zap className="text-white fill-white" size={22} />
           </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-arc-text">
-              Ostrich Legs
-            </h1>
-            <div className="flex items-center gap-2">
-              <span
-                className={`flex h-2 w-2 rounded-full ${isRunning ? "bg-emerald-500 animate-pulse" : "bg-zinc-500"}`}
-              />
-              <p className="text-arc-muted text-xs font-medium uppercase tracking-wider">
-                {status}
-              </p>
-            </div>
+          <span className="text-xl font-black tracking-tighter text-gray-800">
+            Ostrich-Legs
+          </span>
+
+          <div
+            className={`ml-4 px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5 border transition-colors ${isConnected ? "bg-green-50 text-green-600 border-green-200" : "bg-red-50 text-red-500 border-red-200"}`}
+          >
+            {isConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
+            {isConnected ? "ONLINE" : "OFFLINE"}
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <ThemeToggle />
+        <nav className="hidden lg:flex items-center gap-1 bg-gray-100/80 p-1.5 rounded-2xl shadow-inner border border-gray-200/50">
+          {["Dashboard", "Monitoring"].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-6 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${activeTab === tab ? "bg-white text-brand-orange shadow-sm border border-gray-100 scale-100" : "text-text-muted hover:text-text-main hover:bg-white/50 scale-95"}`}
+            >
+              {tab}
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex items-center gap-4">
           <button
-            onClick={() => setShowQR(true)}
-            className="group flex items-center gap-2 px-5 py-2.5 rounded-full bg-arc-card border border-arc-border hover:border-indigo-500/30 transition-all"
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 group cursor-pointer hover:bg-gray-100 p-2 rounded-xl transition-colors"
           >
-            <Share2
-              size={16}
-              className="text-arc-muted group-hover:text-indigo-500"
+            <Settings
+              size={20}
+              className="text-text-muted group-hover:rotate-90 transition-transform"
             />
-            <span className="text-sm font-semibold text-arc-text group-hover:text-indigo-500">
-              Connect
-            </span>
           </button>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-7xl mx-auto relative z-10">
-        {/* ROW 1: GPU Monitor */}
-        {/* BUG 1 FIX: Memoized component handles high-frequency updates without re-rendering parent layout */}
-        <MemoGpuStatusMonitor
-          completedCount={swarmStats.completedJobs}
-          throttle={throttle}
-        />
+      <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 pb-12">
+        {activeTab === "Dashboard" ? (
+          <>
+            <div className="lg:col-span-8 space-y-8 min-w-0 flex flex-col">
+              <VelocityMonitor
+                velocity={snapshot.stats.globalVelocity}
+                throttle={throttle}
+              />
+              <ResourceStats
+                stats={snapshot.stats}
+                onlineCount={devices.length}
+              />
+              <div className="flex-1 min-h-75">
+                <ActiveSwarm
+                  devices={devices}
+                  onBenchmark={runLocalBenchmark}
+                  onToggle={toggleDevice}
+                />
+              </div>
+            </div>
 
-        <div className="md:col-span-4 h-90 flex gap-4">
-          <MemoDeviceHealth
-            className="flex-1 h-full"
-            devices={devices}
-            onRunBenchmark={runBenchmark}
-          />
-          <MemoSwarmControls
-            isRunning={isRunning}
-            status={status}
-            onStart={startSwarm}
-            onPause={pauseSwarm}
-            onStop={stopSwarm}
-          />
-        </div>
+            <div className="lg:col-span-4 space-y-8 min-w-0">
+              {/* 2. Real Job Counts */}
+              <JobGauge
+                total={snapshot.stats.totalJobs}
+                completed={snapshot.stats.completedJobs}
+              />
 
-        {/* ROW 2: Throttle & Terminal */}
-        <MemoThrottleControl
-          throttle={throttle}
-          setThrottle={handleThrottleChange}
-          totalCores={swarmStats.totalCores}
-          activeCores={Math.min(calculatedActiveCores, swarmStats.totalCores)}
-          deviceCount={swarmStats.totalDevices}
-        />
+              <SwarmControls
+                status={snapshot.runState}
+                onToggle={() => setRunState(isRunning ? "PAUSED" : "RUNNING")}
+                onStop={() => setRunState("STOPPED")}
+              />
 
-        <MemoLiveTerminal logs={logs} status={status} />
-
-        {/* ROW 3: Detailed Dashboard */}
-        <MemoSwarmDashboard
-          devices={devices}
-          stats={swarmStats as any}
-          onToggleDevice={toggleDevice}
-        />
-      </div>
+              {/* 3. Real Resources */}
+              <ThrottleControl
+                value={throttle}
+                onChange={setThrottle}
+                totalGPUs={totalResources.totalGPUs}
+                totalCores={totalResources.totalCores}
+                totalMemory={totalResources.totalMemory}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="lg:col-span-12 h-[80vh]">
+            {/* 4. Real Logs */}
+            <LiveTerminal logs={logs} />
+          </div>
+        )}
+      </main>
 
       <DeviceConnector
-        isOpen={showQR}
-        joinCode={joinCode}
-        serverUrl={serverUrl}
-        onClose={() => setShowQR(false)}
+        isOpen={isModalOpen}
+        joinCode="OS-99"
+        onClose={() => setIsModalOpen(false)}
       />
     </div>
   );
 }
-
-export default App;
