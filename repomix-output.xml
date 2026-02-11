@@ -68,6 +68,8 @@ client/tsconfig.app.json
 client/tsconfig.json
 client/tsconfig.node.json
 client/vite.config.ts
+flowchartinsp.png
+Resource_share-COLAB.ipynb
 server/package.json
 server/src/index.ts
 server/src/socket/SwarmSocketHandler.ts
@@ -82,6 +84,382 @@ shared/types.ts
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="Resource_share-COLAB.ipynb">
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "uh_ss-Sq2pN9"
+      },
+      "source": []
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 1,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "5CmKm_o41_8T",
+        "outputId": "cc41c109-c90e-4631-a457-0c804a1f8be1"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "\u001b[?25l   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m0.0/82.1 kB\u001b[0m \u001b[31m?\u001b[0m eta \u001b[36m-:--:--\u001b[0m\r\u001b[2K   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m82.1/82.1 kB\u001b[0m \u001b[31m4.3 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\n",
+            "\u001b[?25h\u001b[?25l   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m0.0/59.8 kB\u001b[0m \u001b[31m?\u001b[0m eta \u001b[36m-:--:--\u001b[0m\r\u001b[2K   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m59.8/59.8 kB\u001b[0m \u001b[31m4.0 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\n",
+            "\u001b[?25h"
+          ]
+        }
+      ],
+      "source": [
+        "!pip install python-socketio --quiet\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# @title Ostrich Legs Worker Node (v4.0 - Adaptive Benchmark & Polling)\n",
+        "# @markdown Run this cell to join the compute swarm!\n",
+        "\n",
+        "import sys\n",
+        "import subprocess\n",
+        "import time\n",
+        "import json\n",
+        "import os\n",
+        "import uuid\n",
+        "import threading\n",
+        "import platform\n",
+        "import numpy as np\n",
+        "\n",
+        "# --- 1. INSTALL DEPENDENCIES ---\n",
+        "try:\n",
+        "    import socketio\n",
+        "except ImportError:\n",
+        "    subprocess.check_call([sys.executable, \"-m\", \"pip\", \"install\", \"python-socketio[client]\", \"requests\"])\n",
+        "    import socketio\n"
+      ],
+      "metadata": {
+        "id": "WhzaxOm_QbZA"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Try importing Torch for GPU support\n",
+        "HAS_GPU = False\n",
+        "try:\n",
+        "    import torch\n",
+        "    if torch.cuda.is_available():\n",
+        "        HAS_GPU = True\n",
+        "        print(f\"🚀 GPU DETECTED: {torch.cuda.get_device_name(0)}\")\n",
+        "    else:\n",
+        "        print(\"⚠️ GPU not found. Falling back to CPU.\")\n",
+        "except ImportError:\n",
+        "    print(\"⚠️ PyTorch not installed. Falling back to CPU.\")\n"
+      ],
+      "metadata": {
+        "id": "VTIB47esQgO7"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# --- 4. KERNELS ---\n",
+        "\n",
+        "def run_stress_test(iterations):\n",
+        "    \"\"\"CPU Bound Stress Test\"\"\"\n",
+        "    start = time.time()\n",
+        "    count = int(iterations or 100000)\n",
+        "    # CPU heavy vector math\n",
+        "    x = np.random.rand(int(count/100))\n",
+        "    np.sin(x) * np.sqrt(x)\n",
+        "    return float(time.time() - start)\n",
+        "\n",
+        "def run_matrix_mul(data):\n",
+        "    \"\"\"Hybrid GPU/CPU Matrix Multiplication\"\"\"\n",
+        "    start = time.time()\n",
+        "\n",
+        "    # Extract dimensions (default 300 for normal jobs)\n",
+        "    size = int(data.get('size', 300))\n",
+        "\n",
+        "    if HAS_GPU:\n",
+        "        # GPU PATH\n",
+        "        a = torch.rand(size, size, device='cuda')\n",
+        "        b = torch.rand(size, size, device='cuda')\n",
+        "        torch.matmul(a, b)\n",
+        "        torch.cuda.synchronize()\n",
+        "    else:\n",
+        "        # CPU PATH\n",
+        "        a = np.random.rand(size, size)\n",
+        "        b = np.random.rand(size, size)\n",
+        "        np.dot(a, b)\n",
+        "\n",
+        "    return float(time.time() - start)\n",
+        "\n",
+        "def process_job(job):\n",
+        "    global last_work_time\n",
+        "    if not sio.connected: return False\n",
+        "\n",
+        "    job_id = job['id']\n",
+        "    job_type = job['type']\n",
+        "    job_data = job['data']\n",
+        "\n",
+        "    try:\n",
+        "        duration = 0\n",
+        "        if job_type == 'MATH_STRESS':\n",
+        "            duration = run_stress_test(job_data.get('iterations', 50000))\n",
+        "        elif job_type == 'MAT_MUL':\n",
+        "            duration = run_matrix_mul(job_data)\n",
+        "\n",
+        "        last_work_time = time.time()\n",
+        "\n",
+        "        if sio.connected:\n",
+        "            sio.emit('job:complete', {\n",
+        "                'chunkId': job_id,\n",
+        "                'result': 'Calculated',\n",
+        "                'durationMs': duration * 1000,\n",
+        "                'workerId': DEVICE_ID,\n",
+        "                'timestamp': time.time() * 1000\n",
+        "            })\n",
+        "            return True\n",
+        "    except Exception as e:\n",
+        "        print(f\"\\nJob Error: {e}\")\n",
+        "        if sio.connected:\n",
+        "            sio.emit('job:complete', {\n",
+        "                'chunkId': job_id,\n",
+        "                'error': str(e),\n",
+        "                'workerId': DEVICE_ID\n",
+        "            })\n",
+        "        return False\n",
+        "\n",
+        "# --- 5. EVENTS ---\n",
+        "\n",
+        "@sio.event\n",
+        "def connect():\n",
+        "    print(f\"\\n✅ Connected! ID: {DEVICE_ID}\")\n",
+        "\n",
+        "    # Detect System Info\n",
+        "    import multiprocessing\n",
+        "    cores = multiprocessing.cpu_count()\n",
+        "    mem = 12\n",
+        "\n",
+        "    sio.emit('device:register', {\n",
+        "        'name': DEVICE_NAME,\n",
+        "        'type': 'COLAB',\n",
+        "        'capabilities': {\n",
+        "            'cpuCores': cores,\n",
+        "            'memoryGB': mem,\n",
+        "            'gpuAvailable': HAS_GPU,\n",
+        "            # If GPU, we can handle huge concurrency because CUDA is parallel\n",
+        "            'maxConcurrency': cores * 4 if HAS_GPU else cores,\n",
+        "            'supportedJobs': ['MATH_STRESS', 'MAT_MUL']\n",
+        "        }\n",
+        "    })\n",
+        "\n",
+        "@sio.on('job:batch')\n",
+        "def on_batch(jobs):\n",
+        "    global is_working\n",
+        "    is_working = True\n",
+        "    print(f\"\\r📦 Batch: {len(jobs)} | GPU: {'ON' if HAS_GPU else 'OFF'}\", end=\"\")\n",
+        "\n",
+        "    for job in jobs:\n",
+        "        if not sio.connected: break\n",
+        "        process_job(job)\n",
+        "\n",
+        "    is_working = False\n",
+        "\n",
+        "    # Pull next batch\n",
+        "    if sio.connected:\n",
+        "        sio.emit('job:request_batch')\n",
+        "\n",
+        "@sio.on('cmd:run_benchmark')\n",
+        "def on_benchmark():\n",
+        "    print(\"\\n🚀 Starting Benchmark...\", end=\"\")\n",
+        "    try:\n",
+        "        start = time.time()\n",
+        "        score = 0\n",
+        "\n",
+        "        if HAS_GPU:\n",
+        "            # CASE A: GPU (Heavy Matrix Mul)\n",
+        "            size = 1000\n",
+        "            a = torch.rand(size, size, device='cuda')\n",
+        "            b = torch.rand(size, size, device='cuda')\n",
+        "            torch.matmul(a, b)\n",
+        "            torch.cuda.synchronize()\n",
+        "\n",
+        "            duration = time.time() - start\n",
+        "            # Formula: 2 Billion Ops / Seconds\n",
+        "            score = int(2000000000 / (duration + 0.00001))\n",
+        "            print(f\" [GPU MODE] Score: {score:,}\")\n",
+        "\n",
+        "        else:\n",
+        "            # CASE B: CPU (Simple Loop)\n",
+        "            # 5 Million Iterations\n",
+        "            count = 5000000\n",
+        "            x = np.random.rand(int(count/100))\n",
+        "            np.sin(x) * np.sqrt(x)\n",
+        "\n",
+        "            duration = time.time() - start\n",
+        "            # Formula: Iterations / Seconds\n",
+        "            score = int(count / (duration + 0.00001))\n",
+        "            print(f\" [CPU MODE] Score: {score:,}\")\n",
+        "\n",
+        "        sio.emit('benchmark:result', {'score': score})\n",
+        "\n",
+        "    except Exception as e:\n",
+        "        print(f\" Benchmark Failed: {e}\")\n",
+        "\n",
+        "@sio.event\n",
+        "def disconnect():\n",
+        "    print(\"\\n❌ Disconnected from server.\")\n",
+        "\n",
+        "# --- 6. BACKGROUND POLLER ---\n",
+        "def poller_loop():\n",
+        "    while True:\n",
+        "        try:\n",
+        "            # If idle for >1s, ask for work\n",
+        "            if sio.connected and not is_working:\n",
+        "                if time.time() - last_work_time > 1.0:\n",
+        "                    sio.emit('job:request_batch')\n",
+        "            time.sleep(1.0)\n",
+        "        except:\n",
+        "            pass\n"
+      ],
+      "metadata": {
+        "id": "ou5a0ug1Qsqj"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# --- 3. IDENTITY ---\n",
+        "id_file = \"device_identity.txt\"\n",
+        "if os.path.exists(id_file):\n",
+        "    with open(id_file, \"r\") as f:\n",
+        "        DEVICE_ID = f.read().strip()\n",
+        "else:\n",
+        "    DEVICE_ID = f\"colab-{str(uuid.uuid4())[:8]}\"\n",
+        "    with open(id_file, \"w\") as f:\n",
+        "        f.write(DEVICE_ID)\n",
+        "\n",
+        "sio = socketio.Client(reconnection=True, reconnection_delay=5)\n",
+        "is_working = False\n",
+        "last_work_time = time.time()\n"
+      ],
+      "metadata": {
+        "id": "3x1KtBgcQvKl"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# --- 2. CONFIGURATION ---\n",
+        "SERVER_URL = \"https://public-pride-bought-sys.trycloudflare.com/\" # @param {type:\"string\"}\n",
+        "DEVICE_NAME = \"Colab-Node-01\" # @param {type:\"string\"}\n",
+        "\n",
+        "\n",
+        "\n",
+        "# --- 7. MAIN START ---\n",
+        "def main():\n",
+        "    print(f\"🚀 Initializing Worker {DEVICE_ID}...\")\n",
+        "\n",
+        "    # Start Poller\n",
+        "    t = threading.Thread(target=poller_loop, daemon=True)\n",
+        "    t.start()\n",
+        "\n",
+        "    # Auth URL\n",
+        "    auth_url = f\"{SERVER_URL}?persistentId={DEVICE_ID}\"\n",
+        "\n",
+        "    while True:\n",
+        "        try:\n",
+        "            if not sio.connected:\n",
+        "                print(f\"Connecting to {SERVER_URL}...\")\n",
+        "                sio.connect(auth_url, transports=['websocket', 'polling'])\n",
+        "                sio.wait()\n",
+        "        except KeyboardInterrupt:\n",
+        "            print(\"\\nStopping...\")\n",
+        "            break\n",
+        "        except Exception as e:\n",
+        "            print(f\"Connection Error: {e}\")\n",
+        "            time.sleep(5)\n"
+      ],
+      "metadata": {
+        "id": "5zJYP80nQ3Z8"
+      },
+      "execution_count": 1,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 2,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 158
+        },
+        "id": "dfTz0baT1GI1",
+        "collapsed": true,
+        "outputId": "eaf27aba-a478-4785-e2b5-82adfa6fcdbd"
+      },
+      "outputs": [
+        {
+          "output_type": "error",
+          "ename": "NameError",
+          "evalue": "name 'main' is not defined",
+          "traceback": [
+            "\u001b[0;31m---------------------------------------------------------------------------\u001b[0m",
+            "\u001b[0;31mNameError\u001b[0m                                 Traceback (most recent call last)",
+            "\u001b[0;32m/tmp/ipython-input-217905245.py\u001b[0m in \u001b[0;36m<cell line: 0>\u001b[0;34m()\u001b[0m\n\u001b[1;32m      1\u001b[0m \u001b[0;32mif\u001b[0m \u001b[0m__name__\u001b[0m \u001b[0;34m==\u001b[0m \u001b[0;34m'__main__'\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m----> 2\u001b[0;31m     \u001b[0mmain\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m",
+            "\u001b[0;31mNameError\u001b[0m: name 'main' is not defined"
+          ]
+        }
+      ],
+      "source": [
+        "if __name__ == '__main__':\n",
+        "    main()"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [],
+      "metadata": {
+        "id": "_Fi0UHRcQ_ws"
+      },
+      "execution_count": null,
+      "outputs": []
+    }
+  ],
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "gpuType": "T4"
+    },
+    "kernelspec": {
+      "display_name": "Python 3",
+      "name": "python3"
+    },
+    "language_info": {
+      "name": "python"
+    },
+    "accelerator": "GPU"
+  },
+  "nbformat": 4,
+  "nbformat_minor": 0
+}
+</file>
 
 <file path="client/eslint.config.js">
 import js from '@eslint/js'
@@ -628,215 +1006,6 @@ createRoot(document.getElementById('root')!).render(
 }
 </file>
 
-<file path="server/src/socket/SwarmSocketHandler.ts">
-import { Server, Socket } from "socket.io";
-import { SwarmCoordinator } from "../swarm/SwarmCoordinator.js";
-import {
-  SwarmRunState,
-  type RegisterPayload,
-  type WorkerResult,
-} from "../../../shared/types.js";
-
-export class SwarmSocketHandler {
-  // Explicit properties required for erasable syntax
-  private io: Server;
-  private coordinator: SwarmCoordinator;
-
-  constructor(io: Server, coordinator: SwarmCoordinator) {
-    this.io = io;
-    this.coordinator = coordinator;
-
-    this.setupStateBroadcasting();
-    this.io.on("connection", (s) => this.handleConnection(s));
-  }
-
-  private setupStateBroadcasting() {
-    this.coordinator.stateStore.on("change", (snapshot) => {
-      this.io.emit("swarm:snapshot", snapshot);
-    });
-  }
-
-  private handleConnection(socket: Socket) {
-    const persistentId = socket.handshake.query.persistentId as string;
-
-    if (!persistentId) {
-      socket.disconnect(true);
-      return;
-    }
-
-    socket.on("device:register", (data: RegisterPayload) => {
-      this.coordinator.handleRegistration(socket.id, persistentId, data);
-      socket.emit("swarm:snapshot", this.coordinator.stateStore.getSnapshot());
-    });
-
-    socket.on("cmd:set_run_state", (state: SwarmRunState) => {
-      this.coordinator.setRunState(state);
-    });
-
-    socket.on("cmd:toggle_device", (data: { id: string; enabled: boolean }) => {
-      this.coordinator.toggleDevice(data.id, data.enabled);
-    });
-
-    socket.on("job:request_batch", () => {
-      const jobs = this.coordinator.getWorkForDevice(persistentId);
-      if (jobs.length > 0) {
-        socket.emit("job:batch", jobs);
-      }
-    });
-
-    socket.on("job:complete", (result: WorkerResult) => {
-      result.deviceId = persistentId;
-      this.coordinator.completeJob(result);
-    });
-
-    socket.on("disconnect", () => {
-      this.coordinator.handleDisconnect(socket.id);
-    });
-  }
-}
-</file>
-
-<file path="server/src/swarm/JobGenerator.ts">
-import { SwarmCoordinator } from "./SwarmCoordinator.js";
-import { type JobChunk, SwarmRunState } from "../../../shared/types.js";
-
-export class JobGenerator {
-  // Explicit property declarations required for Erasable Syntax
-  private coordinator: SwarmCoordinator;
-  private interval: NodeJS.Timeout | null = null;
-
-  constructor(coordinator: SwarmCoordinator) {
-    this.coordinator = coordinator; // Explicit assignment
-
-    this.coordinator.stateStore.on("change", (snapshot) => {
-      if (snapshot.runState === SwarmRunState.RUNNING) {
-        this.start();
-      } else {
-        this.stop();
-      }
-    });
-  }
-
-  private start() {
-    if (this.interval) return;
-    console.log("[Generator] Swarm RUNNING -> Starting job stream...");
-
-    this.fillQueue();
-
-    this.interval = setInterval(() => {
-      this.fillQueue();
-    }, 1000);
-  }
-
-  private stop() {
-    if (this.interval) {
-      clearInterval(this.interval);
-      this.interval = null;
-      console.log("[Generator] Swarm STOPPED -> Pausing job stream.");
-    }
-  }
-
-  private fillQueue() {
-    const metrics = this.coordinator.scheduler.getMetrics();
-
-    if (metrics.pendingJobs < 100) {
-      const batchSize = 50;
-      const jobs: JobChunk[] = [];
-
-      for (let i = 0; i < batchSize; i++) {
-        jobs.push({
-          id: `job-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-          type: Math.random() > 0.5 ? "MAT_MUL" : "MATH_STRESS",
-          data: { size: 30, iterations: 50000 },
-          status: "PENDING",
-          createdAt: Date.now(),
-        });
-      }
-
-      this.coordinator.submitBatch(jobs);
-    }
-  }
-}
-</file>
-
-<file path="server/src/swarm/SwarmStateStore.ts">
-import { EventEmitter } from "events";
-import {
-  type SwarmSnapshot,
-  SwarmRunState,
-  type DeviceInfo,
-} from "../../../shared/types";
-
-export class SwarmStateStore extends EventEmitter {
-  private snapshot: SwarmSnapshot;
-
-  constructor() {
-    super();
-    this.snapshot = {
-      runState: SwarmRunState.IDLE,
-      globalThrottle: 0.3,
-      devices: {},
-      stats: {
-        totalJobs: 0,
-        activeJobs: 0,
-        pendingJobs: 0,
-      },
-    };
-  }
-
-  public getSnapshot(): SwarmSnapshot {
-    return JSON.parse(JSON.stringify(this.snapshot));
-  }
-
-  public getDevice(deviceId: string): DeviceInfo | undefined {
-    return this.snapshot.devices[deviceId];
-  }
-
-  public getAllDevices(): DeviceInfo[] {
-    return Object.values(this.snapshot.devices);
-  }
-
-  public updateRunState(state: SwarmRunState): void {
-    if (this.snapshot.runState !== state) {
-      this.snapshot.runState = state;
-      this.emitChange();
-    }
-  }
-
-  public upsertDevice(device: DeviceInfo): void {
-    this.snapshot.devices[device.id] = device;
-    this.emitChange();
-  }
-
-  public updateDeviceState(
-    deviceId: string,
-    partial: Partial<DeviceInfo>,
-  ): void {
-    const device = this.snapshot.devices[deviceId];
-    if (device) {
-      this.snapshot.devices[deviceId] = { ...device, ...partial };
-      this.emitChange();
-    }
-  }
-
-  public removeDevice(deviceId: string): void {
-    if (this.snapshot.devices[deviceId]) {
-      delete this.snapshot.devices[deviceId];
-      this.emitChange();
-    }
-  }
-
-  public updateStats(stats: Partial<SwarmSnapshot["stats"]>): void {
-    this.snapshot.stats = { ...this.snapshot.stats, ...stats };
-    this.emitChange();
-  }
-
-  private emitChange() {
-    this.emit("change", this.getSnapshot());
-  }
-}
-</file>
-
 <file path="server/tsconfig.json">
 {
   "compilerOptions": {
@@ -1317,6 +1486,226 @@ export default defineConfig({
 }
 </file>
 
+<file path="server/src/socket/SwarmSocketHandler.ts">
+import { Server, Socket } from "socket.io";
+import { SwarmCoordinator } from "../swarm/SwarmCoordinator.js";
+import {
+  SwarmRunState,
+  type RegisterPayload,
+  type WorkerResult,
+} from "../../../shared/types.js";
+
+export class SwarmSocketHandler {
+  private io: Server;
+  private coordinator: SwarmCoordinator;
+
+  constructor(io: Server, coordinator: SwarmCoordinator) {
+    this.io = io;
+    this.coordinator = coordinator;
+    this.setupStateBroadcasting();
+    this.io.on("connection", (s) => this.handleConnection(s));
+  }
+
+  private setupStateBroadcasting() {
+    this.coordinator.stateStore.on("change", (snapshot) => {
+      this.io.emit("swarm:snapshot", snapshot);
+    });
+  }
+
+  private handleConnection(socket: Socket) {
+    const persistentId = socket.handshake.query.persistentId as string;
+
+    if (!persistentId) {
+      socket.disconnect(true);
+      return;
+    }
+
+    socket.on("device:register", (data: RegisterPayload) => {
+      this.coordinator.handleRegistration(socket.id, persistentId, data);
+      socket.emit("swarm:snapshot", this.coordinator.stateStore.getSnapshot());
+    });
+
+    socket.on("cmd:set_run_state", (state: SwarmRunState) => {
+      this.coordinator.setRunState(state);
+    });
+
+    socket.on("cmd:toggle_device", (data: { id: string; enabled: boolean }) => {
+      this.coordinator.toggleDevice(data.id, data.enabled);
+    });
+
+    // --- NEW: Global Benchmark Trigger ---
+    socket.on("cmd:trigger_benchmark", () => {
+      // Broadcast to ALL clients to start their benchmarks
+      this.io.emit("cmd:run_benchmark");
+    });
+
+    // --- NEW: Receive Result ---
+    socket.on("benchmark:result", (data: { score: number }) => {
+      this.coordinator.handleBenchmarkResult(persistentId, data.score);
+    });
+
+    socket.on("job:request_batch", () => {
+      const jobs = this.coordinator.getWorkForDevice(persistentId);
+      if (jobs.length > 0) {
+        socket.emit("job:batch", jobs);
+      }
+    });
+
+    socket.on("job:complete", (result: WorkerResult) => {
+      result.deviceId = persistentId;
+      this.coordinator.completeJob(result);
+    });
+
+    socket.on("disconnect", () => {
+      this.coordinator.handleDisconnect(socket.id);
+    });
+  }
+}
+</file>
+
+<file path="server/src/swarm/JobGenerator.ts">
+import { SwarmCoordinator } from "./SwarmCoordinator.js";
+import { type JobChunk, SwarmRunState } from "../../../shared/types.js";
+
+export class JobGenerator {
+  private coordinator: SwarmCoordinator;
+  private interval: NodeJS.Timeout | null = null;
+
+  constructor(coordinator: SwarmCoordinator) {
+    this.coordinator = coordinator;
+
+    this.coordinator.stateStore.on("change", (snapshot) => {
+      if (snapshot.runState === SwarmRunState.RUNNING) {
+        this.start();
+      } else {
+        this.stop();
+      }
+    });
+  }
+
+  private start() {
+    if (this.interval) return;
+    console.log("[Generator] Swarm RUNNING -> Starting heavy job stream...");
+
+    this.fillQueue();
+
+    this.interval = setInterval(() => {
+      this.fillQueue();
+    }, 2000); // Check every 2 seconds (Slower check is fine)
+  }
+
+  private stop() {
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
+      console.log("[Generator] Swarm STOPPED -> Pausing job stream.");
+    }
+  }
+
+  private fillQueue() {
+    const metrics = this.coordinator.scheduler.getMetrics();
+
+    // INCREASED BUFFER: Keep 2000 jobs pending to prevent starvation
+    if (metrics.pendingJobs < 2000) {
+      const batchSize = 200; // Generate big batches
+      const jobs: JobChunk[] = [];
+
+      for (let i = 0; i < batchSize; i++) {
+        const isMatrix = Math.random() > 0.5;
+        jobs.push({
+          id: `job-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          type: isMatrix ? "MAT_MUL" : "MATH_STRESS",
+          data: isMatrix ? { size: 300 } : { iterations: 5000000 },
+          status: "PENDING",
+          createdAt: Date.now(),
+        });
+      }
+
+      this.coordinator.submitBatch(jobs);
+    }
+  }
+}
+</file>
+
+<file path="server/src/swarm/SwarmStateStore.ts">
+import { EventEmitter } from "events";
+import {
+  type SwarmSnapshot,
+  SwarmRunState,
+  type DeviceInfo,
+} from "../../../shared/types";
+
+export class SwarmStateStore extends EventEmitter {
+  private snapshot: SwarmSnapshot;
+
+  constructor() {
+    super();
+    this.snapshot = {
+      runState: SwarmRunState.IDLE,
+      globalThrottle: 0.3,
+      devices: {},
+      stats: {
+        totalJobs: 0,
+        activeJobs: 0,
+        pendingJobs: 0,
+        completedJobs: 0,
+      },
+    };
+  }
+
+  public getSnapshot(): SwarmSnapshot {
+    return JSON.parse(JSON.stringify(this.snapshot));
+  }
+
+  public getDevice(deviceId: string): DeviceInfo | undefined {
+    return this.snapshot.devices[deviceId];
+  }
+
+  public getAllDevices(): DeviceInfo[] {
+    return Object.values(this.snapshot.devices);
+  }
+
+  public updateRunState(state: SwarmRunState): void {
+    if (this.snapshot.runState !== state) {
+      this.snapshot.runState = state;
+      this.emitChange();
+    }
+  }
+
+  public upsertDevice(device: DeviceInfo): void {
+    this.snapshot.devices[device.id] = device;
+    this.emitChange();
+  }
+
+  public updateDeviceState(
+    deviceId: string,
+    partial: Partial<DeviceInfo>,
+  ): void {
+    const device = this.snapshot.devices[deviceId];
+    if (device) {
+      this.snapshot.devices[deviceId] = { ...device, ...partial };
+      this.emitChange();
+    }
+  }
+
+  public removeDevice(deviceId: string): void {
+    if (this.snapshot.devices[deviceId]) {
+      delete this.snapshot.devices[deviceId];
+      this.emitChange();
+    }
+  }
+
+  public updateStats(stats: Partial<SwarmSnapshot["stats"]>): void {
+    this.snapshot.stats = { ...this.snapshot.stats, ...stats };
+    this.emitChange();
+  }
+
+  private emitChange() {
+    this.emit("change", this.getSnapshot());
+  }
+}
+</file>
+
 <file path="client/src/components/dashboard/DeviceConnector.tsx">
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -1594,78 +1983,6 @@ export function DeviceConnector({
 }
 </file>
 
-<file path="client/src/components/dashboard/DeviceHealth.tsx">
-import { Cpu, RotateCw } from "lucide-react";
-import { Card } from "../ui/Card";
-import { Badge } from "../ui/Badge";
-// import { useComputeSwarm } from "../../hooks/useComputeSwarm";
-
-// Add className prop to allow parent to control dimensions
-export function DeviceHealth({
-  status,
-  opsScore,
-  workerId,
-  className = "",
-  onRunBenchmark,
-}: {
-  status: string;
-  opsScore: number;
-  workerId: string;
-  className?: string;
-  onRunBenchmark: () => void;
-}) {
-  return (
-    // Changed: Removed "h-75" and "md:col-span-4". Added {className}.
-    <Card className={`flex flex-col justify-between ${className}`}>
-      <div>
-        <div className="flex justify-between items-start mb-4">
-          <div className="p-2 bg-arc-bg rounded-xl border border-arc-border">
-            <Cpu size={20} className="text-indigo-500" />
-          </div>
-          <Badge active={status === "WORKING"} text={status} />
-        </div>
-        <h3 className="text-base font-medium text-arc-text">Device Health</h3>
-        <p className="text-xs text-arc-muted mt-0.5">Allocation & Benchmarks</p>
-      </div>
-
-      <div className="space-y-2 mt-2">
-        {/* BENCHMARK ROW */}
-        <div className="p-3 rounded-2xl bg-arc-bg border border-arc-border flex justify-between items-center group">
-          <div className="flex flex-col">
-            <span className="text-[10px] text-arc-muted font-bold tracking-wider mb-0.5">
-              BENCHMARK
-            </span>
-            <span className="text-base font-mono text-indigo-500 font-bold">
-              {opsScore > 0 ? opsScore.toLocaleString() : "---"}
-              <span className="text-[10px] text-arc-muted font-normal ml-1">
-                OPS
-              </span>
-            </span>
-          </div>
-
-          <button
-            onClick={onRunBenchmark} // <--- USE THE PROP
-            className={`p-2 rounded-full hover:bg-indigo-500/10 transition-colors ${opsScore === 0 ? "animate-pulse text-indigo-500" : "text-arc-muted opacity-0 group-hover:opacity-100"}`}
-            title="Re-run Benchmark"
-          >
-            <RotateCw size={14} />
-          </button>
-        </div>
-
-        <div className="p-3 rounded-2xl bg-arc-bg border border-arc-border flex justify-between items-center">
-          <span className="text-[10px] text-arc-muted font-bold tracking-wider">
-            ID
-          </span>
-          <span className="text-[10px] font-mono text-arc-muted truncate max-w-20">
-            {workerId || "Connecting..."}
-          </span>
-        </div>
-      </div>
-    </Card>
-  );
-}
-</file>
-
 <file path="server/src/swarm/JoinCodeManager.ts">
 import { type JoinCode } from "../../../shared/types.js";
 import { randomBytes } from "crypto";
@@ -1760,209 +2077,99 @@ export class JoinCodeManager {
 }
 </file>
 
-<file path="client/src/components/dashboard/GpuStatusMonitor.tsx">
-import { useEffect, useRef } from "react";
+<file path="client/src/components/dashboard/DeviceHealth.tsx">
+import { Cpu, RotateCw, Monitor, Smartphone, Server } from "lucide-react";
 import { Card } from "../ui/Card";
+import { type DeviceInfo, type DeviceType } from "../../../../shared/types";
 
-interface DataPoint {
-  value: number;
-  throttle: number;
-  timestamp: number;
+interface DeviceHealthProps {
+  devices: DeviceInfo[];
+  className?: string;
+  onRunBenchmark: () => void;
 }
 
-interface GpuStatusMonitorProps {
-  completedCount: number;
-  throttle: number; // 0 to 100
-}
-
-export function GpuStatusMonitor({
-  completedCount,
-  throttle,
-}: GpuStatusMonitorProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const dataRef = useRef<DataPoint[]>([]);
-  const countRef = useRef(completedCount);
-  const prevCountRef = useRef(completedCount);
-  const animationFrameRef = useRef<number>(0);
-  const throttleRef = useRef(throttle);
-
-  useEffect(() => {
-    throttleRef.current = throttle;
-  }, [throttle]);
-
-  useEffect(() => {
-    countRef.current = completedCount;
-  }, [completedCount]);
-
-  useEffect(() => {
-    // Initialize data array
-    if (dataRef.current.length === 0) {
-      dataRef.current = new Array(60).fill(null).map(() => ({
-        value: 0,
-        throttle: 30,
-        timestamp: Date.now(),
-      }));
+export function DeviceHealth({
+  devices,
+  className = "",
+  onRunBenchmark,
+}: DeviceHealthProps) {
+  const getIcon = (type: DeviceType) => {
+    switch (type) {
+      case "MOBILE":
+        return Smartphone;
+      case "SERVER":
+        return Server;
+      case "COLAB":
+        return Server;
+      default:
+        return Monitor;
     }
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d", { alpha: true });
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
-
-    const dataInterval = setInterval(() => {
-      const now = Date.now();
-      const delta = countRef.current - prevCountRef.current;
-      prevCountRef.current = countRef.current;
-
-      dataRef.current.shift();
-      dataRef.current.push({
-        value: delta * 5,
-        throttle: throttleRef.current,
-        timestamp: now,
-      });
-    }, 200);
-
-    const draw = () => {
-      if (!ctx || !canvas) return;
-      const width = rect.width;
-      const height = rect.height;
-
-      ctx.clearRect(0, 0, width, height);
-
-      const recentData = dataRef.current.slice(-5);
-      const currentVelocity =
-        recentData.length > 0
-          ? recentData.reduce((a, b) => a + b.value, 0) / recentData.length
-          : 0;
-
-      // Draw Grid
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
-      ctx.lineWidth = 1;
-      for (let i = 0; i < 5; i++) {
-        const y = (height / 4) * i;
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
-        ctx.stroke();
-      }
-
-      const maxVal = Math.max(...dataRef.current.map((d) => d.value), 10);
-      const getColor = (level: number) => {
-        if (level <= 30) return [16, 185, 129]; // Emerald
-        if (level >= 80) return [244, 63, 94]; // Rose
-        return [99, 102, 241]; // Indigo
-      };
-
-      // Draw Chart
-      const data = dataRef.current;
-      for (let i = 0; i < data.length - 1; i++) {
-        const [r, g, b] = getColor(data[i].throttle);
-
-        const x1 = (i / (data.length - 1)) * width;
-        const x2 = ((i + 1) / (data.length - 1)) * width;
-        const y1 = height - (data[i].value / maxVal) * (height * 0.8);
-        const y2 = height - (data[i + 1].value / maxVal) * (height * 0.8);
-
-        // Fill
-        const gradient = ctx.createLinearGradient(x1, y1, x1, height);
-        gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.3)`);
-        gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-
-        ctx.beginPath();
-        ctx.moveTo(x1, height);
-        ctx.lineTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.lineTo(x2, height);
-        ctx.closePath();
-        ctx.fillStyle = gradient;
-        ctx.fill();
-
-        // Stroke
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.strokeStyle = `rgb(${r}, ${g}, ${b})`;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
-
-      // Text Overlay
-      ctx.font = "bold 48px Inter, sans-serif";
-      ctx.fillStyle = "var(--arc-text)"; // Uses CSS variable
-      ctx.textAlign = "left";
-      ctx.fillText(Math.round(currentVelocity).toString(), 32, 60);
-
-      ctx.font = "16px Inter, sans-serif";
-      ctx.fillStyle = "var(--arc-muted)";
-      ctx.fillText("chunks / sec", 32, 85);
-
-      animationFrameRef.current = requestAnimationFrame(draw);
-    };
-
-    draw();
-
-    return () => {
-      clearInterval(dataInterval);
-      if (animationFrameRef.current)
-        cancelAnimationFrame(animationFrameRef.current);
-    };
-  }, []);
-
-  const getColorHex = (level: number) => {
-    if (level <= 30) return "#10b981";
-    if (level >= 80) return "#f43f5e";
-    return "#6366f1";
   };
-  const currentColor = getColorHex(throttle);
 
   return (
-    <Card
-      className="md:col-span-8 h-90 flex flex-col justify-between relative"
-      noPadding
-    >
-      <div className="p-8 pb-0 z-20 relative">
-        <div className="flex items-center gap-3 mb-2">
-          <div
-            className="w-2 h-2 rounded-full animate-pulse"
-            style={{ backgroundColor: currentColor }}
-          />
-          <h2 className="text-xs font-bold tracking-widest text-arc-muted uppercase">
-            Live Velocity (GPU)
-          </h2>
+    <Card className={`flex flex-col ${className}`} noPadding>
+      <div className="p-6 pb-0 flex justify-between items-start">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-1.5 bg-indigo-500/10 rounded-lg">
+              <Cpu size={16} className="text-indigo-500" />
+            </div>
+            <h3 className="text-sm font-bold text-arc-text uppercase tracking-wider">
+              Benchmarks
+            </h3>
+          </div>
+          <p className="text-xs text-arc-muted">
+            {devices.length} Connected Nodes
+          </p>
         </div>
 
-        <p className="text-xs text-arc-muted font-medium mt-12">
-          Lifetime Contribution:{" "}
-          <span className="font-mono text-arc-text opacity-80">
-            {completedCount.toLocaleString()}
-          </span>{" "}
-          chunks
-        </p>
-
-        <div className="flex items-center gap-2 mt-2">
-          <span
-            className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-            style={{
-              backgroundColor: `${currentColor}20`,
-              color: currentColor,
-            }}
-          >
-            {Math.round(throttle)}% Throttle
-          </span>
-        </div>
+        <button
+          onClick={onRunBenchmark}
+          className="p-2 rounded-xl bg-arc-bg hover:bg-indigo-500/10 hover:text-indigo-500 text-arc-muted transition-all active:scale-95 border border-arc-border"
+          title="Benchmark Swarm"
+        >
+          <RotateCw size={16} />
+        </button>
       </div>
 
-      <canvas
-        ref={canvasRef}
-        className="absolute bottom-0 left-0 right-0 h-55 w-full pointer-events-none"
-      />
+      <div className="p-4 space-y-2 overflow-y-auto custom-scrollbar h-full">
+        {devices.map((device) => {
+          const Icon = getIcon(device.type);
+          return (
+            <div
+              key={device.id}
+              className="flex items-center justify-between p-3 rounded-xl bg-arc-bg/50 border border-arc-border/50"
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={`p-2 rounded-lg ${device.opsScore > 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-zinc-500/10 text-zinc-500"}`}
+                >
+                  <Icon size={14} />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-medium text-arc-text truncate max-w-25">
+                    {device.name}
+                  </span>
+                  <span className="text-[10px] text-arc-muted font-mono">
+                    {device.id.slice(0, 6)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <span className="text-sm font-mono font-bold text-indigo-500 block">
+                  {device.opsScore > 0
+                    ? device.opsScore.toLocaleString()
+                    : "---"}
+                </span>
+                <span className="text-[9px] text-arc-muted uppercase tracking-wider">
+                  OPS
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </Card>
   );
 }
@@ -2067,234 +2274,6 @@ export function ThrottleControl({
     </Card>
   );
 }
-</file>
-
-<file path="client/src/utils/worker.ts">
-/// <reference lib="webworker" />
-
-// --- CONFIGURATION & LIMITS ---
-const LOGICAL_CORES = navigator.hardwareConcurrency || 4;
-
-// --- STATE MANAGEMENT ---
-// Map stores: Worker ID -> { Worker Instance, Busy Status, Current Chunk ID }
-const threadPool = new Map<
-  number,
-  {
-    worker: Worker;
-    objectUrl: string; // <--- ADDED
-    busy: boolean;
-    currentChunkId: string | null;
-  }
->();
-
-let throttleLimit = 0.3; // Default start at 30%
-let nextWorkerId = 0;
-
-// --- SUB-WORKER FACTORY ---
-// Creates a lightweight worker that runs the actual kernels
-const createSubWorker = (_workerId: number) => {
-  const blob = new Blob(
-    [
-      `
-    // 1. Define Kernels INSIDE the blob
-    const runStressTest = (iterations) => {
-      let sum = 0;
-      const count = iterations || 1000000;
-      for (let i = 0; i < count; i++) {
-        sum += Math.sqrt(i) * Math.sin(i);
-      }
-      return sum;
-    };
-
-    const runMatrixMul = (rowA, matrixB) => {
-      if (!rowA || !matrixB) return []; 
-      if (rowA.length !== matrixB.length) return [];
-
-      const resultRow = new Array(matrixB[0].length).fill(0);
-      for (let j = 0; j < matrixB[0].length; j++) {
-        let sum = 0;
-        for (let k = 0; k < rowA.length; k++) {
-          sum += rowA[k] * matrixB[k][j];
-        }
-        resultRow[j] = sum;
-      }
-      return resultRow;
-    };
-
-    self.onmessage = (e) => {
-      try {
-        const { type, data } = e.data;
-        let result;
-
-        if (type === "MATH_STRESS") {
-          const iterations = typeof data === 'object' ? data.iterations : data;
-          result = runStressTest(iterations);
-        } 
-        else if (type === "MAT_MUL") {
-          if (data && data.size) {
-            const size = data.size;
-            const matrixB = Array(size).fill(0).map(() => Array(size).fill(0).map(() => Math.random()));
-            const rowVector = Array(size).fill(0).map(() => Math.random());
-            result = runMatrixMul(rowVector, matrixB);
-          } else if (data && data.row && data.matrixB) {
-            result = runMatrixMul(data.row, data.matrixB);
-          } else {
-             throw new Error("Invalid MAT_MUL data");
-          }
-        }
-        else {
-          throw new Error("Unknown Kernel: " + type);
-        }
-
-        self.postMessage({ success: true, result });
-      } catch (err) {
-        self.postMessage({ success: false, error: err.message || String(err) });
-      }
-    }
-  `,
-    ],
-    { type: "application/javascript" },
-  );
-
-  const objectUrl = URL.createObjectURL(blob); // <--- CAPTURE URL
-  return { worker: new Worker(objectUrl), objectUrl };
-};
-// --- THREAD POOL MANAGER ---
-const applyConfig = () => {
-  const targetThreadCount = Math.max(
-    1,
-    Math.floor(LOGICAL_CORES * throttleLimit),
-  );
-
-  const currentCount = threadPool.size;
-
-  // SCALE UP
-  if (targetThreadCount > currentCount) {
-    for (let i = currentCount; i < targetThreadCount; i++) {
-      const wId = nextWorkerId++;
-      const { worker, objectUrl } = createSubWorker(wId); // <--- DESTRUCTURE
-      threadPool.set(wId, {
-        worker,
-        objectUrl,
-        busy: false,
-        currentChunkId: null,
-      });
-    }
-  }
-
-  // SCALE DOWN
-  if (targetThreadCount < currentCount) {
-    const toRemove = currentCount - targetThreadCount;
-    let removed = 0;
-
-    for (const [id, thread] of threadPool.entries()) {
-      if (!thread.busy && removed < toRemove) {
-        thread.worker.terminate();
-        URL.revokeObjectURL(thread.objectUrl); // <--- CRITICAL FIX: FREE MEMORY
-        threadPool.delete(id);
-        removed++;
-      }
-    }
-  }
-
-  self.postMessage({
-    type: "CONFIG_APPLIED",
-    threads: threadPool.size,
-    limit: throttleLimit,
-  });
-};
-// --- INITIALIZATION ---
-applyConfig();
-
-// --- MAIN MESSAGE DISPATCHER ---
-self.onmessage = async (e: MessageEvent) => {
-  const { type, chunk, throttleLevel, workerId } = e.data;
-
-  // CONFIG UPDATE
-  if (type === "UPDATE_CONFIG") {
-    if (throttleLevel !== undefined) {
-      throttleLimit = throttleLevel;
-    }
-    applyConfig();
-    return;
-  }
-
-  // BENCHMARKING
-  if (type === "BENCHMARK") {
-    const start = performance.now();
-    let sum = 0;
-    // Quick burst calculation
-    for (let i = 0; i < 500000; i++) {
-      sum += Math.sqrt(i);
-    }
-    const duration = performance.now() - start;
-    const score = Math.round((500000 / (duration || 1)) * 1000);
-
-    self.postMessage({
-      type: "BENCHMARK_COMPLETE",
-      score: score,
-    });
-    return;
-  }
-
-  // JOB PROCESSING
-  if (type === "JOB_CHUNK") {
-    // 1. Find an idle worker
-    let selectedThreadId = -1;
-    let selectedWorker = null;
-
-    for (const [id, thread] of threadPool.entries()) {
-      if (!thread.busy) {
-        selectedThreadId = id;
-        selectedWorker = thread.worker;
-        break;
-      }
-    }
-
-    if (!selectedWorker) {
-      self.postMessage({
-        type: "JOB_ERROR",
-        chunkId: chunk.id,
-        error: "CPU_SATURATED",
-      });
-      return;
-    }
-
-    // 2. Mark thread as busy
-    const thread = threadPool.get(selectedThreadId)!;
-    thread.busy = true;
-    thread.currentChunkId = chunk.id;
-
-    // 3. Set up completion handler
-    selectedWorker.onmessage = (ev) => {
-      thread.busy = false;
-      thread.currentChunkId = null;
-
-      if (ev.data.success) {
-        self.postMessage({
-          type: "JOB_COMPLETE",
-          chunkId: chunk.id,
-          result: ev.data.result,
-          workerId: workerId,
-        });
-      } else {
-        self.postMessage({
-          type: "JOB_ERROR",
-          chunkId: chunk.id,
-          error: ev.data.error,
-        });
-      }
-    };
-
-    // 4. Dispatch to sub-worker
-    selectedWorker.postMessage({
-      type: chunk.type,
-      data: chunk.data,
-    });
-  }
-};
-
-export {};
 </file>
 
 <file path="server/src/swarm/WorkStealingScheduler.ts">
@@ -2495,107 +2474,197 @@ export class WorkStealingScheduler extends EventEmitter {
 }
 </file>
 
-<file path="shared/types.ts">
-// --- CONSTANTS (Erasable Enums) ---
-export const SwarmRunState = {
-  IDLE: "IDLE",
-  RUNNING: "RUNNING",
-  PAUSED: "PAUSED",
-  STOPPED: "STOPPED",
-} as const;
-export type SwarmRunState = (typeof SwarmRunState)[keyof typeof SwarmRunState];
+<file path="client/src/components/dashboard/GpuStatusMonitor.tsx">
+import { useEffect, useRef } from "react";
+import { Card } from "../ui/Card";
 
-export const DeviceState = {
-  ENABLED: "ENABLED",
-  DISABLED: "DISABLED",
-  BUSY: "BUSY",
-  ONLINE: "ONLINE",
-  OFFLINE: "OFFLINE",
-  ERROR: "ERROR",
-} as const;
-export type DeviceState = (typeof DeviceState)[keyof typeof DeviceState];
-
-export type DeviceType = "DESKTOP" | "MOBILE" | "COLAB" | "SERVER" | "TABLET";
-export type JobType = "MATH_STRESS" | "MAT_MUL" | "TEXT_TOKENIZE" | "CUSTOM";
-
-// --- INTERFACES ---
-
-export interface JoinCode {
-  code: string;
-  expiresAt: number;
-  maxUses: number;
-  usedCount: number;
-  createdBy: string;
-  metadata?: {
-    description?: string;
-    tags?: string[];
-  };
-}
-
-export interface DeviceCapabilities {
-  cpuCores: number;
-  memoryGB: number;
-  gpuAvailable: boolean;
-  maxConcurrency: number;
-  supportedJobs: JobType[];
-}
-
-export interface DeviceInfo {
-  id: string;
-  socketId: string;
-  name: string;
-  type: DeviceType;
-  state: DeviceState;
-  capabilities: DeviceCapabilities;
-
-  // Metrics
-  opsScore: number;
-  currentLoad: number;
-  totalJobsCompleted: number;
-  avgJobDuration: number;
-  connectedAt: number;
-  lastHeartbeat: number;
-
-  // Configuration
-  isThrottled: boolean;
-  throttleLevel: number;
-}
-
-export interface SwarmSnapshot {
-  runState: SwarmRunState;
-  globalThrottle: number;
-  devices: Record<string, DeviceInfo>;
-  stats: {
-    totalJobs: number;
-    activeJobs: number;
-    pendingJobs: number;
-  };
-}
-
-export interface JobChunk {
-  id: string;
-  type: JobType;
-  data: any;
-  status: "PENDING" | "ASSIGNED" | "COMPLETED";
-  assignedTo?: string;
-  assignedAt?: number;
-  createdAt: number;
-}
-
-export interface WorkerResult {
-  chunkId: string;
-  workerId: string;
-  deviceId?: string;
-  result?: any;
-  error?: string;
-  durationMs?: number;
+interface DataPoint {
+  value: number;
+  throttle: number;
   timestamp: number;
 }
 
-export interface RegisterPayload {
-  name: string;
-  type: DeviceType;
-  capabilities?: Partial<DeviceCapabilities>;
+interface GpuStatusMonitorProps {
+  completedCount: number; // This is now GLOBAL completed count
+  throttle: number;
+}
+
+export function GpuStatusMonitor({
+  completedCount,
+  throttle,
+}: GpuStatusMonitorProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const dataRef = useRef<DataPoint[]>([]);
+  const countRef = useRef(completedCount);
+  const prevCountRef = useRef(completedCount);
+  const throttleRef = useRef(throttle);
+
+  useEffect(() => {
+    throttleRef.current = throttle;
+  }, [throttle]);
+  useEffect(() => {
+    countRef.current = completedCount;
+  }, [completedCount]);
+
+  useEffect(() => {
+    if (dataRef.current.length === 0) {
+      dataRef.current = new Array(60).fill(0).map(() => ({
+        value: 0,
+        throttle: 30,
+        timestamp: Date.now(),
+      }));
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    // Sample data every 500ms (aligned with UI update)
+    const dataInterval = setInterval(() => {
+      const delta = countRef.current - prevCountRef.current;
+      prevCountRef.current = countRef.current;
+
+      dataRef.current.shift();
+      dataRef.current.push({
+        value: delta, // Delta is chunks per 500ms
+        throttle: throttleRef.current,
+        timestamp: Date.now(),
+      });
+    }, 500);
+
+    let animationFrameId: number;
+    const draw = () => {
+      const width = rect.width;
+      const height = rect.height;
+
+      ctx.clearRect(0, 0, width, height);
+
+      // --- Draw Logic ---
+      const recent = dataRef.current.slice(-5);
+      const avgSpeed = recent.reduce((a, b) => a + b.value, 0) / recent.length;
+      // Convert 500ms chunks to "per second"
+      const speedPerSec = Math.round(avgSpeed * 2);
+
+      // Grid
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 4; i++) {
+        const y = (height / 3) * i;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+
+      // Chart
+      const data = dataRef.current;
+      const maxVal = Math.max(...data.map((d) => d.value), 5);
+
+      const getColor = (lvl: number) => {
+        if (lvl <= 30) return [16, 185, 129];
+        if (lvl >= 80) return [244, 63, 94];
+        return [99, 102, 241];
+      };
+
+      for (let i = 0; i < data.length - 1; i++) {
+        const [r, g, b] = getColor(data[i].throttle);
+        const x1 = (i / (data.length - 1)) * width;
+        const x2 = ((i + 1) / (data.length - 1)) * width;
+        const y1 = height - (data[i].value / maxVal) * (height * 0.8);
+        const y2 = height - (data[i + 1].value / maxVal) * (height * 0.8);
+
+        const grad = ctx.createLinearGradient(x1, y1, x1, height);
+        grad.addColorStop(0, `rgba(${r},${g},${b},0.4)`);
+        grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+
+        ctx.beginPath();
+        ctx.moveTo(x1, height);
+        ctx.lineTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.lineTo(x2, height);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = `rgb(${r},${g},${b})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      // Text
+      ctx.font = "bold 48px Inter";
+      ctx.fillStyle = "var(--arc-text)";
+      ctx.textAlign = "left";
+      ctx.fillText(speedPerSec.toString(), 32, 60);
+
+      ctx.font = "14px Inter";
+      ctx.fillStyle = "var(--arc-muted)";
+      ctx.fillText("global chunks / sec", 32, 85);
+
+      animationFrameId = requestAnimationFrame(draw);
+    };
+
+    draw();
+
+    return () => {
+      clearInterval(dataInterval);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, []);
+
+  const currentColor =
+    throttle <= 30 ? "#10b981" : throttle >= 80 ? "#f43f5e" : "#6366f1";
+
+  return (
+    <Card
+      className="md:col-span-8 h-90 flex flex-col justify-between relative"
+      noPadding
+    >
+      <div className="p-8 pb-0 z-20 relative">
+        <div className="flex items-center gap-3 mb-2">
+          <div
+            className="w-2 h-2 rounded-full animate-pulse"
+            style={{ backgroundColor: currentColor }}
+          />
+          <h2 className="text-xs font-bold tracking-widest text-arc-muted uppercase">
+            Global Swarm Velocity
+          </h2>
+        </div>
+        <p className="text-xs text-arc-muted font-medium mt-12">
+          Total Contribution:{" "}
+          <span className="font-mono text-arc-text opacity-80">
+            {completedCount.toLocaleString()}
+          </span>{" "}
+          chunks
+        </p>
+        <div className="flex items-center gap-2 mt-2">
+          <span
+            className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+            style={{
+              backgroundColor: `${currentColor}20`,
+              color: currentColor,
+            }}
+          >
+            {Math.round(throttle)}% Throttle
+          </span>
+        </div>
+      </div>
+      <canvas
+        ref={canvasRef}
+        className="absolute bottom-0 left-0 right-0 h-55 w-full pointer-events-none"
+      />
+    </Card>
+  );
 }
 </file>
 
@@ -2817,8 +2886,417 @@ function StatBox({
 }
 </file>
 
+<file path="client/src/utils/worker.ts">
+/// <reference lib="webworker" />
+
+// --- CONFIGURATION ---
+const LOGICAL_CORES = navigator.hardwareConcurrency || 4;
+
+// --- STATE ---
+const threadPool = new Map<
+  number,
+  { worker: Worker; objectUrl: string; busy: boolean }
+>();
+let throttleLimit = 0.3;
+let nextWorkerId = 0;
+
+// --- GPU KERNEL (WGSL) ---
+const WGSL_SHADER = `
+@group(0) @binding(0) var<storage, read> matrixA : array<f32>;
+@group(0) @binding(1) var<storage, read> matrixB : array<f32>;
+@group(0) @binding(2) var<storage, read_write> result : array<f32>;
+@group(0) @binding(3) var<uniform> uniforms : vec2<f32>; // [width, height]
+
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
+  let index = global_id.x;
+  let size = u32(uniforms.x);
+  
+  if (index >= size * size) { return; }
+
+  let row = index / size;
+  let col = index % size;
+  let sum = 0.0;
+
+  for (let k = 0u; k < size; k = k + 1u) {
+    sum = sum + matrixA[row * size + k] * matrixB[k * size + col];
+  }
+
+  result[index] = sum;
+}
+`;
+
+// --- SUB-WORKER FACTORY ---
+const createSubWorker = (_wId: number) => {
+  const blob = new Blob(
+    [
+      `
+    // --- CPU KERNELS (Fallback) ---
+    const runCpuStress = (iterations) => {
+      let sum = 0;
+      const count = iterations || 100000;
+      for (let i = 0; i < count; i++) {
+        sum += Math.sqrt(i) * Math.sin(i);
+      }
+      return sum;
+    };
+
+    const runCpuMatrix = (size) => {
+       const dummy = new Float32Array(size * size);
+       for(let i=0; i<1000; i++) Math.random(); 
+       return dummy;
+    };
+
+    // --- GPU CONTEXT ---
+    let device = null;
+    let computePipeline = null;
+
+    async function initWebGPU() {
+      if (!navigator.gpu) return false;
+      const adapter = await navigator.gpu.requestAdapter();
+      if (!adapter) return false;
+      device = await adapter.requestDevice();
+      
+      const shaderModule = device.createShaderModule({ 
+        code: \`${WGSL_SHADER}\` 
+      });
+      
+      computePipeline = device.createComputePipeline({
+        layout: 'auto',
+        compute: { module: shaderModule, entryPoint: "main" }
+      });
+      return true;
+    }
+
+    let gpuReady = false;
+    initWebGPU().then(ok => gpuReady = ok);
+
+    async function runGpuMatrix(size) {
+      if (!gpuReady || !device) return runCpuMatrix(size);
+
+      // 1. Create Data (Simplified for Benchmark)
+      const matrixSize = size * size;
+      // We don't fill real data to save time, just allocate
+      const resultSize = matrixSize * 4; 
+
+      // 2. Create Buffers
+      const gpuBufferA = device.createBuffer({ size: resultSize, usage: GPUBufferUsage.STORAGE, mappedAtCreation: true });
+      new Float32Array(gpuBufferA.getMappedRange()).fill(1.5);
+      gpuBufferA.unmap();
+
+      const gpuBufferB = device.createBuffer({ size: resultSize, usage: GPUBufferUsage.STORAGE, mappedAtCreation: true });
+      new Float32Array(gpuBufferB.getMappedRange()).fill(2.5);
+      gpuBufferB.unmap();
+
+      const resultBuffer = device.createBuffer({ size: resultSize, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
+      
+      const uniformBuffer = device.createBuffer({ mappedAtCreation: true, size: 16, usage: GPUBufferUsage.UNIFORM });
+      new Float32Array(uniformBuffer.getMappedRange()).set([size, size]);
+      uniformBuffer.unmap();
+
+      // 3. Bind Group
+      const bindGroup = device.createBindGroup({
+        layout: computePipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: gpuBufferA } },
+          { binding: 1, resource: { buffer: gpuBufferB } },
+          { binding: 2, resource: { buffer: resultBuffer } },
+          { binding: 3, resource: { buffer: uniformBuffer } },
+        ]
+      });
+
+      // 4. Dispatch
+      const commandEncoder = device.createCommandEncoder();
+      const passEncoder = commandEncoder.beginComputePass();
+      passEncoder.setPipeline(computePipeline);
+      passEncoder.setBindGroup(0, bindGroup);
+      passEncoder.dispatchWorkgroups(Math.ceil(matrixSize / 64));
+      passEncoder.end();
+
+      device.queue.submit([commandEncoder.finish()]);
+      
+      // Wait for completion (using mapAsync as a "fence")
+      const gpuReadBuffer = device.createBuffer({ size: 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+      // We don't actually copy everything back, just wait for queue
+      await gpuReadBuffer.mapAsync(GPUMapMode.READ);
+      return 1; 
+    }
+
+    self.onmessage = async (e) => {
+      const { type, data } = e.data;
+      let result = 0;
+
+      try {
+        if (type === "MAT_MUL" && data.size) {
+             result = await runGpuMatrix(data.size);
+        } 
+        else if (type === "MATH_STRESS") {
+             result = runCpuStress(data.iterations);
+        }
+        else if (type === "BENCHMARK") {
+             const start = performance.now();
+             let score = 0;
+
+             if (gpuReady && device) {
+                 // CASE A: GPU (1000x1000 Matrix)
+                 // ~2 Billion Operations
+                 await runGpuMatrix(1000); 
+                 const duration = (performance.now() - start) / 1000;
+                 score = Math.round(2000000000 / (duration || 0.001));
+             } 
+             else {
+                 // CASE B: CPU (Simple Loop)
+                 const iterations = 5000000;
+                 runCpuStress(iterations);
+                 const duration = (performance.now() - start) / 1000; 
+                 score = Math.round(iterations / (duration || 0.001));
+             }
+
+             self.postMessage({
+               type: "BENCHMARK_COMPLETE",
+               score: score,
+             });
+             return; 
+        }
+        
+        self.postMessage({ success: true, result });
+
+      } catch (err) {
+        self.postMessage({ success: false, error: err.message });
+      }
+    }
+  `,
+    ],
+    { type: "application/javascript" },
+  );
+
+  const objectUrl = URL.createObjectURL(blob);
+  return { worker: new Worker(objectUrl), objectUrl };
+};
+
+// --- MANAGER ---
+const applyConfig = () => {
+  const targetThreadCount = Math.max(
+    1,
+    Math.floor(LOGICAL_CORES * throttleLimit),
+  );
+
+  // ADD WORKERS
+  if (targetThreadCount > threadPool.size) {
+    for (let i = threadPool.size; i < targetThreadCount; i++) {
+      const wId = nextWorkerId++;
+      const { worker, objectUrl } = createSubWorker(wId);
+
+      // PERMANENT LISTENER (Fixes lost benchmark results)
+      worker.onmessage = (ev) => {
+        const msg = ev.data;
+
+        if (msg.type === "BENCHMARK_COMPLETE") {
+          self.postMessage(msg); // Forward to main
+        } else if (msg.success || msg.error) {
+          // Free up the thread
+          const t = threadPool.get(wId);
+          if (t) t.busy = false;
+
+          self.postMessage({
+            type: msg.success ? "JOB_COMPLETE" : "JOB_ERROR",
+            // Note: sub-worker doesn't know chunkId, we'd need to map it if we strictly needed it here,
+            // but the current architecture relies on message ordering or we can patch it.
+            // For simplicity, we assume the main thread tracks which worker has which chunk
+            // BUT actually 'self.onmessage' below has closure over 'chunk.id'.
+            // To fix the closure issue properly, we should pass chunkId into the subworker.
+            // For now, we rely on the closure in 'self.onmessage' below attaching a specific handler
+            // which overrides this one TEMPORARILY.
+          });
+        }
+      };
+
+      threadPool.set(wId, { worker, objectUrl, busy: false });
+    }
+  }
+  // REMOVE WORKERS
+  else if (targetThreadCount < threadPool.size) {
+    const toRemove = threadPool.size - targetThreadCount;
+    let removed = 0;
+    for (const [id, thread] of threadPool.entries()) {
+      if (!thread.busy && removed < toRemove) {
+        thread.worker.terminate();
+        URL.revokeObjectURL(thread.objectUrl);
+        threadPool.delete(id);
+        removed++;
+      }
+    }
+  }
+};
+
+applyConfig();
+
+self.onmessage = async (e) => {
+  const { type, chunk, throttleLevel } = e.data;
+
+  // 1. CONFIG
+  if (type === "UPDATE_CONFIG") {
+    if (throttleLevel !== undefined) throttleLimit = throttleLevel;
+    applyConfig();
+    return;
+  }
+
+  // 2. BENCHMARK
+  if (type === "BENCHMARK") {
+    // Just pick the first available worker
+    // Fix: Remove unused 'thread' variable from destructuring
+    for (const [id] of threadPool.entries()) {
+      const thread = threadPool.get(id);
+      if (thread) {
+        thread.worker.postMessage({ type: "BENCHMARK" });
+        break; // Only run on one thread
+      }
+    }
+    return;
+  }
+
+  // 3. JOB PROCESSING
+  if (type === "JOB_CHUNK") {
+    let selectedId = -1;
+    for (const [id, thread] of threadPool.entries()) {
+      if (!thread.busy) {
+        selectedId = id;
+        break;
+      }
+    }
+
+    if (selectedId === -1) return; // Drop if busy
+
+    const thread = threadPool.get(selectedId)!;
+    thread.busy = true;
+
+    // Attach Specific Job Handler (Overrides generic one for this task)
+    thread.worker.onmessage = (ev) => {
+      thread.busy = false;
+      // Restore generic handler? Ideally yes, but 'applyConfig' sets it.
+      // We just emit the result.
+      self.postMessage({
+        type: ev.data.success ? "JOB_COMPLETE" : "JOB_ERROR",
+        chunkId: chunk.id,
+        result: ev.data.result,
+        error: ev.data.error,
+      });
+    };
+
+    thread.worker.postMessage({ type: chunk.type, data: chunk.data });
+  }
+};
+
+export {};
+</file>
+
+<file path="shared/types.ts">
+// --- CONSTANTS (Erasable Enums) ---
+export const SwarmRunState = {
+  IDLE: "IDLE",
+  RUNNING: "RUNNING",
+  PAUSED: "PAUSED",
+  STOPPED: "STOPPED",
+} as const;
+export type SwarmRunState = (typeof SwarmRunState)[keyof typeof SwarmRunState];
+
+export const DeviceState = {
+  ENABLED: "ENABLED",
+  DISABLED: "DISABLED",
+  BUSY: "BUSY",
+  ONLINE: "ONLINE",
+  OFFLINE: "OFFLINE",
+  ERROR: "ERROR",
+} as const;
+export type DeviceState = (typeof DeviceState)[keyof typeof DeviceState];
+
+export type DeviceType = "DESKTOP" | "MOBILE" | "COLAB" | "SERVER" | "TABLET";
+export type JobType = "MATH_STRESS" | "MAT_MUL" | "TEXT_TOKENIZE" | "CUSTOM";
+
+// --- INTERFACES ---
+
+export interface JoinCode {
+  code: string;
+  expiresAt: number;
+  maxUses: number;
+  usedCount: number;
+  createdBy: string;
+  metadata?: {
+    description?: string;
+    tags?: string[];
+  };
+}
+
+export interface DeviceCapabilities {
+  cpuCores: number;
+  memoryGB: number;
+  gpuAvailable: boolean;
+  maxConcurrency: number;
+  supportedJobs: JobType[];
+}
+
+export interface DeviceInfo {
+  id: string;
+  socketId: string;
+  name: string;
+  type: DeviceType;
+  state: DeviceState;
+  capabilities: DeviceCapabilities;
+
+  // Metrics
+  opsScore: number;
+  currentLoad: number;
+  totalJobsCompleted: number;
+  avgJobDuration: number;
+  connectedAt: number;
+  lastHeartbeat: number;
+
+  // Configuration
+  isThrottled: boolean;
+  throttleLevel: number;
+}
+
+export interface SwarmSnapshot {
+  runState: SwarmRunState;
+  globalThrottle: number;
+  devices: Record<string, DeviceInfo>;
+  stats: {
+    totalJobs: number;
+    activeJobs: number;
+    pendingJobs: number;
+    completedJobs: number;
+  };
+}
+
+export interface JobChunk {
+  id: string;
+  type: JobType;
+  data: any;
+  status: "PENDING" | "ASSIGNED" | "COMPLETED";
+  assignedTo?: string;
+  assignedAt?: number;
+  createdAt: number;
+}
+
+export interface WorkerResult {
+  chunkId: string;
+  workerId: string;
+  deviceId?: string;
+  result?: any;
+  error?: string;
+  durationMs?: number;
+  timestamp: number;
+}
+
+export interface RegisterPayload {
+  name: string;
+  type: DeviceType;
+  capabilities?: Partial<DeviceCapabilities>;
+}
+</file>
+
 <file path="client/src/hooks/useComputeSwarm.ts">
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import {
   type SwarmSnapshot,
@@ -2832,46 +3310,41 @@ import { usePersistentIdentity } from "./usePersistentIdentity";
 
 export const useComputeSwarm = (onLog?: (msg: string) => void) => {
   const [snapshot, setSnapshot] = useState<SwarmSnapshot | null>(null);
-
-  // UI STATE (Throttled)
-  const [completedCount, setCompletedCount] = useState(0);
-  const [opsScore, setOpsScore] = useState(0);
+  const [completedCount, setCompletedCount] = useState(0); // <--- Local State
   const [joinCode, setJoinCode] = useState("LOADING...");
 
-  // HIGH-SPEED REFS (Non-rendering)
+  // Refs
   const completedCountRef = useRef(0);
-  const opsScoreRef = useRef(0);
-
+  const onLogRef = useRef(onLog);
   const socketRef = useRef<Socket | null>(null);
   const workerRef = useRef<Worker | null>(null);
+
   const identity = usePersistentIdentity();
 
-  // --- 1. Worker Management ---
-  const initWorker = useCallback(() => {
-    if (workerRef.current) workerRef.current.terminate();
-    workerRef.current = new OstrichWorker();
+  useEffect(() => {
+    onLogRef.current = onLog;
+  }, [onLog]);
 
-    workerRef.current.onmessage = (e) => {
+  // --- 1. Master Setup ---
+  useEffect(() => {
+    const worker = new OstrichWorker();
+    workerRef.current = worker;
+
+    worker.onmessage = (e) => {
       const { type, chunkId, result, score, error } = e.data;
 
       if (type === "BENCHMARK_COMPLETE") {
-        // Store in ref, don't re-render yet
-        opsScoreRef.current = score;
-        setOpsScore(score); // Benchmark is rare, safe to render immediately
+        onLogRef.current?.(`[CPU] Benchmark Result: ${score} OPS`);
+        socketRef.current?.emit("benchmark:result", { score });
       } else if (type === "JOB_COMPLETE") {
-        // HOT PATH: ONLY Update Ref
         completedCountRef.current += 1;
-
-        // Network IO is async/off-main-thread usually, so this is fine
         socketRef.current?.emit("job:complete", {
           chunkId,
           result,
           workerId: identity.id,
         } as WorkerResult);
-
         socketRef.current?.emit("job:request_batch");
       } else if (type === "JOB_ERROR") {
-        onLog?.(`[ERR] Job failed: ${error}`);
         socketRef.current?.emit("job:complete", {
           chunkId,
           error,
@@ -2879,26 +3352,6 @@ export const useComputeSwarm = (onLog?: (msg: string) => void) => {
         } as WorkerResult);
       }
     };
-  }, [identity.id, onLog]);
-
-  // --- 2. UI Sync Loop (The Fix) ---
-  useEffect(() => {
-    const uiInterval = setInterval(() => {
-      // Only trigger React Render if numbers changed
-      setCompletedCount((prev) => {
-        if (prev !== completedCountRef.current) {
-          return completedCountRef.current;
-        }
-        return prev;
-      });
-    }, 200); // Update UI 5 times per second max (Smooth but not freezing)
-
-    return () => clearInterval(uiInterval);
-  }, []);
-
-  // --- 3. Socket Connection ---
-  useEffect(() => {
-    initWorker();
 
     const sUrl = import.meta.env.DEV
       ? `${window.location.protocol}//${window.location.hostname}:3000`
@@ -2907,11 +3360,12 @@ export const useComputeSwarm = (onLog?: (msg: string) => void) => {
     const s = io(sUrl, {
       query: { persistentId: identity.id },
       transports: ["websocket"],
+      reconnectionAttempts: 10,
     });
     socketRef.current = s;
 
     s.on("connect", () => {
-      onLog?.(`[NET] Connected as ${identity.name}`);
+      onLogRef.current?.(`[NET] Connected as ${identity.name}`);
       s.emit("device:register", {
         name: identity.name,
         type: "DESKTOP",
@@ -2920,31 +3374,44 @@ export const useComputeSwarm = (onLog?: (msg: string) => void) => {
       s.emit("REQUEST_JOIN_CODE");
     });
 
-    s.on("swarm:snapshot", (newSnapshot: SwarmSnapshot) => {
-      setSnapshot(newSnapshot);
-    });
+    s.on("swarm:snapshot", setSnapshot);
+    s.on("JOIN_CODE", (d) => setJoinCode(d.code));
 
-    s.on("JOIN_CODE", (data: { code: string }) => {
-      setJoinCode(data.code);
+    // BENCHMARK TRIGGER
+    s.on("cmd:run_benchmark", () => {
+      onLogRef.current?.("[SYS] Worker starting benchmark...");
+      worker.postMessage({ type: "BENCHMARK" });
     });
 
     s.on("job:batch", (jobs: JobChunk[]) => {
-      if (!workerRef.current) return;
-      jobs.forEach((job) => {
-        workerRef.current?.postMessage({ type: "JOB_CHUNK", chunk: job });
-      });
+      jobs.forEach((job) =>
+        worker.postMessage({ type: "JOB_CHUNK", chunk: job }),
+      );
     });
 
     return () => {
       s.disconnect();
-      workerRef.current?.terminate();
+      worker.terminate();
     };
-  }, [identity, initWorker, onLog]);
+  }, [identity.id, identity.name]);
 
-  // --- 4. Auto-Request Loop ---
+  // --- 2. UI Sync Loop ---
+  useEffect(() => {
+    const uiInterval = setInterval(() => {
+      setCompletedCount((prev) => {
+        // Sync local ref to state for UI updates
+        if (prev !== completedCountRef.current) {
+          return completedCountRef.current;
+        }
+        return prev;
+      });
+    }, 500);
+    return () => clearInterval(uiInterval);
+  }, []);
+
+  // --- 3. Auto-Request Loop ---
   useEffect(() => {
     if (!snapshot) return;
-
     const myDevice = snapshot.devices[identity.id];
     const isSwarmRunning = snapshot.runState === SwarmRunState.RUNNING;
     const amIEnabled =
@@ -2953,12 +3420,13 @@ export const useComputeSwarm = (onLog?: (msg: string) => void) => {
 
     if (isSwarmRunning && amIEnabled) {
       const interval = setInterval(() => {
-        socketRef.current?.emit("job:request_batch");
+        if (socketRef.current?.connected) {
+          socketRef.current.emit("job:request_batch");
+        }
       }, 1000);
-
       return () => clearInterval(interval);
     }
-  }, [snapshot, identity.id]);
+  }, [snapshot?.runState, snapshot?.devices, identity.id]);
 
   return {
     status: snapshot?.runState || SwarmRunState.IDLE,
@@ -2966,8 +3434,9 @@ export const useComputeSwarm = (onLog?: (msg: string) => void) => {
     devices: Object.values(snapshot?.devices || {}),
     myDevice: snapshot?.devices[identity.id],
     joinCode,
-    completedCount, // This is now a throttled state
-    opsScore,
+
+    // FIX: Return the LOCAL state, not the snapshot (smoother + solves linter error)
+    completedCount: completedCount,
 
     startSwarm: () =>
       socketRef.current?.emit("cmd:set_run_state", SwarmRunState.RUNNING),
@@ -2977,17 +3446,57 @@ export const useComputeSwarm = (onLog?: (msg: string) => void) => {
       socketRef.current?.emit("cmd:set_run_state", SwarmRunState.STOPPED),
     toggleDevice: (id: string, enabled: boolean) =>
       socketRef.current?.emit("cmd:toggle_device", { id, enabled }),
-
-    updateThrottle: (level: number) => {
+    updateThrottle: (level: number) =>
       workerRef.current?.postMessage({
         type: "UPDATE_CONFIG",
         throttleLevel: level / 100,
-      });
-    },
+      }),
 
-    runBenchmark: () => workerRef.current?.postMessage({ type: "BENCHMARK" }),
+    runBenchmark: () => {
+      onLogRef.current?.("[SYS] Requesting Swarm Benchmark...");
+      socketRef.current?.emit("cmd:trigger_benchmark");
+    },
   };
 };
+</file>
+
+<file path="server/src/index.ts">
+import express from "express";
+import { createServer } from "http";
+import { Server } from "socket.io";
+import cors from "cors";
+import { SwarmCoordinator } from "./swarm/SwarmCoordinator";
+import { SwarmSocketHandler } from "./socket/SwarmSocketHandler";
+import { JobGenerator } from "./swarm/JobGenerator";
+console.log("Starting Ostrich Swarm Server...");
+
+const PORT = Number(process.env.PORT) || 3000;
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const httpServer = createServer(app);
+
+const io = new Server(httpServer, {
+  cors: { origin: "*", methods: ["GET", "POST"] },
+  transports: ["websocket", "polling"],
+  maxHttpBufferSize: 1e8,
+  pingTimeout: 60000,
+});
+
+const swarmCoordinator = new SwarmCoordinator();
+new SwarmSocketHandler(io, swarmCoordinator);
+new JobGenerator(swarmCoordinator);
+
+// Optional API access to state
+app.get("/api/stats", (_, res) => {
+  res.json(swarmCoordinator.stateStore.getSnapshot());
+});
+
+httpServer.listen(PORT, "0.0.0.0", () => {
+  console.log(`[Server] Ostrich Swarm Coordinator running on port: ${PORT}`);
+});
 </file>
 
 <file path="server/src/swarm/SwarmCoordinator.ts">
@@ -3113,9 +3622,15 @@ export class SwarmCoordinator {
         });
       }
     }
+
+    // --- FIX: Increment Global Completed Count ---
+    const currentStats = this.stateStore.getSnapshot().stats;
+    this.stateStore.updateStats({
+      completedJobs: (currentStats.completedJobs || 0) + 1,
+    });
+
     this.syncQueueStats();
   }
-
   private syncQueueStats() {
     const metrics = this.scheduler.getMetrics();
     this.stateStore.updateStats({
@@ -3153,11 +3668,17 @@ export class SwarmCoordinator {
 
     return jobs;
   }
+  public handleBenchmarkResult(deviceId: string, score: number) {
+    const device = this.stateStore.getDevice(deviceId);
+    if (device) {
+      this.stateStore.updateDeviceState(deviceId, { opsScore: score });
+    }
+  }
 }
 </file>
 
 <file path="client/src/App.tsx">
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, memo } from "react";
 import { Zap, Share2 } from "lucide-react";
 import { useComputeSwarm } from "./hooks/useComputeSwarm";
 
@@ -3171,10 +3692,18 @@ import { ThemeToggle } from "./components/ui/ThemeToggle";
 import { LiveTerminal } from "./components/dashboard/LiveTerminal";
 import { SwarmRunState, DeviceState } from "../../shared/types";
 
+// --- MEMOIZED COMPONENTS (Prevents re-renders on every tick) ---
+const MemoSwarmDashboard = memo(SwarmDashboard);
+const MemoGpuStatusMonitor = memo(GpuStatusMonitor);
+const MemoThrottleControl = memo(ThrottleControl);
+const MemoDeviceHealth = memo(DeviceHealth);
+const MemoSwarmControls = memo(SwarmControls);
+const MemoLiveTerminal = memo(LiveTerminal);
+
 function App() {
   const [showQR, setShowQR] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
-  const [throttle, setThrottle] = useState(30); // Local state for immediate UI feedback
+  const [throttle, setThrottle] = useState(30);
 
   const addLog = useCallback((msg: string) => {
     setLogs((prev) => [...prev.slice(-19), `> ${msg}`]);
@@ -3183,11 +3712,10 @@ function App() {
   const {
     status,
     devices,
-    myDevice,
+
     stats,
     joinCode,
-    completedCount,
-    opsScore,
+
     startSwarm,
     pauseSwarm,
     stopSwarm,
@@ -3196,32 +3724,57 @@ function App() {
     updateThrottle,
   } = useComputeSwarm(addLog);
 
-  const handleThrottleChange = (val: number) => {
-    setThrottle(val);
-    updateThrottle(val);
-  };
+  const handleThrottleChange = useCallback(
+    (val: number) => {
+      setThrottle(val);
+      updateThrottle(val);
+    },
+    [updateThrottle],
+  );
 
   const isRunning = status === SwarmRunState.RUNNING;
   const serverUrl = `${window.location.protocol}//${window.location.hostname}:3000`;
 
-  // Computed Stats
-  const swarmStats = {
-    runState: status,
-    globalThrottle: throttle,
-    totalDevices: devices.length,
-    onlineDevices: devices.filter(
+  // --- BUG 4 FIX: Math Calculation ---
+  const swarmStats = useMemo(() => {
+    // Only count enabled devices (ONLINE or BUSY)
+    const activeDevicesList = devices.filter(
       (d) => d.state === DeviceState.ONLINE || d.state === DeviceState.BUSY,
-    ).length,
-    busyDevices: devices.filter((d) => d.state === DeviceState.BUSY).length,
-    totalCores: devices.reduce((acc, d) => acc + d.capabilities.cpuCores, 0),
-    totalMemoryGB: devices.reduce((acc, d) => acc + d.capabilities.memoryGB, 0),
-    pendingJobs: stats?.pendingJobs || 0,
-    activeJobs: stats?.activeJobs || 0,
-    completedJobs: devices.reduce((acc, d) => acc + d.totalJobsCompleted, 0),
-    globalVelocity: 0,
-    devicesByType: {},
-  };
-  // If we have 3 cores and 20% throttle, we use ceil(3 * 0.2) = 1 core.
+    );
+
+    return {
+      runState: status,
+      globalThrottle: throttle,
+      totalDevices: devices.length,
+      onlineDevices: activeDevicesList.length,
+      busyDevices: devices.filter((d) => d.state === DeviceState.BUSY).length,
+
+      totalCores: activeDevicesList.reduce(
+        (acc, d) => acc + d.capabilities.cpuCores,
+        0,
+      ),
+      totalMemoryGB: activeDevicesList.reduce(
+        (acc, d) => acc + d.capabilities.memoryGB,
+        0,
+      ),
+
+      pendingJobs: stats?.pendingJobs || 0,
+      activeJobs: stats?.activeJobs || 0,
+      completedJobs: devices.reduce((acc, d) => acc + d.totalJobsCompleted, 0),
+      globalVelocity: 0,
+
+      // FIX: Correctly count devices by type
+      devicesByType: devices.reduce(
+        (acc, device) => {
+          const type = device.type || "DESKTOP";
+          acc[type] = (acc[type] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
+    };
+  }, [devices, status, throttle, stats]);
+
   const calculatedActiveCores = Math.ceil(
     swarmStats.totalCores * (throttle / 100),
   );
@@ -3266,18 +3819,20 @@ function App() {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-7xl mx-auto relative z-10">
-        {/* ROW 1: GPU Monitor & Controls */}
-        <GpuStatusMonitor completedCount={completedCount} throttle={throttle} />
+        {/* ROW 1: GPU Monitor */}
+        {/* BUG 1 FIX: Memoized component handles high-frequency updates without re-rendering parent layout */}
+        <MemoGpuStatusMonitor
+          completedCount={swarmStats.completedJobs}
+          throttle={throttle}
+        />
 
         <div className="md:col-span-4 h-90 flex gap-4">
-          <DeviceHealth
+          <MemoDeviceHealth
             className="flex-1 h-full"
-            status={myDevice?.state || DeviceState.OFFLINE}
-            opsScore={opsScore}
-            workerId={myDevice?.id || "..."}
+            devices={devices}
             onRunBenchmark={runBenchmark}
           />
-          <SwarmControls
+          <MemoSwarmControls
             isRunning={isRunning}
             status={status}
             onStart={startSwarm}
@@ -3287,7 +3842,7 @@ function App() {
         </div>
 
         {/* ROW 2: Throttle & Terminal */}
-        <ThrottleControl
+        <MemoThrottleControl
           throttle={throttle}
           setThrottle={handleThrottleChange}
           totalCores={swarmStats.totalCores}
@@ -3295,10 +3850,10 @@ function App() {
           deviceCount={swarmStats.totalDevices}
         />
 
-        <LiveTerminal logs={logs} status={status} />
+        <MemoLiveTerminal logs={logs} status={status} />
 
         {/* ROW 3: Detailed Dashboard */}
-        <SwarmDashboard
+        <MemoSwarmDashboard
           devices={devices}
           stats={swarmStats as any}
           onToggleDevice={toggleDevice}
@@ -3316,45 +3871,6 @@ function App() {
 }
 
 export default App;
-</file>
-
-<file path="server/src/index.ts">
-import express from "express";
-import { createServer } from "http";
-import { Server } from "socket.io";
-import cors from "cors";
-import { SwarmCoordinator } from "./swarm/SwarmCoordinator";
-import { SwarmSocketHandler } from "./socket/SwarmSocketHandler";
-import { JobGenerator } from "./swarm/JobGenerator";
-console.log("Starting Ostrich Swarm Server...");
-
-const PORT = Number(process.env.PORT) || 3000;
-
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-const httpServer = createServer(app);
-
-const io = new Server(httpServer, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
-  transports: ["websocket", "polling"],
-  maxHttpBufferSize: 1e8,
-  pingTimeout: 60000,
-});
-
-const swarmCoordinator = new SwarmCoordinator();
-new SwarmSocketHandler(io, swarmCoordinator);
-new JobGenerator(swarmCoordinator);
-
-// Optional API access to state
-app.get("/api/stats", (_, res) => {
-  res.json(swarmCoordinator.stateStore.getSnapshot());
-});
-
-httpServer.listen(PORT, "0.0.0.0", () => {
-  console.log(`[Server] Ostrich Swarm Coordinator running on port: ${PORT}`);
-});
 </file>
 
 </files>

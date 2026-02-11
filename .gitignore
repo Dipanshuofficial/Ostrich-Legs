@@ -1,0 +1,14 @@
+
+
+node_modules/
+
+# Markdowns for notes
+AGENTS.md
+PROJECT_CONTEXT.md
+
+# Repomix
+repomix.config.json
+repomix-output.xml
+
+# Images
+flowchartinsp.png
