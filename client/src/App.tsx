@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react"; // Added useEffect
 import { Zap, Settings, Wifi, WifiOff } from "lucide-react";
 import { useSwarmEngine } from "./hooks/useSwarmEngine";
-import { useSwarmExecution } from "./hooks/useSwarmExecution";
-import { type SwarmResources, type SwarmSnapshot } from "./core/types";
+// Removed unused import: useSwarmExecution
 
 // Features
 import { VelocityMonitor } from "./features/dashboard/VelocityMonitor";
@@ -13,6 +12,7 @@ import { ThrottleControl } from "./features/dashboard/ThrottleControl";
 import { LiveTerminal } from "./features/terminal/LiveTerminal";
 import { DeviceConnector } from "./features/connection/DeviceConnector";
 import { SwarmControls } from "./features/dashboard/SwarmControls";
+import { type SwarmSnapshot, type SwarmResources } from "./core/types";
 
 const EMPTY_SNAPSHOT: SwarmSnapshot = {
   runState: "STOPPED",
@@ -45,6 +45,7 @@ export default function App() {
     runLocalBenchmark,
     isConnected,
     toggleDevice,
+    updateThrottle, // Now available here
     totalResources,
     logs,
   } = useSwarmEngine("local-ostrich-01");
@@ -52,7 +53,10 @@ export default function App() {
   const snapshot = serverSnapshot || EMPTY_SNAPSHOT;
   const isRunning = snapshot.runState === "RUNNING";
 
-  useSwarmExecution(throttle, isRunning);
+  // 2. Throttle Effect
+  useEffect(() => {
+    updateThrottle(throttle);
+  }, [throttle, updateThrottle]);
 
   return (
     <div className="min-h-screen bg-surface-muted p-4 md:p-8 font-sans antialiased text-text-main selection:bg-brand-orange/20">
@@ -121,7 +125,6 @@ export default function App() {
             </div>
 
             <div className="lg:col-span-4 space-y-8 min-w-0">
-              {/* 2. Real Job Counts */}
               <JobGauge
                 total={snapshot.stats.totalJobs}
                 completed={snapshot.stats.completedJobs}
@@ -133,7 +136,6 @@ export default function App() {
                 onStop={() => setRunState("STOPPED")}
               />
 
-              {/* 3. Real Resources */}
               <ThrottleControl
                 value={throttle}
                 onChange={setThrottle}
@@ -145,7 +147,6 @@ export default function App() {
           </>
         ) : (
           <div className="lg:col-span-12 h-[80vh]">
-            {/* 4. Real Logs */}
             <LiveTerminal logs={logs} />
           </div>
         )}

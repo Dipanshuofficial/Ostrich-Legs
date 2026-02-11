@@ -1,8 +1,10 @@
 /// <reference lib="webworker" />
 
 // --- CONFIGURATION ---
-const LOGICAL_CORES = navigator.hardwareConcurrency || 4;
-
+// SAFETY: Always leave 1 core free for the UI/OS, or 2 if you have >8 cores
+const TOTAL_CORES = navigator.hardwareConcurrency || 4;
+const RESERVED_CORES = TOTAL_CORES > 8 ? 2 : 1;
+const LOGICAL_CORES = Math.max(1, TOTAL_CORES - RESERVED_CORES);
 // --- STATE ---
 const threadPool = new Map<
   number,
@@ -16,7 +18,7 @@ const WGSL_SHADER = `
 @group(0) @binding(0) var<storage, read> matrixA : array<f32>;
 @group(0) @binding(1) var<storage, read> matrixB : array<f32>;
 @group(0) @binding(2) var<storage, read_write> result : array<f32>;
-@group(0) @binding(3) var<uniform> uniforms : vec2<f32>; // [width, height]
+@group(0) @binding(3) var<uniform> uniforms : vec2<f32>;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
@@ -27,7 +29,7 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
 
   let row = index / size;
   let col = index % size;
-  let sum = 0.0;
+  var sum = 0.0; // FIXED: Changed 'let' to 'var' to allow mutation
 
   for (var k = 0u; k < size; k = k + 1u) {
     sum = sum + matrixA[row * size + k] * matrixB[k * size + col];
@@ -138,59 +140,76 @@ const createSubWorker = (_wId: number) => {
       await device.queue.onSubmittedWorkDone();
       return 1; 
     }
+    // SIGNAL ALIVE
+    console.log("🔧 WORKER THREAD: Initialized & Ready");
+    self.postMessage({ log: "Worker Thread Ready" });
 
     self.onmessage = async (e) => {
-      const { type, data, _throttle } = e.data;
-      
+      // 1. INPUT: Unwrap the message
+      // The hook sends: { type: "EXECUTE_JOB", payload: { id, type, data } }
+      let { type, data, payload, _throttle, throttleLevel: altThrottle } = e.data;
+      let chunkId = null;
+
+      // Handle the wrapper if it exists
+      if (type === "EXECUTE_JOB" && payload) {
+        type = payload.type;      // Extract real type (e.g., "MAT_MUL")
+        data = payload.data;      // Extract real data
+        chunkId = payload.id;     // CRITICAL: We need this to tell the server which job we finished
+      }
+
+      // 2. CONFIG: Update Throttle
       if (_throttle !== undefined) throttleLevel = _throttle;
+      else if (altThrottle !== undefined) throttleLevel = altThrottle;
+
+      // SAFETY: Sleep based on throttle to keep UI responsive
+      const restTime = Math.round((1 - throttleLevel) * 100);
+      if (restTime > 0) await new Promise(r => setTimeout(r, restTime));
 
       let result = 0;
 
       try {
-        if (type === "MAT_MUL") {
-             // Use GPU if available
-             if (gpuReady && device) {
-                 await runGpuMatrix(data.size || 256);
-                 result = 1; 
-             } else {
-                 result = runCpuMatrix(data.size || 256);
-             }
+        // 3. EXECUTE: Run the math
+        if (type === "MAT_MUL" && data) {
+             // GPU Path
+             if (gpuReady && device) await runGpuMatrix(data.size || 256);
+             else runCpuMatrix(data.size || 256);
+             result = 1; 
         } 
         else if (type === "MATH_STRESS") {
              result = runCpuStress(data.iterations);
         }
         else if (type === "BENCHMARK") {
              const start = performance.now();
-             let score = 0;
-
-             // Run a heavy task to measure "raw" performance
              if (gpuReady && device) {
-                 await runGpuMatrix(1024); // Heavy GPU Load
+                 await runGpuMatrix(1024); 
                  const duration = (performance.now() - start) / 1000;
-                 // Base Score: ~2000-5000 range
-                 score = Math.round(2000 / (duration + 0.001));
-             } 
-             else {
-                 runCpuStress(5000000); // Heavy CPU Load
+                 result = Math.round(5000 / (duration + 0.001));
+             } else {
+                 runCpuStress(2000000);
                  const duration = (performance.now() - start) / 1000; 
-                 score = Math.round(500 / (duration + 0.001));
+                 result = Math.round(1000 / (duration + 0.001));
              }
-
-             // APPLY THROTTLE SCALING
-             // This ensures the UI reflects the user's eco/max choice
-             const finalScore = Math.floor(score * throttleLevel);
-
-             self.postMessage({
-               type: "BENCHMARK_COMPLETE",
-               score: finalScore
-             });
+             
+             self.postMessage({ type: "BENCHMARK_COMPLETE", score: result });
              return; 
         }
         
-        self.postMessage({ success: true, result });
+        // 4. OUTPUT: Send the result back with the PROPER TAGS
+        // If we don't send "JOB_COMPLETE", the hook ignores us.
+        if (type !== "UPDATE_CONFIG") {
+            self.postMessage({ 
+                type: "JOB_COMPLETE", 
+                chunkId: chunkId,
+                result: result 
+            });
+        }
 
       } catch (err) {
-        self.postMessage({ success: false, error: err.message });
+        self.postMessage({ 
+            type: "JOB_ERROR", 
+            chunkId: chunkId, 
+            error: err.message 
+        });
       }
     }
   `,

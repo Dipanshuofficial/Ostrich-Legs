@@ -12,84 +12,112 @@ const jobScheduler = new JobScheduler();
 
 // GLOBAL STATS
 let globalRunState: SwarmSnapshot["runState"] = "STOPPED";
-let globalCompletedCount = 0; // Real counter
+let globalCompletedCount = 0;
 
 console.log("🚀 Ostrich Swarm Coordinator Online");
 
 io.on("connection", (socket) => {
   const persistentId = socket.handshake.query.persistentId as string;
 
-  // ... (Keep heartbeat, register, run_state listeners same as before) ...
   socket.on("heartbeat", () => deviceManager.heartbeat(persistentId));
+
   socket.on("device:register", (data) => {
+    console.log(
+      `[REG] Device: ${data.name} | Cores: ${data.capabilities.cpuCores}`,
+    );
     deviceManager.register(persistentId, data.name, data.capabilities);
     broadcastState();
   });
+
   socket.on("cmd:set_run_state", (state) => {
+    console.log(`[CMD] Swarm State Change: ${globalRunState} -> ${state}`);
     globalRunState = state;
     broadcastState();
   });
+
   socket.on("cmd:toggle_device", ({ id, enabled }) => {
+    console.log(`[CMD] Toggle Node ${id}: ${enabled ? "ON" : "OFF"}`);
     deviceManager.toggleDevice(id, enabled);
     broadcastState();
   });
-  socket.on("cmd:trigger_benchmark", () => io.emit("cmd:run_benchmark"));
 
-  // JOB REQUEST
-  socket.on("job:request", () => {
-    if (globalRunState !== "RUNNING") return;
+  socket.on("job:complete", (data) => {
+    globalCompletedCount++;
     const device = deviceManager
       .getAllDevices()
       .find((d) => d.id === persistentId);
-    if (device) {
-      const job = jobScheduler.getJobForDevice(device);
-      if (job) socket.emit("job:assignment", job);
+    if (device) device.totalJobsCompleted++;
+
+    // Log failures
+    if (data.error) {
+      console.log(`[JOB] Failed: ${data.error}`);
     }
   });
 
-  // FIX: JOB COMPLETION LOGIC
-  socket.on("job:complete", (_data) => {
-    // 1. Increment Global Counter
-    globalCompletedCount++;
+  socket.on("cmd:trigger_benchmark", () => {
+    console.log("[CMD] Broadcasting Benchmark Request");
+    io.emit("cmd:run_benchmark");
+  });
 
-    // 2. Increment Device Counter
+  // --- JOB BATCH REQUEST HANDLER ---
+  socket.on("job:request_batch", () => {
+    if (globalRunState !== "RUNNING") return;
+
     const device = deviceManager
       .getAllDevices()
       .find((d) => d.id === persistentId);
-    if (device) {
-      device.totalJobsCompleted = (device.totalJobsCompleted || 0) + 1;
+    if (!device || device.status !== "ONLINE") return;
+
+    // Send a batch of 5 jobs at a time
+    const batch = [];
+    for (let i = 0; i < 5; i++) {
+      const job = jobScheduler.getJobForDevice(device);
+      if (job) batch.push(job);
     }
 
+    if (batch.length > 0) {
+      socket.emit("job:batch", batch);
+    }
+  });
+  socket.on("cmd:trigger_benchmark", () => {
+    console.log("[CMD] Broadcasting Benchmark Request");
+    io.emit("cmd:run_benchmark");
+  });
+
+  // --- MISSING HANDLER FIXED BELOW ---
+  socket.on("benchmark:result", (data) => {
+    // 1. Log it so we know it arrived
+    console.log(`[BENCH] Update for ${persistentId}: ${data.score} OPS`);
+
+    // 2. Update the internal store
+    deviceManager.updateScore(persistentId, data.score);
+
+    // 3. Force immediate broadcast to all clients
     broadcastState();
   });
 
-  // ... disconnect listener ...
+  socket.on("disconnect", (reason) => {
+    console.log(`[NET] Client Disconnect: ${reason}`);
+  });
 
   function broadcastState() {
     const resources = deviceManager.getAvailableResources();
     const queue = jobScheduler.getQueueStats();
+    const allDevices = deviceManager.getAllDevices();
 
-    // Real Math: Dynamic Total
-    // If we are stopped, active is 0. If running, it's based on connected nodes.
-    const active = globalRunState === "RUNNING" ? resources.onlineCount : 0;
-    const pending = queue.pending;
-    const completed = globalCompletedCount;
-
-    // Total is the sum of everything we know about
-    const total = completed + pending + active;
+    const totalOpsScore = allDevices
+      .filter((d) => d.status === "ONLINE" || d.status === "BUSY")
+      .reduce((sum, d) => sum + (d.opsScore || 0), 0);
 
     const snapshot: SwarmSnapshot = {
       runState: globalRunState,
-      devices: deviceManager
-        .getAllDevices()
-        .reduce((acc, d) => ({ ...acc, [d.id]: d }), {}),
+      devices: allDevices.reduce((acc, d) => ({ ...acc, [d.id]: d }), {}),
       stats: {
-        totalJobs: total, // Now grows as jobs come in/finish
-        activeJobs: active,
-        pendingJobs: pending,
-        completedJobs: completed,
-        // Velocity: If 0 active, 0 velocity. Else estimate based on recent throughput or active nodes.
-        globalVelocity: active > 0 ? resources.onlineCount * 840 : 0,
+        totalJobs: globalCompletedCount + queue.pending,
+        activeJobs: globalRunState === "RUNNING" ? resources.onlineCount : 0,
+        pendingJobs: queue.pending,
+        completedJobs: globalCompletedCount,
+        globalVelocity: globalRunState === "RUNNING" ? totalOpsScore : 0,
       },
       resources,
     };
@@ -97,5 +125,6 @@ io.on("connection", (socket) => {
     io.emit("swarm:snapshot", snapshot);
   }
 
-  setInterval(broadcastState, 1000);
+  // Broadcast frequently to keep UI snappy
+  setInterval(broadcastState, 500);
 });

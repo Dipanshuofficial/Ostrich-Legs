@@ -1,4 +1,4 @@
-import { Play, Pause, Power, Square } from "lucide-react";
+import { Play, Pause, Square } from "lucide-react";
 import { Card } from "../../components/Card";
 
 interface SwarmControlsProps {
@@ -12,6 +12,7 @@ export const SwarmControls = ({
   onToggle,
   onStop,
 }: SwarmControlsProps) => {
+  // Use status prop directly, but add visual feedback
   const isRunning = status === "RUNNING";
 
   return (
@@ -21,20 +22,22 @@ export const SwarmControls = ({
       </h3>
 
       <div className="grid grid-cols-2 gap-4">
-        {/* Toggle Button (Play/Pause) - Tactile Feel */}
         <button
-          onClick={onToggle}
+          onClick={() => {
+            console.log("CLICKED TOGGLE"); // Debug log
+            onToggle();
+          }}
           className={`
-            h-20 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98]
+            h-20 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-200 active:scale-[0.95]
             ${
               isRunning
-                ? "bg-surface-muted shadow-inner border border-transparent" // Pressed State
-                : "bg-surface-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] border border-white" // Unpressed Pop
+                ? "bg-surface-muted shadow-inner border border-transparent opacity-90"
+                : "bg-surface-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] border border-white hover:bg-gray-50"
             }
           `}
         >
           <div
-            className={`p-2 rounded-full ${isRunning ? "bg-brand-orange text-white shadow-sm" : "text-text-muted"}`}
+            className={`p-2 rounded-full transition-colors ${isRunning ? "bg-brand-orange text-white" : "text-text-muted bg-gray-100"}`}
           >
             {isRunning ? (
               <Pause size={24} fill="currentColor" />

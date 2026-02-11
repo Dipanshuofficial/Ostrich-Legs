@@ -4,7 +4,7 @@ import { Activity } from "lucide-react";
 
 interface VelocityMonitorProps {
   readonly velocity: number;
-  readonly throttle: number; // New Prop
+  readonly throttle: number;
 }
 
 export const VelocityMonitor = ({
@@ -13,80 +13,110 @@ export const VelocityMonitor = ({
 }: VelocityMonitorProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dataRef = useRef<number[]>(new Array(60).fill(0));
+  const requestRef = useRef<number>(0);
 
-  // Determine Color based on Throttle
-  const getColor = () => {
-    if (throttle < 30) return "#22c55e"; // Green (Eco)
-    if (throttle < 70) return "#ff7d54"; // Orange (Balanced)
-    return "#ef4444"; // Red (Overdrive)
+  // DEBUG 1: Verify Props on every update
+  useEffect(() => {
+    if (velocity > 0) {
+      console.log(`[UI-VELOCITY] 🟢 Data Received: ${velocity} OPS`);
+    } else {
+      console.log(`[UI-VELOCITY] 🔴 Data is ZERO`);
+    }
+  }, [velocity]);
+
+  const getColor = (val: number) => {
+    if (val < 30) return "#22c55e";
+    if (val < 70) return "#ff7d54";
+    return "#ef4444";
   };
-
-  const activeColor = getColor();
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      console.error("[UI-VELOCITY] Canvas Ref is NULL");
+      return;
+    }
+
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    let animationFrameId: number;
-    let lastDrawTime = 0;
+    // Handle high-DPI displays
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
 
-    const draw = (timestamp: number) => {
-      // ... (Keep existing frame limiting logic) ...
-      if (timestamp - lastDrawTime < 33) {
-        animationFrameId = requestAnimationFrame(draw);
-        return;
-      }
-      lastDrawTime = timestamp;
+    // DEBUG 2: Verify Canvas Dimensions
+    if (rect.width === 0) console.warn("[UI-VELOCITY] Canvas has 0 width!");
 
-      const { width, height } = canvas;
-      ctx.clearRect(0, 0, width, height);
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
 
+    const animate = () => {
+      // 1. Shift Data
       dataRef.current.shift();
       dataRef.current.push(velocity);
 
-      // Dynamic Gradient
-      const gradient = ctx.createLinearGradient(0, 0, 0, height);
-      gradient.addColorStop(0, `${activeColor}80`); // 50% opacity
-      gradient.addColorStop(1, `${activeColor}00`); // 0% opacity
+      // DEBUG 3: Random sample check (1% chance to avoid spam)
+      if (Math.random() < 0.01) {
+        const max = Math.max(...dataRef.current);
+        console.log(`[UI-LOOP] Max value in graph buffer: ${max}`);
+      }
+
+      // 2. Clear
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      // 3. Draw
+      const activeColor = getColor(throttle);
+
+      const gradient = ctx.createLinearGradient(0, 0, 0, rect.height);
+      gradient.addColorStop(0, `${activeColor}40`);
+      gradient.addColorStop(1, `${activeColor}00`);
 
       ctx.beginPath();
-      ctx.lineWidth = 4;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.strokeStyle = activeColor; // Use dynamic color
+      const step = rect.width / (dataRef.current.length - 1);
 
-      const step = width / (dataRef.current.length - 1);
+      ctx.moveTo(0, rect.height);
 
-      ctx.moveTo(0, height);
       dataRef.current.forEach((val, i) => {
         const x = i * step;
-        const normalized = Math.min(val / 2000, 1);
-        const y = height - normalized * height * 0.8 - 10;
+        // Scale: Dynamic scaling!
+        // If max velocity is small, scale up so we see SOMETHING
+        // Minimum scale is 100 to prevent noise
+        const dynamicMax = Math.max(Math.max(...dataRef.current) * 1.2, 100);
+
+        const normalized = Math.min(val / dynamicMax, 1);
+        const y = rect.height - normalized * rect.height * 0.8 - 10;
         ctx.lineTo(x, y);
       });
-      ctx.lineTo(width, height);
+
+      ctx.lineTo(rect.width, rect.height);
       ctx.fillStyle = gradient;
       ctx.fill();
 
       // Stroke
       ctx.beginPath();
+      ctx.lineWidth = 2;
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = activeColor;
+
       dataRef.current.forEach((val, i) => {
         const x = i * step;
-        const normalized = Math.min(val / 2000, 1);
-        const y = height - normalized * height * 0.8 - 10;
+        const dynamicMax = Math.max(Math.max(...dataRef.current) * 1.2, 100);
+        const normalized = Math.min(val / dynamicMax, 1);
+        const y = rect.height - normalized * rect.height * 0.8 - 10;
+
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       });
       ctx.stroke();
 
-      animationFrameId = requestAnimationFrame(draw);
+      requestRef.current = requestAnimationFrame(animate);
     };
 
-    animationFrameId = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [velocity, activeColor]); // Re-run when color changes
+    requestRef.current = requestAnimationFrame(animate);
+
+    return () => cancelAnimationFrame(requestRef.current);
+  }, [velocity, throttle]);
 
   return (
     <Card className="h-80 flex flex-col relative overflow-hidden bg-surface-white border border-border-soft shadow-soft-depth">
@@ -106,7 +136,7 @@ export const VelocityMonitor = ({
         <div className="bg-surface-muted/50 px-4 py-2 rounded-xl border border-white/50 shadow-inner backdrop-blur-sm">
           <span
             className="text-3xl font-black tabular-nums tracking-tight"
-            style={{ color: activeColor }}
+            style={{ color: getColor(throttle) }}
           >
             {velocity.toLocaleString()}
           </span>
@@ -115,14 +145,8 @@ export const VelocityMonitor = ({
           </span>
         </div>
       </div>
-      {/* ... Canvas Container ... */}
       <div className="flex-1 w-full min-h-0 relative bg-surface-muted/30 rounded-xl border border-black/5 shadow-inner overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          width={800}
-          height={300}
-          className="w-full h-full relative z-10"
-        />
+        <canvas ref={canvasRef} className="w-full h-full relative z-10" />
       </div>
     </Card>
   );

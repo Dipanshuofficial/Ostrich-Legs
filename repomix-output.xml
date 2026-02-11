@@ -83,6 +83,576 @@ server/tsconfig.json
 <files>
 This section contains the contents of the repository's files.
 
+<file path=".gitignore">
+node_modules/
+
+# Markdowns for notes
+AGENTS.md
+PROJECT_CONTEXT.md
+
+# Repomix
+repomix.config.json
+repomix-output.xml
+
+# Images
+flowchartinsp.png
+</file>
+
+<file path="Architecture.md">
+Client Architecture Plan: Ostrich-Legs
+Resource Impact Analysis & CPU Usage Investigation
+
+---
+
+1. EXECUTIVE SUMMARY
+   
+
+---
+
+2. COMPLETE FILE ARCHITECTURE
+   D:\JOB\Ostrich-Legs\client\
+   ├── Configuration Layer
+   │ ├── vite.config.ts # Build tool configuration
+   │ ├── tsconfig\*.json # TypeScript configurations (3 files)
+   │ ├── eslint.config.js # Linting rules
+   │ └── package.json # Dependencies & scripts
+   │
+   ├── Entry Points
+   │ ├── index.html # HTML entry
+   │ ├── src/main.tsx # React DOM mount
+   │ └── src/App.tsx # Root component
+   │
+   ├── Core Hooks (CPU-Intensive)
+   │ ├── src/hooks/useComputeSwarm.ts # Main orchestration hook
+   │ └── src/hooks/usePersistentIdentity.ts # Device ID management
+   │
+   ├── Web Workers (Maximum CPU)
+   │ └── src/utils/worker.ts # Worker manager + sub-workers
+   │
+   ├── UI Components
+   │ ├── src/components/ui/
+   │ │ ├── Card.tsx # Layout wrapper
+   │ │ ├── Badge.tsx # Status indicators
+   │ │ └── ThemeToggle.tsx # Dark/light mode
+   │ │
+   │ └── src/components/dashboard/
+   │ ├── GpuStatusMonitor.tsx # Canvas velocity chart [HIGH CPU]
+   │ ├── SwarmDashboard.tsx # Device list & stats
+   │ ├── StatusMonitor.tsx # Recharts (unused)
+   │ ├── LiveTerminal.tsx # Log console
+   │ ├── DeviceHealth.tsx # Benchmark display
+   │ ├── ThrottleControl.tsx # CPU slider
+   │ ├── SwarmControls.tsx # Start/Pause buttons
+   │ └── DeviceConnector.tsx # QR code modal
+   │
+   ├── Styles
+   │ └── src/index.css # Tailwind v4 + custom CSS
+   │
+   └── Assets
+   └── src/assets/react.svg # Static asset
+
+---
+
+3. RESOURCE IMPACT BY FILE
+   CRITICAL CPU CONSUMERS 🔴
+   src/utils/worker.ts - HIGHEST IMPACT
+   Resource Profile:
+
+- CPU: 70-100% when active (intentional - this IS the compute engine)
+- Memory: 50-200MB depending on thread pool size
+- GPU: Uses WebGPU when available (2 billion ops/matrix)
+  Architecture:
+  Main Thread
+  └── OstrichWorker (Manager)
+  └── Thread Pool (Dynamic 1-N workers)
+  └── Sub-Workers (Created via Blob URLs)
+  ├── GPU Kernel (WGSL shader)
+  └── CPU Kernel (Math loops)
+  Resource Hotspots:
+
+1. Lines 15-38: WGSL shader compilation (one-time, expensive)
+2. Lines 41-186: Sub-worker factory - creates workers via new Blob() + URL.createObjectURL()
+3. Lines 46-59: CPU stress test - Math.sqrt(i) \* Math.sin(i) in tight loop
+4. Lines 85-134: GPU matrix multiplication - 1000×1000 = 2 billion operations
+5. Lines 188-241: Dynamic thread pool scaling based on throttleLimit
+   Impact Assessment:
+
+- Development Mode: Workers run at full throttle regardless of dev server
+- Thread Creation: Each sub-worker is a separate JS context (memory overhead)
+- Blob URLs: URL.createObjectURL creates memory pressure if not revoked properly
+
+---
+
+src/hooks/useComputeSwarm.ts - HIGH IMPACT
+Resource Profile:
+
+- CPU: 5-15% from intervals and socket handling
+- Memory: Low (~5MB)
+- Network: Continuous WebSocket traffic
+  Critical Sections:
+  Lines 101-112: UI Sync Loop
+  const uiInterval = setInterval(() => {
+  setCompletedCount((prev) => {
+  if (prev !== completedCountRef.current) {
+  return completedCountRef.current; // State update every 500ms
+  }
+  return prev;
+  });
+  }, 500);
+- Impact: Forces React re-evaluation every 500ms even if value unchanged
+- Optimization: Use requestAnimationFrame instead, or only update on actual change
+  Lines 114-131: Auto-Request Loop
+  const interval = setInterval(() => {
+  if (socketRef.current?.connected) {
+  socketRef.current.emit("job:request_batch"); // Every 1000ms when running
+  }
+  }, 1000);
+- Impact: Network overhead + server load
+- Note: This is likely the intended behavior for distributed computing
+  Lines 30-98: Master Setup Effect
+- Creates Web Worker (lines 32-33)
+- Socket.io connection with reconnection (lines 62-67)
+- Event listeners for: connect, snapshot, join codes, benchmarks, job batches
+
+---
+
+src/components/dashboard/GpuStatusMonitor.tsx - MEDIUM-HIGH IMPACT
+Resource Profile:
+
+- CPU: 10-20% from canvas rendering
+- GPU: Moderate (2D canvas acceleration)
+- Memory: Low (60 data points buffer)
+  Critical Sections:
+  Lines 66-137: Animation Loop
+  const draw = () => {
+  // ... canvas drawing logic ...
+  animationFrameId = requestAnimationFrame(draw); // 60 FPS continuous
+  };
+  draw();
+- Impact: Runs at 60fps continuously, even when tab not visible
+- Drawing Operations:
+  - Lines 71: clearRect every frame
+  - Lines 79-88: Grid drawing (4 lines)
+  - Lines 100-125: Chart with gradients (60 iterations)
+  - Lines 128-135: Text rendering
+    Lines 54-64: Data Sampling Interval
+    const dataInterval = setInterval(() => {
+    const delta = countRef.current - prevCountRef.current;
+    // ... push new data point every 500ms
+    }, 500);
+    Canvas Resizing (Lines 47-51):
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width _ dpr; // High-DPI scaling
+    canvas.height = rect.height _ dpr;
+    ctx.scale(dpr, dpr);
+- Impact: Double memory on retina displays
+
+---
+
+MODERATE IMPACT 🟡
+vite.config.ts - DEV MODE ONLY
+Resource Profile:
+
+- CPU: 20-40% during HMR (Hot Module Replacement)
+- Memory: 100-300MB for dev server
+- Disk: File watching overhead
+  Configuration Analysis:
+- Line 7: @vitejs/plugin-react-swc - Uses SWC (Rust-based, fast but memory hungry)
+- Lines 9-20: Proxy configuration forwards /api and /socket.io to port 3000
+- Issue: --host flag exposes to network, increasing overhead
+  Why bun run dev is slow:
+
+1. SWC compilation in real-time
+2. File system watching with fs.watch
+3. Proxy middleware processing
+4. Source map generation
+5. CSS processing (Tailwind v4)
+
+---
+
+src/App.tsx - MODERATE IMPACT
+Resource Profile:
+
+- CPU: 5-10% from re-renders
+- Memory: 20-50MB (depends on device list size)
+  Optimization Strategies Used (Good):
+- Lines 16-21: Memoized components prevent cascading re-renders
+- Lines 58-96: useMemo for expensive stats calculation
+- Lines 28-30: useCallback for log function
+  Potential Issues:
+- Lines 44-45: completedCount updates trigger swarmStats recalculation (line 83)
+- Lines 142-180: All memoized components still receive new props on every parent render
+
+---
+
+src/components/dashboard/LiveTerminal.tsx - LOW-MODERATE
+Resource Profile:
+
+- CPU: 2-5% from scrolling animation
+- Memory: Grows with log history (capped at 19 lines)
+  Lines 15-19: Scroll Effect
+  useEffect(() => {
+  if (logsEndRef.current) {
+  logsEndRef.current.scrollIntoView({ behavior: "smooth" });
+  }
+  }, [logs]); // Runs on every new log entry
+
+---
+
+LOW IMPACT 🟢
+| File | Impact | Notes |
+|------|--------|-------|
+| main.tsx | Minimal | Simple React mount |
+| usePersistentIdentity.ts | Minimal | One-time localStorage read |
+| Card.tsx | Minimal | Presentational |
+| ThemeToggle.tsx | Minimal | User-triggered only |
+| index.css | Low | Some CSS animations (grain effect) |
+
+---
+
+4. CPU USAGE BREAKDOWN (Development Mode)
+   When Running bun run dev:
+   Total CPU Usage: 40-150% (multi-core)
+   Breakdown by Component:
+   ├── Vite Dev Server 20-40%
+   │ ├── SWC Compilation 10-20%
+   │ ├── File Watching 5-10%
+   │ ├── HMR Processing 5-10%
+   │ └── Proxy Middleware 2-5%
+   │
+   ├── Web Workers 30-100% (INTENTIONAL)
+   │ ├── Thread Pool 20-80%
+   │ ├── GPU Compute 0-50% (if WebGPU available)
+   │ └── CPU Math Kernels 10-50%
+   │
+   ├── React/UI 10-25%
+   │ ├── Canvas Animation 10-20%
+   │ ├── State Updates 3-8%
+   │ ├── Socket.io Events 2-5%
+   │ └── Component Rendering 1-3%
+   │
+   └── Browser Overhead 5-10%
+   ├── Garbage Collection 2-5%
+   ├── DOM Updates 2-4%
+   └── Event Loop 1-2%
+
+---
+
+5. SPECIFIC BOTTLENECKS IDENTIFIED
+   Bottleneck 1: Continuous Animation (GpuStatusMonitor.tsx:67)
+   const draw = () => {
+   // ... draws every frame
+   animationFrameId = requestAnimationFrame(draw); // NEVER STOPS
+   };
+   Issue: Animation runs even when:
+
+- Tab is backgrounded
+- Swarm is IDLE
+- Window is minimized
+  Fix Strategy:
+  // Use Page Visibility API
+  document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+  cancelAnimationFrame(animationFrameId);
+  } else {
+  draw();
+  }
+  });
+
+---
+
+Bottleneck 2: Unnecessary State Sync (useComputeSwarm.ts:101-112)
+setInterval(() => {
+setCompletedCount((prev) => {
+if (prev !== completedCountRef.current) {
+return completedCountRef.current;
+}
+return prev;
+});
+}, 500);
+Issue: Checks state every 500ms even when no jobs complete
+Fix Strategy:
+// Only update when value actually changes
+useEffect(() => {
+const checkInterval = setInterval(() => {
+if (completedCountRef.current !== lastEmittedRef.current) {
+setCompletedCount(completedCountRef.current);
+lastEmittedRef.current = completedCountRef.current;
+}
+}, 500);
+}, []);
+
+---
+
+Bottleneck 3: Canvas Full Redraw Every Frame (GpuStatusMonitor.tsx:71-125)
+Issue: Redraws entire 60-point chart at 60fps (3600 operations/sec)
+Optimization Options:
+
+1. Double Buffering: Draw to offscreen canvas, swap
+2. Incremental Drawing: Only draw new data points
+3. Reduce FPS: Cap at 30fps for charts (sufficient for data viz)
+4. WebGL: For truly high-performance rendering
+
+---
+
+Bottleneck 4: Worker Thread Overhead (worker.ts:41-186)
+Issue: Each sub-worker is created via Blob URL
+const blob = new Blob([code], { type: "application/javascript" });
+const objectUrl = URL.createObjectURL(blob);
+return { worker: new Worker(objectUrl), objectUrl };
+Memory Impact:
+
+- Each worker context: ~5-10MB
+- Thread pool default: LOGICAL_CORES \* 0.3 (e.g., 8 cores = 2-3 workers)
+- Total: 15-30MB just for worker overhead
+
+---
+
+Bottleneck 5: Vite SWC in Bun (vite.config.ts:7)
+Issue: You're using Bun runtime with SWC (Rust-based) compiler
+
+- SWC is optimized for Node.js
+- Bun has its own native bundler that's faster
+- Running SWC under Bun adds translation overhead
+
+---
+
+6. OPTIMIZATION RECOMMENDATIONS
+   Immediate Wins (Low Effort, High Impact)
+1. Pause Canvas When Idle
+   - Add visibility checking to GpuStatusMonitor
+   - Pause animation when status === 'IDLE'
+1. Throttle State Updates
+   - Reduce UI sync interval from 500ms to 1000-2000ms
+   - Use requestAnimationFrame + timestamp checking
+1. Optimize Vite Dev
+   - Use bunx --bun vite instead of bun run dev (native Bun compilation)
+   - Or switch to npm run dev with Node for SWC optimization
+1. Add Worker Throttling
+   - Respect throttle setting even in dev mode
+   - Add devMode: low-power option
+     Medium-Term Improvements
+1. Canvas Optimization
+   - Implement dirty-rectangle rendering
+   - Use will-change: contents CSS hint
+   - Consider switching to WebGL for complex charts
+1. Web Worker Pool
+   - Pre-allocate workers at startup
+   - Reuse workers instead of terminating/creating
+   - Use SharedArrayBuffer for zero-copy communication
+1. React Optimizations
+   - Add React.memo to pure components (already partially done)
+   - Virtualize device list if >50 devices
+   - Use useDeferredValue for non-urgent updates
+     Long-Term Architecture
+1. Separate Dev/Prod Worker Behavior
+   - Workers auto-pause in dev mode when no activity
+   - Separate development bundle without heavy compute
+1. Replace Canvas with WebGL
+   - Use Three.js or raw WebGL for velocity charts
+   - GPU-accelerated rendering reduces CPU load
+1. Bun-Native Build
+   - Create Bun-native worker implementation
+   - Use Bun's built-in bundler instead of Vite
+
+---
+
+7. FILE-BY-FILE OPTIMIZATION CHECKLIST
+   High Priority
+
+- [ ] GpuStatusMonitor.tsx: Add visibility-aware animation pausing
+- [ ] useComputeSwarm.ts: Reduce sync interval, optimize effect deps
+- [ ] worker.ts: Add dev-mode throttling, optimize thread pool scaling
+      Medium Priority
+- [ ] vite.config.ts: Evaluate Bun-native alternatives
+- [ ] App.tsx: Add useDeferredValue for stats
+- [ ] LiveTerminal.tsx: Virtualize long log lists
+      Low Priority
+- [ ] index.css: Optimize grain texture (CSS containment)
+- [ ] SwarmDashboard.tsx: Virtualize device list
+- [ ] ThemeToggle.tsx: Preload theme to avoid flash
+
+---
+
+8. MEASURING IMPROVEMENTS
+   Use these Chrome DevTools metrics:
+1. Performance Tab: Record 10 seconds of activity
+   - Look for long frames (>16ms)
+   - Check "Scripting" vs "Rendering" time
+1. Memory Tab: Take heap snapshots
+   - Monitor Worker-related memory
+   - Check for detached DOM nodes
+1. Network Tab: Monitor WebSocket traffic
+   - Batch job requests should dominate
+   - Watch for unnecessary polling
+1. Bun Built-in Profiler:
+   bun --inspect run dev
+
+---
+
+9. SUMMARY
+   Your CPU usage is expected behavior for a distributed computing client that:
+
+- Runs continuous mathematical computations
+- Maintains real-time WebSocket connections
+- Renders high-frequency data visualizations
+- Uses Vite's development server with HMR
+  The heavy load is primarily from:
+
+1. Intentional compute work (Web Workers) - 70-100%
+2. Vite dev server overhead - 20-40%
+3. Canvas animation - 10-20%
+   Quick fixes to try immediately:
+4. Switch to bunx --bun vite for native Bun performance
+5. Add if (status === 'IDLE') return null; to GpuStatusMonitor when not running
+6. Reduce setInterval in useComputeSwarm from 500ms to 2000ms
+</file>
+
+<file path="client/.gitignore">
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+</file>
+
+<file path="client/eslint.config.js">
+import js from '@eslint/js'
+import globals from 'globals'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
+import tseslint from 'typescript-eslint'
+import { defineConfig, globalIgnores } from 'eslint/config'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      js.configs.recommended,
+      tseslint.configs.recommended,
+      reactHooks.configs.flat.recommended,
+      reactRefresh.configs.vite,
+    ],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.browser,
+    },
+  },
+])
+</file>
+
+<file path="client/index.html">
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>client</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+</file>
+
+<file path="client/README.md">
+# React + TypeScript + Vite
+
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+
+Currently, two official plugins are available:
+
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+
+## React Compiler
+
+The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+
+## Expanding the ESLint configuration
+
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+
+```js
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+
+      // Remove tseslint.configs.recommended and replace with this
+      tseslint.configs.recommendedTypeChecked,
+      // Alternatively, use this for stricter rules
+      tseslint.configs.strictTypeChecked,
+      // Optionally, add this for stylistic rules
+      tseslint.configs.stylisticTypeChecked,
+
+      // Other configs...
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```
+
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+      // Enable lint rules for React
+      reactX.configs['recommended-typescript'],
+      // Enable lint rules for React DOM
+      reactDom.configs.recommended,
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```
+</file>
+
 <file path="client/src/components/Card.tsx">
 import { type ReactNode } from "react";
 import { clsx, type ClassValue } from "clsx";
@@ -1126,34 +1696,44 @@ export const useSwarmEngine = (persistentId: string) => {
   const connect = useCallback(() => {
     if (socketRef.current?.connected) return;
 
-    const socket = io(
+    socketRef.current = io(
       import.meta.env.VITE_SERVER_URL || "http://localhost:3000",
       {
         query: { persistentId },
         transports: ["websocket"],
+        reconnection: true,
       },
     );
 
-    socket.on("connect", () => {
+    socketRef.current.on("connect", () => {
       setIsConnected(true);
       addLog("[SYS] Connected to Coordinator");
-      socket.emit("device:register", {
+      socketRef.current?.emit("device:register", {
         name: "Local Host",
         capabilities: getLocalSpecs(),
       });
     });
 
-    socket.on("disconnect", () => {
+    socketRef.current.on("disconnect", () => {
       setIsConnected(false);
       addLog("[ERR] Connection Lost");
     });
 
-    socket.on("swarm:snapshot", (data: SwarmSnapshot) => {
+    socketRef.current.on("swarm:snapshot", (data: SwarmSnapshot) => {
       setSnapshot(data);
     });
-
-    socketRef.current = socket;
   }, [persistentId]);
+
+  useEffect(() => {
+    connect();
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.removeAllListeners();
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
+  }, [connect]);
 
   useEffect(() => {
     if (!isConnected) return;
@@ -1163,13 +1743,6 @@ export const useSwarmEngine = (persistentId: string) => {
     );
     return () => clearInterval(interval);
   }, [isConnected]);
-
-  useEffect(() => {
-    connect();
-    return () => {
-      socketRef.current?.disconnect();
-    };
-  }, [connect]);
 
   // Actions
   const setRunState = (state: SwarmStatus) => {
@@ -1273,7 +1846,7 @@ const WGSL_SHADER = `
 @group(0) @binding(0) var<storage, read> matrixA : array<f32>;
 @group(0) @binding(1) var<storage, read> matrixB : array<f32>;
 @group(0) @binding(2) var<storage, read_write> result : array<f32>;
-@group(0) @binding(3) var<uniform> uniforms : vec2<f32>; // [width, height]
+@group(0) @binding(3) var<uniform> uniforms : vec2<f32>;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
@@ -1284,7 +1857,7 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
 
   let row = index / size;
   let col = index % size;
-  let sum = 0.0;
+  var sum = 0.0; // FIXED: Changed 'let' to 'var' to allow mutation
 
   for (var k = 0u; k < size; k = k + 1u) {
     sum = sum + matrixA[row * size + k] * matrixB[k * size + col];
@@ -1397,9 +1970,11 @@ const createSubWorker = (_wId: number) => {
     }
 
     self.onmessage = async (e) => {
-      const { type, data, _throttle } = e.data;
+      const { type, data, _throttle, throttleLevel: altThrottle } = e.data;
       
+      // Ensure throttle is captured regardless of property name used
       if (_throttle !== undefined) throttleLevel = _throttle;
+      else if (altThrottle !== undefined) throttleLevel = altThrottle;
 
       let result = 0;
 
@@ -1418,28 +1993,20 @@ const createSubWorker = (_wId: number) => {
         }
         else if (type === "BENCHMARK") {
              const start = performance.now();
-             let score = 0;
-
-             // Run a heavy task to measure "raw" performance
+             // Run at full power for the benchmark to see true capability
              if (gpuReady && device) {
-                 await runGpuMatrix(1024); // Heavy GPU Load
+                 await runGpuMatrix(1024); 
                  const duration = (performance.now() - start) / 1000;
-                 // Base Score: ~2000-5000 range
-                 score = Math.round(2000 / (duration + 0.001));
-             } 
-             else {
-                 runCpuStress(5000000); // Heavy CPU Load
+                 result = Math.round(5000 / (duration + 0.001)); // Higher base for GPU
+             } else {
+                 runCpuStress(5000000);
                  const duration = (performance.now() - start) / 1000; 
-                 score = Math.round(500 / (duration + 0.001));
+                 result = Math.round(1000 / (duration + 0.001));
              }
-
-             // APPLY THROTTLE SCALING
-             // This ensures the UI reflects the user's eco/max choice
-             const finalScore = Math.floor(score * throttleLevel);
 
              self.postMessage({
                type: "BENCHMARK_COMPLETE",
-               score: finalScore
+               score: result // Send the RAW score, don't multiply by throttleLevel here
              });
              return; 
         }
@@ -1573,776 +2140,6 @@ self.onmessage = async (e) => {
     });
   }
 };
-</file>
-
-<file path="server/src/core/types.ts">
-export type DeviceType = "DESKTOP" | "MOBILE" | "COLAB" | "SERVER";
-export type JobType = "MATH_STRESS" | "MAT_MUL" | "TEXT_TOKENIZE";
-
-export interface DeviceCapabilities {
-  cpuCores: number;
-  memoryGB: number;
-  gpuAvailable: boolean;
-  gpuName?: string;
-}
-
-export interface DeviceInfo {
-  id: string;
-  name: string;
-  type: DeviceType;
-  status: "ONLINE" | "BUSY" | "OFFLINE" | "DISABLED";
-  capabilities: DeviceCapabilities;
-  opsScore: number;
-  totalJobsCompleted: number;
-  lastHeartbeat: number;
-}
-
-export interface SwarmResources {
-  totalCores: number;
-  totalMemory: number;
-  totalGPUs: number;
-  onlineCount: number;
-}
-
-export interface Job {
-  id: string;
-  type: JobType;
-  complexity: number;
-  data: any;
-}
-
-export interface SwarmSnapshot {
-  runState: "IDLE" | "RUNNING" | "PAUSED" | "STOPPED";
-  devices: Record<string, DeviceInfo>;
-  stats: {
-    totalJobs: number;
-    activeJobs: number;
-    pendingJobs: number;
-    completedJobs: number;
-    globalVelocity: number;
-  };
-  resources: SwarmResources;
-}
-</file>
-
-<file path="server/src/managers/DeviceManager.ts">
-import { type DeviceInfo, type DeviceCapabilities } from "../core/types";
-
-export class DeviceManager {
-  private devices = new Map<string, DeviceInfo>();
-  private HEATBEAT_TIMEOUT = 10000; // 10s offline threshold
-
-  constructor() {
-    // Heartbeat Pulse Check every 5s
-    setInterval(() => this.checkHeartbeats(), 5000);
-  }
-
-  public register(id: string, name: string, caps: DeviceCapabilities) {
-    const existing = this.devices.get(id);
-    this.devices.set(id, {
-      id,
-      name,
-      type: caps.gpuAvailable ? "SERVER" : "DESKTOP",
-      status: existing?.status === "DISABLED" ? "DISABLED" : "ONLINE",
-      capabilities: caps,
-      opsScore: existing?.opsScore || 0,
-      totalJobsCompleted: existing?.totalJobsCompleted || 0,
-      lastHeartbeat: Date.now(),
-    });
-  }
-
-  public heartbeat(id: string) {
-    const device = this.devices.get(id);
-    if (device && device.status !== "DISABLED") {
-      device.lastHeartbeat = Date.now();
-      if (device.status === "OFFLINE") device.status = "ONLINE";
-    }
-  }
-
-  public toggleDevice(id: string, enabled: boolean) {
-    const device = this.devices.get(id);
-    if (device) {
-      device.status = enabled ? "ONLINE" : "DISABLED";
-    }
-  }
-
-  public updateScore(id: string, score: number) {
-    const device = this.devices.get(id);
-    if (device) device.opsScore = score;
-  }
-
-  public getAvailableResources() {
-    let totalCores = 0;
-    let totalMemory = 0;
-    let totalGPUs = 0;
-    let onlineCount = 0;
-
-    this.devices.forEach((d) => {
-      if (d.status === "ONLINE" || d.status === "BUSY") {
-        totalCores += d.capabilities.cpuCores;
-        totalMemory += d.capabilities.memoryGB;
-        if (d.capabilities.gpuAvailable) totalGPUs++;
-        onlineCount++;
-      }
-    });
-
-    return { totalCores, totalMemory, totalGPUs, onlineCount };
-  }
-
-  public getAllDevices() {
-    return Array.from(this.devices.values());
-  }
-
-  private checkHeartbeats() {
-    const now = Date.now();
-    this.devices.forEach((device) => {
-      if (
-        device.status !== "DISABLED" &&
-        now - device.lastHeartbeat > this.HEATBEAT_TIMEOUT
-      ) {
-        device.status = "OFFLINE";
-      }
-    });
-  }
-}
-</file>
-
-<file path="server/src/managers/JobScheduler.ts">
-import { type Job, type DeviceInfo } from "../core/types";
-
-export class JobScheduler {
-  private jobQueue: Job[] = [];
-
-  constructor() {
-    // Generate dummy jobs periodically (Low overhead: just pushing objects)
-    setInterval(() => this.generateJobs(), 2000);
-  }
-
-  private generateJobs() {
-    if (this.jobQueue.length > 500) return; // Prevent memory overflow
-
-    // Create 50 lightweight job objects
-    for (let i = 0; i < 50; i++) {
-      const isGpuTask = Math.random() > 0.7; // 30% GPU tasks
-      this.jobQueue.push({
-        id: `job-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        type: isGpuTask ? "MAT_MUL" : "MATH_STRESS",
-        complexity: Math.floor(Math.random() * 10) + 1,
-        data: isGpuTask ? { size: 1024 } : { iterations: 100000 },
-      });
-    }
-  }
-
-  public getJobForDevice(device: DeviceInfo): Job | null {
-    if (device.status === "DISABLED" || device.status === "OFFLINE")
-      return null;
-
-    // Capability-based Scheduling
-    const preferredType = device.capabilities.gpuAvailable
-      ? "MAT_MUL"
-      : "MATH_STRESS";
-
-    // Find best match
-    const index = this.jobQueue.findIndex((j) => j.type === preferredType);
-
-    if (index !== -1) {
-      return this.jobQueue.splice(index, 1)[0];
-    }
-
-    // Fallback: take any job
-    return this.jobQueue.shift() || null;
-  }
-
-  public getQueueStats() {
-    return {
-      pending: this.jobQueue.length,
-      active: 0, // In a real DB this would be tracked
-    };
-  }
-}
-</file>
-
-<file path=".gitignore">
-node_modules/
-
-# Markdowns for notes
-AGENTS.md
-PROJECT_CONTEXT.md
-
-# Repomix
-repomix.config.json
-repomix-output.xml
-
-# Images
-flowchartinsp.png
-</file>
-
-<file path="Architecture.md">
-Client Architecture Plan: Ostrich-Legs
-Resource Impact Analysis & CPU Usage Investigation
-
----
-
-1. EXECUTIVE SUMMARY
-   
-
----
-
-2. COMPLETE FILE ARCHITECTURE
-   D:\JOB\Ostrich-Legs\client\
-   ├── Configuration Layer
-   │ ├── vite.config.ts # Build tool configuration
-   │ ├── tsconfig\*.json # TypeScript configurations (3 files)
-   │ ├── eslint.config.js # Linting rules
-   │ └── package.json # Dependencies & scripts
-   │
-   ├── Entry Points
-   │ ├── index.html # HTML entry
-   │ ├── src/main.tsx # React DOM mount
-   │ └── src/App.tsx # Root component
-   │
-   ├── Core Hooks (CPU-Intensive)
-   │ ├── src/hooks/useComputeSwarm.ts # Main orchestration hook
-   │ └── src/hooks/usePersistentIdentity.ts # Device ID management
-   │
-   ├── Web Workers (Maximum CPU)
-   │ └── src/utils/worker.ts # Worker manager + sub-workers
-   │
-   ├── UI Components
-   │ ├── src/components/ui/
-   │ │ ├── Card.tsx # Layout wrapper
-   │ │ ├── Badge.tsx # Status indicators
-   │ │ └── ThemeToggle.tsx # Dark/light mode
-   │ │
-   │ └── src/components/dashboard/
-   │ ├── GpuStatusMonitor.tsx # Canvas velocity chart [HIGH CPU]
-   │ ├── SwarmDashboard.tsx # Device list & stats
-   │ ├── StatusMonitor.tsx # Recharts (unused)
-   │ ├── LiveTerminal.tsx # Log console
-   │ ├── DeviceHealth.tsx # Benchmark display
-   │ ├── ThrottleControl.tsx # CPU slider
-   │ ├── SwarmControls.tsx # Start/Pause buttons
-   │ └── DeviceConnector.tsx # QR code modal
-   │
-   ├── Styles
-   │ └── src/index.css # Tailwind v4 + custom CSS
-   │
-   └── Assets
-   └── src/assets/react.svg # Static asset
-
----
-
-3. RESOURCE IMPACT BY FILE
-   CRITICAL CPU CONSUMERS 🔴
-   src/utils/worker.ts - HIGHEST IMPACT
-   Resource Profile:
-
-- CPU: 70-100% when active (intentional - this IS the compute engine)
-- Memory: 50-200MB depending on thread pool size
-- GPU: Uses WebGPU when available (2 billion ops/matrix)
-  Architecture:
-  Main Thread
-  └── OstrichWorker (Manager)
-  └── Thread Pool (Dynamic 1-N workers)
-  └── Sub-Workers (Created via Blob URLs)
-  ├── GPU Kernel (WGSL shader)
-  └── CPU Kernel (Math loops)
-  Resource Hotspots:
-
-1. Lines 15-38: WGSL shader compilation (one-time, expensive)
-2. Lines 41-186: Sub-worker factory - creates workers via new Blob() + URL.createObjectURL()
-3. Lines 46-59: CPU stress test - Math.sqrt(i) \* Math.sin(i) in tight loop
-4. Lines 85-134: GPU matrix multiplication - 1000×1000 = 2 billion operations
-5. Lines 188-241: Dynamic thread pool scaling based on throttleLimit
-   Impact Assessment:
-
-- Development Mode: Workers run at full throttle regardless of dev server
-- Thread Creation: Each sub-worker is a separate JS context (memory overhead)
-- Blob URLs: URL.createObjectURL creates memory pressure if not revoked properly
-
----
-
-src/hooks/useComputeSwarm.ts - HIGH IMPACT
-Resource Profile:
-
-- CPU: 5-15% from intervals and socket handling
-- Memory: Low (~5MB)
-- Network: Continuous WebSocket traffic
-  Critical Sections:
-  Lines 101-112: UI Sync Loop
-  const uiInterval = setInterval(() => {
-  setCompletedCount((prev) => {
-  if (prev !== completedCountRef.current) {
-  return completedCountRef.current; // State update every 500ms
-  }
-  return prev;
-  });
-  }, 500);
-- Impact: Forces React re-evaluation every 500ms even if value unchanged
-- Optimization: Use requestAnimationFrame instead, or only update on actual change
-  Lines 114-131: Auto-Request Loop
-  const interval = setInterval(() => {
-  if (socketRef.current?.connected) {
-  socketRef.current.emit("job:request_batch"); // Every 1000ms when running
-  }
-  }, 1000);
-- Impact: Network overhead + server load
-- Note: This is likely the intended behavior for distributed computing
-  Lines 30-98: Master Setup Effect
-- Creates Web Worker (lines 32-33)
-- Socket.io connection with reconnection (lines 62-67)
-- Event listeners for: connect, snapshot, join codes, benchmarks, job batches
-
----
-
-src/components/dashboard/GpuStatusMonitor.tsx - MEDIUM-HIGH IMPACT
-Resource Profile:
-
-- CPU: 10-20% from canvas rendering
-- GPU: Moderate (2D canvas acceleration)
-- Memory: Low (60 data points buffer)
-  Critical Sections:
-  Lines 66-137: Animation Loop
-  const draw = () => {
-  // ... canvas drawing logic ...
-  animationFrameId = requestAnimationFrame(draw); // 60 FPS continuous
-  };
-  draw();
-- Impact: Runs at 60fps continuously, even when tab not visible
-- Drawing Operations:
-  - Lines 71: clearRect every frame
-  - Lines 79-88: Grid drawing (4 lines)
-  - Lines 100-125: Chart with gradients (60 iterations)
-  - Lines 128-135: Text rendering
-    Lines 54-64: Data Sampling Interval
-    const dataInterval = setInterval(() => {
-    const delta = countRef.current - prevCountRef.current;
-    // ... push new data point every 500ms
-    }, 500);
-    Canvas Resizing (Lines 47-51):
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width _ dpr; // High-DPI scaling
-    canvas.height = rect.height _ dpr;
-    ctx.scale(dpr, dpr);
-- Impact: Double memory on retina displays
-
----
-
-MODERATE IMPACT 🟡
-vite.config.ts - DEV MODE ONLY
-Resource Profile:
-
-- CPU: 20-40% during HMR (Hot Module Replacement)
-- Memory: 100-300MB for dev server
-- Disk: File watching overhead
-  Configuration Analysis:
-- Line 7: @vitejs/plugin-react-swc - Uses SWC (Rust-based, fast but memory hungry)
-- Lines 9-20: Proxy configuration forwards /api and /socket.io to port 3000
-- Issue: --host flag exposes to network, increasing overhead
-  Why bun run dev is slow:
-
-1. SWC compilation in real-time
-2. File system watching with fs.watch
-3. Proxy middleware processing
-4. Source map generation
-5. CSS processing (Tailwind v4)
-
----
-
-src/App.tsx - MODERATE IMPACT
-Resource Profile:
-
-- CPU: 5-10% from re-renders
-- Memory: 20-50MB (depends on device list size)
-  Optimization Strategies Used (Good):
-- Lines 16-21: Memoized components prevent cascading re-renders
-- Lines 58-96: useMemo for expensive stats calculation
-- Lines 28-30: useCallback for log function
-  Potential Issues:
-- Lines 44-45: completedCount updates trigger swarmStats recalculation (line 83)
-- Lines 142-180: All memoized components still receive new props on every parent render
-
----
-
-src/components/dashboard/LiveTerminal.tsx - LOW-MODERATE
-Resource Profile:
-
-- CPU: 2-5% from scrolling animation
-- Memory: Grows with log history (capped at 19 lines)
-  Lines 15-19: Scroll Effect
-  useEffect(() => {
-  if (logsEndRef.current) {
-  logsEndRef.current.scrollIntoView({ behavior: "smooth" });
-  }
-  }, [logs]); // Runs on every new log entry
-
----
-
-LOW IMPACT 🟢
-| File | Impact | Notes |
-|------|--------|-------|
-| main.tsx | Minimal | Simple React mount |
-| usePersistentIdentity.ts | Minimal | One-time localStorage read |
-| Card.tsx | Minimal | Presentational |
-| ThemeToggle.tsx | Minimal | User-triggered only |
-| index.css | Low | Some CSS animations (grain effect) |
-
----
-
-4. CPU USAGE BREAKDOWN (Development Mode)
-   When Running bun run dev:
-   Total CPU Usage: 40-150% (multi-core)
-   Breakdown by Component:
-   ├── Vite Dev Server 20-40%
-   │ ├── SWC Compilation 10-20%
-   │ ├── File Watching 5-10%
-   │ ├── HMR Processing 5-10%
-   │ └── Proxy Middleware 2-5%
-   │
-   ├── Web Workers 30-100% (INTENTIONAL)
-   │ ├── Thread Pool 20-80%
-   │ ├── GPU Compute 0-50% (if WebGPU available)
-   │ └── CPU Math Kernels 10-50%
-   │
-   ├── React/UI 10-25%
-   │ ├── Canvas Animation 10-20%
-   │ ├── State Updates 3-8%
-   │ ├── Socket.io Events 2-5%
-   │ └── Component Rendering 1-3%
-   │
-   └── Browser Overhead 5-10%
-   ├── Garbage Collection 2-5%
-   ├── DOM Updates 2-4%
-   └── Event Loop 1-2%
-
----
-
-5. SPECIFIC BOTTLENECKS IDENTIFIED
-   Bottleneck 1: Continuous Animation (GpuStatusMonitor.tsx:67)
-   const draw = () => {
-   // ... draws every frame
-   animationFrameId = requestAnimationFrame(draw); // NEVER STOPS
-   };
-   Issue: Animation runs even when:
-
-- Tab is backgrounded
-- Swarm is IDLE
-- Window is minimized
-  Fix Strategy:
-  // Use Page Visibility API
-  document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-  cancelAnimationFrame(animationFrameId);
-  } else {
-  draw();
-  }
-  });
-
----
-
-Bottleneck 2: Unnecessary State Sync (useComputeSwarm.ts:101-112)
-setInterval(() => {
-setCompletedCount((prev) => {
-if (prev !== completedCountRef.current) {
-return completedCountRef.current;
-}
-return prev;
-});
-}, 500);
-Issue: Checks state every 500ms even when no jobs complete
-Fix Strategy:
-// Only update when value actually changes
-useEffect(() => {
-const checkInterval = setInterval(() => {
-if (completedCountRef.current !== lastEmittedRef.current) {
-setCompletedCount(completedCountRef.current);
-lastEmittedRef.current = completedCountRef.current;
-}
-}, 500);
-}, []);
-
----
-
-Bottleneck 3: Canvas Full Redraw Every Frame (GpuStatusMonitor.tsx:71-125)
-Issue: Redraws entire 60-point chart at 60fps (3600 operations/sec)
-Optimization Options:
-
-1. Double Buffering: Draw to offscreen canvas, swap
-2. Incremental Drawing: Only draw new data points
-3. Reduce FPS: Cap at 30fps for charts (sufficient for data viz)
-4. WebGL: For truly high-performance rendering
-
----
-
-Bottleneck 4: Worker Thread Overhead (worker.ts:41-186)
-Issue: Each sub-worker is created via Blob URL
-const blob = new Blob([code], { type: "application/javascript" });
-const objectUrl = URL.createObjectURL(blob);
-return { worker: new Worker(objectUrl), objectUrl };
-Memory Impact:
-
-- Each worker context: ~5-10MB
-- Thread pool default: LOGICAL_CORES \* 0.3 (e.g., 8 cores = 2-3 workers)
-- Total: 15-30MB just for worker overhead
-
----
-
-Bottleneck 5: Vite SWC in Bun (vite.config.ts:7)
-Issue: You're using Bun runtime with SWC (Rust-based) compiler
-
-- SWC is optimized for Node.js
-- Bun has its own native bundler that's faster
-- Running SWC under Bun adds translation overhead
-
----
-
-6. OPTIMIZATION RECOMMENDATIONS
-   Immediate Wins (Low Effort, High Impact)
-1. Pause Canvas When Idle
-   - Add visibility checking to GpuStatusMonitor
-   - Pause animation when status === 'IDLE'
-1. Throttle State Updates
-   - Reduce UI sync interval from 500ms to 1000-2000ms
-   - Use requestAnimationFrame + timestamp checking
-1. Optimize Vite Dev
-   - Use bunx --bun vite instead of bun run dev (native Bun compilation)
-   - Or switch to npm run dev with Node for SWC optimization
-1. Add Worker Throttling
-   - Respect throttle setting even in dev mode
-   - Add devMode: low-power option
-     Medium-Term Improvements
-1. Canvas Optimization
-   - Implement dirty-rectangle rendering
-   - Use will-change: contents CSS hint
-   - Consider switching to WebGL for complex charts
-1. Web Worker Pool
-   - Pre-allocate workers at startup
-   - Reuse workers instead of terminating/creating
-   - Use SharedArrayBuffer for zero-copy communication
-1. React Optimizations
-   - Add React.memo to pure components (already partially done)
-   - Virtualize device list if >50 devices
-   - Use useDeferredValue for non-urgent updates
-     Long-Term Architecture
-1. Separate Dev/Prod Worker Behavior
-   - Workers auto-pause in dev mode when no activity
-   - Separate development bundle without heavy compute
-1. Replace Canvas with WebGL
-   - Use Three.js or raw WebGL for velocity charts
-   - GPU-accelerated rendering reduces CPU load
-1. Bun-Native Build
-   - Create Bun-native worker implementation
-   - Use Bun's built-in bundler instead of Vite
-
----
-
-7. FILE-BY-FILE OPTIMIZATION CHECKLIST
-   High Priority
-
-- [ ] GpuStatusMonitor.tsx: Add visibility-aware animation pausing
-- [ ] useComputeSwarm.ts: Reduce sync interval, optimize effect deps
-- [ ] worker.ts: Add dev-mode throttling, optimize thread pool scaling
-      Medium Priority
-- [ ] vite.config.ts: Evaluate Bun-native alternatives
-- [ ] App.tsx: Add useDeferredValue for stats
-- [ ] LiveTerminal.tsx: Virtualize long log lists
-      Low Priority
-- [ ] index.css: Optimize grain texture (CSS containment)
-- [ ] SwarmDashboard.tsx: Virtualize device list
-- [ ] ThemeToggle.tsx: Preload theme to avoid flash
-
----
-
-8. MEASURING IMPROVEMENTS
-   Use these Chrome DevTools metrics:
-1. Performance Tab: Record 10 seconds of activity
-   - Look for long frames (>16ms)
-   - Check "Scripting" vs "Rendering" time
-1. Memory Tab: Take heap snapshots
-   - Monitor Worker-related memory
-   - Check for detached DOM nodes
-1. Network Tab: Monitor WebSocket traffic
-   - Batch job requests should dominate
-   - Watch for unnecessary polling
-1. Bun Built-in Profiler:
-   bun --inspect run dev
-
----
-
-9. SUMMARY
-   Your CPU usage is expected behavior for a distributed computing client that:
-
-- Runs continuous mathematical computations
-- Maintains real-time WebSocket connections
-- Renders high-frequency data visualizations
-- Uses Vite's development server with HMR
-  The heavy load is primarily from:
-
-1. Intentional compute work (Web Workers) - 70-100%
-2. Vite dev server overhead - 20-40%
-3. Canvas animation - 10-20%
-   Quick fixes to try immediately:
-4. Switch to bunx --bun vite for native Bun performance
-5. Add if (status === 'IDLE') return null; to GpuStatusMonitor when not running
-6. Reduce setInterval in useComputeSwarm from 500ms to 2000ms
-</file>
-
-<file path="client/.gitignore">
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-</file>
-
-<file path="client/eslint.config.js">
-import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import tseslint from 'typescript-eslint'
-import { defineConfig, globalIgnores } from 'eslint/config'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      js.configs.recommended,
-      tseslint.configs.recommended,
-      reactHooks.configs.flat.recommended,
-      reactRefresh.configs.vite,
-    ],
-    languageOptions: {
-      ecmaVersion: 2020,
-      globals: globals.browser,
-    },
-  },
-])
-</file>
-
-<file path="client/index.html">
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>client</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
-</file>
-
-<file path="client/README.md">
-# React + TypeScript + Vite
-
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-</file>
-
-<file path="client/src/main.tsx">
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
-import "./core/theme.css";
-import App from "./App.tsx";
-
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
 </file>
 
 <file path="client/tsconfig.app.json">
@@ -2791,6 +2588,193 @@ createRoot(document.getElementById("root")!).render(
 }
 </file>
 
+<file path="server/src/core/types.ts">
+export type DeviceType = "DESKTOP" | "MOBILE" | "COLAB" | "SERVER";
+export type JobType = "MATH_STRESS" | "MAT_MUL" | "TEXT_TOKENIZE";
+
+export interface DeviceCapabilities {
+  cpuCores: number;
+  memoryGB: number;
+  gpuAvailable: boolean;
+  gpuName?: string;
+}
+
+export interface DeviceInfo {
+  id: string;
+  name: string;
+  type: DeviceType;
+  status: "ONLINE" | "BUSY" | "OFFLINE" | "DISABLED";
+  capabilities: DeviceCapabilities;
+  opsScore: number;
+  totalJobsCompleted: number;
+  lastHeartbeat: number;
+}
+
+export interface SwarmResources {
+  totalCores: number;
+  totalMemory: number;
+  totalGPUs: number;
+  onlineCount: number;
+}
+
+export interface Job {
+  id: string;
+  type: JobType;
+  complexity: number;
+  data: any;
+}
+
+export interface SwarmSnapshot {
+  runState: "IDLE" | "RUNNING" | "PAUSED" | "STOPPED";
+  devices: Record<string, DeviceInfo>;
+  stats: {
+    totalJobs: number;
+    activeJobs: number;
+    pendingJobs: number;
+    completedJobs: number;
+    globalVelocity: number;
+  };
+  resources: SwarmResources;
+}
+</file>
+
+<file path="server/src/managers/DeviceManager.ts">
+import { type DeviceInfo, type DeviceCapabilities } from "../core/types";
+
+export class DeviceManager {
+  private devices = new Map<string, DeviceInfo>();
+  private HEATBEAT_TIMEOUT = 10000; // 10s offline threshold
+
+  constructor() {
+    // Heartbeat Pulse Check every 5s
+    setInterval(() => this.checkHeartbeats(), 5000);
+  }
+
+  public register(id: string, name: string, caps: DeviceCapabilities) {
+    const existing = this.devices.get(id);
+    this.devices.set(id, {
+      id,
+      name,
+      type: caps.gpuAvailable ? "SERVER" : "DESKTOP",
+      status: existing?.status === "DISABLED" ? "DISABLED" : "ONLINE",
+      capabilities: caps,
+      opsScore: existing?.opsScore || 0,
+      totalJobsCompleted: existing?.totalJobsCompleted || 0,
+      lastHeartbeat: Date.now(),
+    });
+  }
+
+  public heartbeat(id: string) {
+    const device = this.devices.get(id);
+    if (device && device.status !== "DISABLED") {
+      device.lastHeartbeat = Date.now();
+      if (device.status === "OFFLINE") device.status = "ONLINE";
+    }
+  }
+
+  public toggleDevice(id: string, enabled: boolean) {
+    const device = this.devices.get(id);
+    if (device) {
+      device.status = enabled ? "ONLINE" : "DISABLED";
+    }
+  }
+
+  public updateScore(id: string, score: number) {
+    const device = this.devices.get(id);
+    if (device) device.opsScore = score;
+  }
+
+  public getAvailableResources() {
+    let totalCores = 0;
+    let totalMemory = 0;
+    let totalGPUs = 0;
+    let onlineCount = 0;
+
+    this.devices.forEach((d) => {
+      if (d.status === "ONLINE" || d.status === "BUSY") {
+        totalCores += d.capabilities.cpuCores;
+        totalMemory += d.capabilities.memoryGB;
+        if (d.capabilities.gpuAvailable) totalGPUs++;
+        onlineCount++;
+      }
+    });
+
+    return { totalCores, totalMemory, totalGPUs, onlineCount };
+  }
+
+  public getAllDevices() {
+    return Array.from(this.devices.values());
+  }
+
+  private checkHeartbeats() {
+    const now = Date.now();
+    this.devices.forEach((device) => {
+      if (
+        device.status !== "DISABLED" &&
+        now - device.lastHeartbeat > this.HEATBEAT_TIMEOUT
+      ) {
+        device.status = "OFFLINE";
+      }
+    });
+  }
+}
+</file>
+
+<file path="server/src/managers/JobScheduler.ts">
+import { type Job, type DeviceInfo } from "../core/types";
+
+export class JobScheduler {
+  private jobQueue: Job[] = [];
+
+  constructor() {
+    // Generate dummy jobs periodically (Low overhead: just pushing objects)
+    setInterval(() => this.generateJobs(), 2000);
+  }
+
+  private generateJobs() {
+    if (this.jobQueue.length > 500) return; // Prevent memory overflow
+
+    // Create 50 lightweight job objects
+    for (let i = 0; i < 50; i++) {
+      const isGpuTask = Math.random() > 0.7; // 30% GPU tasks
+      this.jobQueue.push({
+        id: `job-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        type: isGpuTask ? "MAT_MUL" : "MATH_STRESS",
+        complexity: Math.floor(Math.random() * 10) + 1,
+        data: isGpuTask ? { size: 1024 } : { iterations: 100000 },
+      });
+    }
+  }
+
+  public getJobForDevice(device: DeviceInfo): Job | null {
+    if (device.status === "DISABLED" || device.status === "OFFLINE")
+      return null;
+
+    // Capability-based Scheduling
+    const preferredType = device.capabilities.gpuAvailable
+      ? "MAT_MUL"
+      : "MATH_STRESS";
+
+    // Find best match
+    const index = this.jobQueue.findIndex((j) => j.type === preferredType);
+
+    if (index !== -1) {
+      return this.jobQueue.splice(index, 1)[0];
+    }
+
+    // Fallback: take any job
+    return this.jobQueue.shift() || null;
+  }
+
+  public getQueueStats() {
+    return {
+      pending: this.jobQueue.length,
+      active: 0, // In a real DB this would be tracked
+    };
+  }
+}
+</file>
+
 <file path="server/tsconfig.json">
 {
   "compilerOptions": {
@@ -2858,6 +2842,19 @@ createRoot(document.getElementById("root")!).render(
     "vite": "^7.2.4"
   }
 }
+</file>
+
+<file path="client/src/main.tsx">
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import "./core/theme.css";
+import App from "./App.tsx";
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+);
 </file>
 
 <file path="client/vite.config.ts">
@@ -3403,16 +3400,35 @@ io.on("connection", (socket) => {
   // ... (Keep heartbeat, register, run_state listeners same as before) ...
   socket.on("heartbeat", () => deviceManager.heartbeat(persistentId));
   socket.on("device:register", (data) => {
+    console.log(
+      `[REG] Device: ${data.name} | Cores: ${data.capabilities.cpuCores}`,
+    );
     deviceManager.register(persistentId, data.name, data.capabilities);
     broadcastState();
   });
+
   socket.on("cmd:set_run_state", (state) => {
+    console.log(`[CMD] Swarm State Change: ${globalRunState} -> ${state}`);
     globalRunState = state;
-    broadcastState();
+    broadcastState(); // Force immediate update to UI
   });
+
   socket.on("cmd:toggle_device", ({ id, enabled }) => {
+    console.log(`[CMD] Toggle Node ${id}: ${enabled ? "ON" : "OFF"}`);
     deviceManager.toggleDevice(id, enabled);
-    broadcastState();
+    broadcastState(); // Force immediate update to UI
+  });
+
+  socket.on("job:complete", (_data) => {
+    globalCompletedCount++;
+    const device = deviceManager
+      .getAllDevices()
+      .find((d) => d.id === persistentId);
+    if (device) device.totalJobsCompleted++;
+    // Log every 10th job to avoid spamming terminal but show activity
+    if (globalCompletedCount % 10 === 0) {
+      console.log(`[JOB] Total Completed: ${globalCompletedCount}`);
+    }
   });
   socket.on("cmd:trigger_benchmark", () => io.emit("cmd:run_benchmark"));
 
@@ -3428,49 +3444,27 @@ io.on("connection", (socket) => {
     }
   });
 
-  // FIX: JOB COMPLETION LOGIC
-  socket.on("job:complete", (_data) => {
-    // 1. Increment Global Counter
-    globalCompletedCount++;
-
-    // 2. Increment Device Counter
-    const device = deviceManager
-      .getAllDevices()
-      .find((d) => d.id === persistentId);
-    if (device) {
-      device.totalJobsCompleted = (device.totalJobsCompleted || 0) + 1;
-    }
-
-    broadcastState();
-  });
-
   // ... disconnect listener ...
 
   function broadcastState() {
     const resources = deviceManager.getAvailableResources();
     const queue = jobScheduler.getQueueStats();
+    const allDevices = deviceManager.getAllDevices();
 
-    // Real Math: Dynamic Total
-    // If we are stopped, active is 0. If running, it's based on connected nodes.
-    const active = globalRunState === "RUNNING" ? resources.onlineCount : 0;
-    const pending = queue.pending;
-    const completed = globalCompletedCount;
-
-    // Total is the sum of everything we know about
-    const total = completed + pending + active;
+    // Calculate real velocity by summing the OPS scores of active nodes
+    const totalOpsScore = allDevices
+      .filter((d) => d.status === "ONLINE" || d.status === "BUSY")
+      .reduce((sum, d) => sum + (d.opsScore || 0), 0);
 
     const snapshot: SwarmSnapshot = {
       runState: globalRunState,
-      devices: deviceManager
-        .getAllDevices()
-        .reduce((acc, d) => ({ ...acc, [d.id]: d }), {}),
+      devices: allDevices.reduce((acc, d) => ({ ...acc, [d.id]: d }), {}),
       stats: {
-        totalJobs: total, // Now grows as jobs come in/finish
-        activeJobs: active,
-        pendingJobs: pending,
-        completedJobs: completed,
-        // Velocity: If 0 active, 0 velocity. Else estimate based on recent throughput or active nodes.
-        globalVelocity: active > 0 ? resources.onlineCount * 840 : 0,
+        totalJobs: globalCompletedCount + queue.pending,
+        activeJobs: globalRunState === "RUNNING" ? resources.onlineCount : 0,
+        pendingJobs: queue.pending,
+        completedJobs: globalCompletedCount,
+        globalVelocity: globalRunState === "RUNNING" ? totalOpsScore : 0,
       },
       resources,
     };
