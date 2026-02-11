@@ -19,7 +19,7 @@ console.log("🚀 Ostrich Swarm Coordinator Online");
 io.on("connection", (socket) => {
   const persistentId = socket.handshake.query.persistentId as string;
 
-  socket.on("heartbeat", () => deviceManager.heartbeat(persistentId));
+  socket.on("heartbeat", (data) => deviceManager.heartbeat(persistentId, data));
 
   socket.on("device:register", (data) => {
     console.log(
@@ -95,7 +95,11 @@ io.on("connection", (socket) => {
     // 3. Force immediate broadcast to all clients
     broadcastState();
   });
-
+  socket.on("device:disconnect", ({ id }) => {
+    console.log(`[NET] Device Disconnected: ${id}`);
+    deviceManager.remove(id);
+    broadcastState();
+  });
   socket.on("disconnect", (reason) => {
     console.log(`[NET] Client Disconnect: ${reason}`);
   });

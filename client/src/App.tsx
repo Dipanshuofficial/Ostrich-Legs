@@ -13,6 +13,7 @@ import { LiveTerminal } from "./features/terminal/LiveTerminal";
 import { DeviceConnector } from "./features/connection/DeviceConnector";
 import { SwarmControls } from "./features/dashboard/SwarmControls";
 import { type SwarmSnapshot, type SwarmResources } from "./core/types";
+import { usePersistentIdentity } from "./hooks/usePersistentIdentity";
 
 const EMPTY_SNAPSHOT: SwarmSnapshot = {
   runState: "STOPPED",
@@ -36,7 +37,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [throttle, setThrottle] = useState(40);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
+  const identity = usePersistentIdentity();
   // 1. Get Real Data & Logs
   const {
     snapshot: serverSnapshot,
@@ -48,7 +49,7 @@ export default function App() {
     updateThrottle, // Now available here
     totalResources,
     logs,
-  } = useSwarmEngine("local-ostrich-01");
+  } = useSwarmEngine(identity.id || "loading-identity");
 
   const snapshot = serverSnapshot || EMPTY_SNAPSHOT;
   const isRunning = snapshot.runState === "RUNNING";

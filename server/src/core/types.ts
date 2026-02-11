@@ -17,6 +17,7 @@ export interface DeviceInfo {
   opsScore: number;
   totalJobsCompleted: number;
   lastHeartbeat: number;
+  lastUserInteraction: number;
 }
 
 export interface SwarmResources {

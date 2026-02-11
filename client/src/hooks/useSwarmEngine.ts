@@ -6,6 +6,7 @@ import {
   type DeviceInfo,
 } from "../core/types";
 import ComputeWorker from "../utils/compute.worker?worker";
+import { usePersistentIdentity } from "./usePersistentIdentity";
 
 const getLocalSpecs = () => ({
   cpuCores: navigator.hardwareConcurrency || 4,
@@ -18,7 +19,8 @@ export const useSwarmEngine = (persistentId: string) => {
   const [snapshot, setSnapshot] = useState<SwarmSnapshot | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
-
+  const identity = usePersistentIdentity();
+  const lastInteractionRef = useRef(Date.now());
   // Local state to track our own contribution immediately
   const [localDevice, setLocalDevice] = useState<DeviceInfo>({
     id: persistentId,
@@ -39,7 +41,31 @@ export const useSwarmEngine = (persistentId: string) => {
     const time = new Date().toLocaleTimeString().split(" ")[0];
     setLogs((prev) => [...prev.slice(-19), `[${time}] ${msg}`]);
   }, []);
+  useEffect(() => {
+    const updateActivity = () => {
+      lastInteractionRef.current = Date.now();
+    };
 
+    // Listen for any sign of life
+    window.addEventListener("mousemove", updateActivity);
+    window.addEventListener("keydown", updateActivity);
+    window.addEventListener("touchstart", updateActivity);
+    window.addEventListener("scroll", updateActivity);
+
+    // Graceful Exit: Tell server we are leaving immediately
+    const handleUnload = () => {
+      socketRef.current?.emit("device:disconnect", { id: persistentId });
+    };
+    window.addEventListener("beforeunload", handleUnload);
+
+    return () => {
+      window.removeEventListener("mousemove", updateActivity);
+      window.removeEventListener("keydown", updateActivity);
+      window.removeEventListener("touchstart", updateActivity);
+      window.removeEventListener("scroll", updateActivity);
+      window.removeEventListener("beforeunload", handleUnload);
+    };
+  }, [persistentId]);
   // --- WORKER SETUP ---
   useEffect(() => {
     addLog("[SYS] Initializing Compute Worker...");
@@ -99,19 +125,29 @@ export const useSwarmEngine = (persistentId: string) => {
   // --- SOCKET SETUP ---
   const connect = useCallback(() => {
     if (socketRef.current?.connected) return;
-
+    if (
+      !persistentId ||
+      persistentId === "loading-identity" ||
+      socketRef.current?.connected
+    )
+      return;
     addLog(
       `[NET] Attempting Connection to ${import.meta.env.VITE_SERVER_URL || "localhost:3000"}...`,
     );
 
-    socketRef.current = io(
-      import.meta.env.VITE_SERVER_URL || "http://localhost:3000",
-      {
-        query: { persistentId },
-        transports: ["websocket"],
-        reconnection: true,
-      },
-    );
+    // IF we are on a tunnel (Cloudflare) or Network IP, use relative path.
+    // IF we are on localhost, default to localhost:3000 for dev.
+    const isTunnel = window.location.hostname.includes("trycloudflare.com");
+    const serverUrl = isTunnel
+      ? "/"
+      : import.meta.env.VITE_SERVER_URL || "http://localhost:3000";
+
+    socketRef.current = io(serverUrl, {
+      query: { persistentId },
+      transports: ["websocket", "polling"], // Ensure polling is enabled for tunnels
+      reconnection: true,
+      path: "/socket.io/", // Explicit path helps proxies
+    });
 
     // DEBUG: Catch-all listener to prove data is arriving
     socketRef.current.onAny((eventName, ...args) => {
@@ -124,7 +160,7 @@ export const useSwarmEngine = (persistentId: string) => {
       addLog("[NET] ✅ Connected to Mother Ship");
 
       socketRef.current?.emit("device:register", {
-        name: "Local Host",
+        name: identity.name,
         capabilities: getLocalSpecs(),
       });
 
@@ -144,7 +180,7 @@ export const useSwarmEngine = (persistentId: string) => {
       // DEBUG: Verify state sync
       if (data.runState === "RUNNING") {
         // If server says RUNNING but we aren't doing anything, log it
-        // console.log("Server is RUNNING. Local Ops:", localDevice.opsScore);
+        console.log("Server is RUNNING. Local Ops:", localDevice.opsScore);
       }
     });
 
@@ -166,7 +202,7 @@ export const useSwarmEngine = (persistentId: string) => {
       addLog("[CMD] 🚀 Benchmark Triggered Remote");
       workerRef.current?.postMessage({ type: "BENCHMARK" });
     });
-  }, [persistentId, addLog]);
+  }, [persistentId, addLog, identity.name]);
 
   useEffect(() => {
     connect();
@@ -179,20 +215,31 @@ export const useSwarmEngine = (persistentId: string) => {
     };
   }, [connect]);
 
-  // --- AUTO-REQUESTER ---
-  // If we are idle, keep asking for work
+  // --- 1. HEARTBEAT LOOP (The Life Support) ---
+  // Runs ALWAYS, regardless of swarm state
   useEffect(() => {
     if (!isConnected) return;
 
-    const interval = setInterval(() => {
-      if (snapshot?.runState === "RUNNING") {
-        // Heartbeat + Work Request
-        socketRef.current?.emit("heartbeat");
-        socketRef.current?.emit("job:request_batch");
-      }
-    }, 1000);
+    const beatInterval = setInterval(() => {
+      socketRef.current?.emit("heartbeat", {
+        lastInteraction: lastInteractionRef.current,
+      });
+    }, 2000);
 
-    return () => clearInterval(interval);
+    return () => clearInterval(beatInterval);
+  }, [isConnected]);
+
+  // --- 2. WORK LOOP (The Engine) ---
+  // Runs ONLY when Swarm is RUNNING
+  useEffect(() => {
+    if (!isConnected || snapshot?.runState !== "RUNNING") return;
+
+    const workInterval = setInterval(() => {
+      // "Give me work"
+      socketRef.current?.emit("job:request_batch");
+    }, 1000); // Ask for work every 1 second
+
+    return () => clearInterval(workInterval);
   }, [isConnected, snapshot?.runState]);
 
   // --- ACTIONS ---
@@ -216,11 +263,19 @@ export const useSwarmEngine = (persistentId: string) => {
 
   // Merge Devices (Server + Updated Local)
   const serverDevices = snapshot ? Object.values(snapshot.devices) : [];
-  const allDevices = [
-    localDevice, // Always put local first
-    ...serverDevices.filter((d) => d.id !== persistentId),
-  ];
-
+  const otherDevices = serverDevices.filter((d) => d.id !== persistentId);
+  const myServerEntry = serverDevices.find((d) => d.id === persistentId);
+  const localPlaceholder: DeviceInfo = myServerEntry || {
+    id: persistentId,
+    name: identity.name || "Initializing...",
+    type: "DESKTOP",
+    status: "ONLINE", // Default until server says otherwise
+    capabilities: getLocalSpecs(),
+    opsScore: 0,
+    totalJobsCompleted: 0,
+    lastHeartbeat: 0,
+  };
+  const allDevices = [localPlaceholder, ...otherDevices];
   const totalResources = snapshot?.resources || {
     totalCores: localDevice.capabilities.cpuCores,
     totalMemory: localDevice.capabilities.memoryGB,

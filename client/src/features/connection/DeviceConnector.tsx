@@ -1,6 +1,7 @@
 import { QRCodeSVG } from "qrcode.react";
-import { X, Copy, Share2 } from "lucide-react";
+import { X, Copy } from "lucide-react";
 import { Card } from "../../components/Card";
+import { useEffect } from "react";
 
 interface DeviceConnectorProps {
   readonly isOpen: boolean;
@@ -18,6 +19,17 @@ export const DeviceConnector = ({
   const copyCode = () => {
     navigator.clipboard.writeText(joinCode);
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-md p-6">
@@ -41,10 +53,7 @@ export const DeviceConnector = ({
           </div>
 
           <div className="inline-block p-4 bg-white border border-border-soft rounded-3xl shadow-sm">
-            <QRCodeSVG
-              value={`https://ostrich.legs/join/${joinCode}`}
-              size={160}
-            />
+            <QRCodeSVG value={"192.168.1.6:5173"} size={160} />
           </div>
 
           <div className="space-y-2">

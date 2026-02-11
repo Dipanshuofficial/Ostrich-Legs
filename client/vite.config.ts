@@ -6,6 +6,8 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
+    allowedHosts: true,
+    host: true,
     proxy: {
       // Forward all requests starting with /api to the backend
       "/api": {
@@ -15,6 +17,8 @@ export default defineConfig({
       // Also proxy the socket.io connection
       "/socket.io": {
         target: "http://localhost:3000",
+        secure: false,
+        changeOrigin: true,
         ws: true,
       },
     },
