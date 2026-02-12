@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"; // Added useEffect
-import { Zap, Settings, Wifi, WifiOff } from "lucide-react";
+import { Zap, Wifi, WifiOff, Share2 } from "lucide-react";
 import { useSwarmEngine } from "./hooks/useSwarmEngine";
 // Removed unused import: useSwarmExecution
 
@@ -62,43 +62,46 @@ export default function App() {
   return (
     <div className="min-h-screen bg-surface-muted p-4 md:p-8 font-sans antialiased text-text-main selection:bg-brand-orange/20">
       {/* Header */}
-      <header className="max-w-7xl mx-auto flex items-center justify-between mb-8 bg-surface-white/90 backdrop-blur-md px-6 py-4 rounded-[28px] border border-white shadow-lg shadow-gray-200/50 sticky top-4 z-50">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-linear-to-br from-brand-orange to-[#ff9f7c] rounded-xl flex items-center justify-center shadow-lg shadow-brand-orange/30 border-t border-white/20">
+      <header className="max-w-7xl mx-auto flex flex-wrap md:flex-nowrap items-center justify-between mb-8 bg-surface-white/90 backdrop-blur-md px-6 py-4 rounded-[28px] border border-white shadow-lg shadow-gray-200/50 sticky top-4 z-50 gap-y-4">
+        {/* 1. Logo Section (Order 1 on all screens) */}
+        <div className="flex items-center gap-3 order-1">
+          <div className="w-10 h-10 bg-linear-to-br from-brand-orange to-[#ff9f7c] rounded-xl flex items-center justify-center shadow-lg shadow-brand-orange/30 border-t border-white/20 shrink-0">
             <Zap className="text-white fill-white" size={22} />
           </div>
-          <span className="text-xl font-black tracking-tighter text-gray-800">
+          <span className="text-lg md:text-xl font-black tracking-tighter text-gray-800 hidden sm:block">
             Ostrich-Legs
           </span>
 
           <div
-            className={`ml-4 px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5 border transition-colors ${isConnected ? "bg-green-50 text-green-600 border-green-200" : "bg-red-50 text-red-500 border-red-200"}`}
+            className={`ml-2 md:ml-4 px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5 border transition-colors ${isConnected ? "bg-green-50 text-green-600 border-green-200" : "bg-red-50 text-red-500 border-red-200"}`}
           >
             {isConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
             {isConnected ? "ONLINE" : "OFFLINE"}
           </div>
         </div>
 
-        <nav className="hidden lg:flex items-center gap-1 bg-gray-100/80 p-1.5 rounded-2xl shadow-inner border border-gray-200/50">
+        {/* 2. Navigation Tabs (Order 3 on Mobile, Order 2 on Desktop) */}
+        <nav className="flex items-center gap-1 bg-gray-100/80 p-1.5 rounded-2xl shadow-inner border border-gray-200/50 order-3 md:order-2 w-full md:w-auto">
           {["Dashboard", "Monitoring"].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-6 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${activeTab === tab ? "bg-white text-brand-orange shadow-sm border border-gray-100 scale-100" : "text-text-muted hover:text-text-main hover:bg-white/50 scale-95"}`}
+              className={`flex-1 md:flex-none px-4 md:px-6 py-2 rounded-xl text-xs font-bold transition-all duration-200 text-center ${activeTab === tab ? "bg-white text-brand-orange shadow-sm border border-gray-100 scale-100" : "text-text-muted hover:text-text-main hover:bg-white/50 scale-95"}`}
             >
               {tab}
             </button>
           ))}
         </nav>
 
-        <div className="flex items-center gap-4">
+        {/* 3. Settings Section (Order 2 on Mobile, Order 3 on Desktop) */}
+        <div className="flex items-center gap-4 order-2 md:order-3">
           <button
             onClick={() => setIsModalOpen(true)}
             className="flex items-center gap-2 group cursor-pointer hover:bg-gray-100 p-2 rounded-xl transition-colors"
           >
-            <Settings
+            <Share2
               size={20}
-              className="text-text-muted group-hover:rotate-90 transition-transform"
+              className="text-text-muted group-hover:scale-110 transition-transform"
             />
           </button>
         </div>
