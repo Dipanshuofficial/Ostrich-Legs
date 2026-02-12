@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Wifi, WifiOff, Share2, LogOut } from "lucide-react";
 import { useSwarmEngine } from "./hooks/useSwarmEngine";
 import { VelocityMonitor } from "./features/dashboard/VelocityMonitor";
@@ -9,67 +9,66 @@ import { ThrottleControl } from "./features/dashboard/ThrottleControl";
 import { LiveTerminal } from "./features/terminal/LiveTerminal";
 import { DeviceConnector } from "./features/connection/DeviceConnector";
 import { SwarmControls } from "./features/dashboard/SwarmControls";
-import { type SwarmSnapshot, type SwarmResources } from "./core/types";
 import { usePersistentIdentity } from "./hooks/usePersistentIdentity";
 
-const EMPTY_SNAPSHOT: SwarmSnapshot = {
-  runState: "STOPPED",
-  devices: {},
-  resources: {
-    totalCores: 0,
-    totalMemory: 0,
-    totalGPUs: 0,
-    onlineCount: 0,
-  } as SwarmResources,
-  stats: {
-    totalJobs: 0,
-    activeJobs: 0,
-    pendingJobs: 0,
-    completedJobs: 0,
-    globalVelocity: 0,
-    globalThrottle: 40,
-  },
-};
-
 export default function App() {
-  const [activeTab, setActiveTab] = useState("Dashboard"); // Restore usage
+  const [activeTab, setActiveTab] = useState("Dashboard");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const identity = usePersistentIdentity();
 
-  // Optimistic UI state for snappy slider
+  // Optimistic UI state for the slider
   const [localThrottle, setLocalThrottle] = useState(40);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
   const {
-    snapshot: serverSnapshot,
+    snapshot,
     devices,
     setRunState,
     runLocalBenchmark,
     isConnected,
     toggleDevice,
     setGlobalThrottle,
-    generateInviteToken, // Destructured correctly
-    totalResources,
+    generateInviteToken,
     logs,
     leaveSwarm,
     manualJoin,
   } = useSwarmEngine(identity.id || "loading-identity");
 
-  const snapshot = serverSnapshot || EMPTY_SNAPSHOT;
-  const isRunning = snapshot.runState === "RUNNING";
+  // Derive resources from snapshot or default to empty
+  const totalResources = useMemo(() => {
+    if (snapshot?.resources) return snapshot.resources;
+    return {
+      totalCores: 0,
+      totalMemory: 0,
+      totalGPUs: 0,
+      onlineCount: 0,
+    };
+  }, [snapshot]);
+
+  const stats = useMemo(() => {
+    if (snapshot?.stats) return snapshot.stats;
+    return {
+      totalJobs: 0,
+      activeJobs: 0,
+      pendingJobs: 0,
+      completedJobs: 0,
+      globalVelocity: 0,
+      globalThrottle: 40,
+    };
+  }, [snapshot]);
+
+  const isRunning = snapshot?.runState === "RUNNING";
   const isGuest = new URLSearchParams(window.location.search).has("invite");
 
   // Sync slider if someone else changes the global throttle
   useEffect(() => {
-    if (snapshot.stats.globalThrottle !== undefined) {
-      setLocalThrottle(snapshot.stats.globalThrottle);
+    if (stats.globalThrottle !== undefined) {
+      setLocalThrottle(stats.globalThrottle);
     }
-  }, [snapshot.stats.globalThrottle]);
+  }, [stats.globalThrottle]);
 
   const handleThrottleChange = (val: number) => {
-    setLocalThrottle(val); // Update UI instantly
-
-    // Only send the final value after scrolling stops (300ms debounce)
+    setLocalThrottle(val);
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
       setGlobalThrottle(val);
@@ -80,7 +79,7 @@ export default function App() {
     <div className="min-h-screen bg-surface-muted p-4 md:p-8 font-sans antialiased text-text-main">
       <header className="max-w-7xl mx-auto flex items-center justify-between mb-8 bg-surface-white/90 backdrop-blur-md px-6 py-4 rounded-[28px] border border-white shadow-lg sticky top-4 z-50">
         <div className="flex items-center gap-3 shrink-0">
-          <div className="w-12 h-12 bg-surface-white rounded-2xl flex items-center justify-center shadow-[4px_4px_10px_#d1d5db,-4px_-4px_10px_#ffffff] border border-white relative overflow-hidden group">
+          <div className="w-12 h-12 bg-surface-white rounded-2xl flex items-center justify-center shadow-soft-depth border border-white relative overflow-hidden group">
             <svg
               viewBox="0 0 512 512"
               className="w-10 h-10 transition-transform duration-500 group-hover:scale-110"
@@ -122,7 +121,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* --- THE BEAUTIFUL TABS ARE BACK --- */}
         <nav className="hidden md:flex items-center gap-1 bg-gray-100/80 p-1.5 rounded-2xl shadow-inner border border-gray-200/50">
           {["Dashboard", "Monitoring"].map((tab) => (
             <button
@@ -136,7 +134,6 @@ export default function App() {
         </nav>
 
         <div className="flex items-center gap-2">
-          {/* Persistent Leave button for all connected states */}
           {isConnected && (
             <button
               onClick={leaveSwarm}
@@ -160,13 +157,11 @@ export default function App() {
           <>
             <div className="lg:col-span-8 space-y-8 flex flex-col">
               <VelocityMonitor
-                velocity={snapshot.stats.globalVelocity}
+                velocity={stats.globalVelocity}
                 throttle={localThrottle}
               />
-              <ResourceStats
-                stats={snapshot.stats}
-                onlineCount={devices.length}
-              />
+              <ResourceStats stats={stats} onlineCount={devices.length} />
+              {/* Tailwind 4 arbitrary value for minimum height constraint */}
               <div className="flex-1 min-h-100">
                 <ActiveSwarm
                   devices={devices}
@@ -178,11 +173,11 @@ export default function App() {
 
             <div className="lg:col-span-4 space-y-8">
               <JobGauge
-                total={snapshot.stats.totalJobs}
-                completed={snapshot.stats.completedJobs}
+                total={stats.totalJobs}
+                completed={stats.completedJobs}
               />
               <SwarmControls
-                status={snapshot.runState}
+                status={snapshot?.runState || "STOPPED"}
                 onToggle={() => setRunState(isRunning ? "PAUSED" : "RUNNING")}
                 onStop={() => setRunState("STOPPED")}
               />

@@ -1,5 +1,13 @@
+// server/src/core/types.ts
 export type DeviceType = "DESKTOP" | "MOBILE" | "COLAB" | "SERVER";
 export type JobType = "MATH_STRESS" | "MAT_MUL" | "TEXT_TOKENIZE";
+// Added REGISTERED to the flow
+export type DeviceConnectionStatus =
+  | "OFFLINE"
+  | "ONLINE"
+  | "BUSY"
+  | "DISABLED"
+  | "REGISTERED";
 
 export interface DeviceCapabilities {
   cpuCores: number;
@@ -12,7 +20,7 @@ export interface DeviceInfo {
   id: string;
   name: string;
   type: DeviceType;
-  status: "ONLINE" | "BUSY" | "OFFLINE" | "DISABLED";
+  status: DeviceConnectionStatus;
   capabilities: DeviceCapabilities;
   opsScore: number;
   totalJobsCompleted: number;
@@ -21,6 +29,7 @@ export interface DeviceInfo {
   swarmId?: string;
 }
 
+// ... rest of the file remains same
 export interface SwarmResources {
   totalCores: number;
   totalMemory: number;

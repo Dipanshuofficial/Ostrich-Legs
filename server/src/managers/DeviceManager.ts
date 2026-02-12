@@ -2,10 +2,8 @@ import { type DeviceInfo, type DeviceCapabilities } from "../core/types";
 
 export class DeviceManager {
   private devices = new Map<string, DeviceInfo>();
-
-  // RELAXED THRESHOLDS for Tunneled Connections
-  private readonly OFFLINE_THRESHOLD = 30000; // 30s: Mark as Offline
-  private readonly DELETE_THRESHOLD = 90000; // 90s: Remove from memory
+  private readonly OFFLINE_THRESHOLD = 30000;
+  private readonly DELETE_THRESHOLD = 90000;
 
   constructor() {
     setInterval(() => this.cleanup(), 5000);
@@ -22,7 +20,8 @@ export class DeviceManager {
       id,
       name,
       type: caps.gpuAvailable ? "SERVER" : "DESKTOP",
-      status: existing?.status === "DISABLED" ? "DISABLED" : "ONLINE",
+      // Set to REGISTERED immediately on handshake
+      status: "REGISTERED",
       capabilities: caps,
       opsScore: existing?.opsScore || 0,
       totalJobsCompleted: existing?.totalJobsCompleted || 0,
@@ -40,8 +39,8 @@ export class DeviceManager {
     if (data?.lastInteraction)
       device.lastUserInteraction = data.lastInteraction;
 
-    // Revive if it was marked offline
-    if (device.status === "OFFLINE") {
+    // If they heartbeat, they are ONLINE
+    if (device.status === "OFFLINE" || device.status === "REGISTERED") {
       device.status = "ONLINE";
     }
   }
@@ -66,7 +65,11 @@ export class DeviceManager {
     let [totalCores, totalMemory, totalGPUs, onlineCount] = [0, 0, 0, 0];
 
     this.getDevicesBySwarm(swarmId).forEach((d) => {
-      if (d.status === "ONLINE" || d.status === "BUSY") {
+      if (
+        d.status === "ONLINE" ||
+        d.status === "BUSY" ||
+        d.status === "REGISTERED"
+      ) {
         totalCores += d.capabilities.cpuCores;
         totalMemory += d.capabilities.memoryGB;
         if (d.capabilities.gpuAvailable) totalGPUs++;
