@@ -91,7 +91,12 @@ const createSubWorker = (_wId: number) => {
       return true;
     }
 
-    initWebGPU().then(ok => gpuReady = ok);
+    const initPromise = initWebGPU().then(ok => {
+      gpuReady = ok;
+      self.postMessage({ log: "GPU Kernel Ready" });
+    });
+
+    
 
     async function runGpuMatrix(size) {
       if (!gpuReady || !device) return runCpuMatrix(size);
@@ -145,6 +150,7 @@ const createSubWorker = (_wId: number) => {
     self.postMessage({ log: "Worker Thread Ready" });
 
     self.onmessage = async (e) => {
+      await initPromise; // Wait for GPU check before processing any jobs
       // 1. INPUT: Unwrap the message
       // The hook sends: { type: "EXECUTE_JOB", payload: { id, type, data } }
       let { type, data, payload, _throttle, throttleLevel: altThrottle } = e.data;
@@ -315,22 +321,24 @@ self.onmessage = async (e) => {
     const thread = threadPool.get(selectedId)!;
     thread.busy = true;
 
-    const originalHandler = thread.worker.onmessage;
-    thread.worker.onmessage = (ev) => {
+    const originalHandler = (thread.worker.onmessage = (ev) => {
       thread.busy = false;
       thread.worker.onmessage = originalHandler;
 
+      // FIX: Check if the sub-worker explicitly sent a JOB_COMPLETE type
+      const isActuallyComplete = ev.data.type === "JOB_COMPLETE";
+
       self.postMessage({
-        type: ev.data.success ? "JOB_COMPLETE" : "JOB_ERROR",
+        type: isActuallyComplete ? "JOB_COMPLETE" : "JOB_ERROR",
         chunkId: jobData.id,
         result: ev.data.result,
         error: ev.data.error,
       });
-    };
+    });
 
     thread.worker.postMessage({
-      type: jobData.type,
-      data: jobData.data,
+      type: "EXECUTE_JOB", // Explicitly telling the sub-worker this is a job
+      payload: jobData, // Passing the full job object (id, type, data)
       _throttle: throttleLimit,
     });
   }

@@ -53,18 +53,37 @@ export const SwarmControls = ({
         </button>
 
         {/* Stop Button - Tactile Feel */}
+        {/* Kill Button - High Intensity Visuals */}
+        {/* Kill Button - High Intensity Visuals */}
         <button
-          onClick={onStop}
-          className="
+          onClick={() => {
+            if (
+              window.confirm(
+                "KILL PROCESS? This will terminate all active local threads and reset the compute kernel.",
+              )
+            ) {
+              onStop();
+            }
+          }}
+          className={`
             h-20 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98]
-            bg-surface-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] border border-white hover:bg-red-50 group
-          "
+            border hover:bg-red-50 group
+            ${
+              status === "STOPPED"
+                ? "bg-red-50 border-red-200 opacity-80"
+                : "bg-surface-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] border-white"
+            }
+          `}
         >
-          <div className="p-2 text-text-muted group-hover:text-red-500 transition-colors">
+          <div
+            className={`p-2 transition-colors ${status === "STOPPED" ? "text-red-600" : "text-text-muted group-hover:text-red-500"}`}
+          >
             <Square size={24} fill="currentColor" />
           </div>
-          <span className="text-[10px] font-black uppercase text-text-muted group-hover:text-red-500">
-            Kill Process
+          <span
+            className={`text-[10px] font-black uppercase ${status === "STOPPED" ? "text-red-600" : "text-text-muted group-hover:text-red-500"}`}
+          >
+            {status === "STOPPED" ? "System Killed" : "Kill Process"}
           </span>
         </button>
       </div>

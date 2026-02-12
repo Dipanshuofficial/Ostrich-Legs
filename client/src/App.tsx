@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Zap, Wifi, WifiOff, Share2, LogOut } from "lucide-react";
+import { Wifi, WifiOff, Share2, LogOut } from "lucide-react";
 import { useSwarmEngine } from "./hooks/useSwarmEngine";
 import { VelocityMonitor } from "./features/dashboard/VelocityMonitor";
 import { ActiveSwarm } from "./features/dashboard/ActiveSwarm";
@@ -80,8 +80,34 @@ export default function App() {
     <div className="min-h-screen bg-surface-muted p-4 md:p-8 font-sans antialiased text-text-main">
       <header className="max-w-7xl mx-auto flex items-center justify-between mb-8 bg-surface-white/90 backdrop-blur-md px-6 py-4 rounded-[28px] border border-white shadow-lg sticky top-4 z-50">
         <div className="flex items-center gap-3 shrink-0">
-          <div className="w-10 h-10 bg-linear-to-br from-brand-orange to-[#ff9f7c] rounded-xl flex items-center justify-center shadow-lg border-t border-white/20">
-            <Zap className="text-white fill-white" size={22} />
+          <div className="w-12 h-12 bg-surface-white rounded-2xl flex items-center justify-center shadow-[4px_4px_10px_#d1d5db,-4px_-4px_10px_#ffffff] border border-white relative overflow-hidden group">
+            <svg
+              viewBox="0 0 512 512"
+              className="w-10 h-10 transition-transform duration-500 group-hover:scale-110"
+            >
+              <path
+                d="M256 120V256M256 256L140 380M256 256L372 380"
+                stroke="#1a1a1e"
+                strokeWidth="48"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M256 130V256M256 256L150 370M256 256L362 370"
+                stroke="#ff7d54"
+                strokeWidth="24"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <circle cx="256" cy="256" r="55" fill="#1a1a1e" />
+              <circle
+                cx="256"
+                cy="256"
+                r="30"
+                fill="#ff7d54"
+                className="animate-pulse"
+              />
+            </svg>
           </div>
           <div className="hidden sm:block">
             <span className="text-lg md:text-xl font-black tracking-tighter text-gray-800">
@@ -110,13 +136,14 @@ export default function App() {
         </nav>
 
         <div className="flex items-center gap-2">
-          {isGuest && (
+          {/* Persistent Leave button for all connected states */}
+          {isConnected && (
             <button
               onClick={leaveSwarm}
-              className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-xl text-[10px] font-black border border-red-100 hover:bg-red-100 transition-all mr-2 uppercase tracking-widest shadow-sm"
+              className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-xl text-[10px] font-black border border-red-100 hover:bg-red-100 transition-all mr-2 uppercase tracking-widest shadow-sm active:scale-95"
             >
               <LogOut size={14} />
-              Leave Swarm
+              {isGuest ? "Leave Swarm" : "Exit Session"}
             </button>
           )}
           <button
@@ -140,7 +167,7 @@ export default function App() {
                 stats={snapshot.stats}
                 onlineCount={devices.length}
               />
-              <div className="flex-1 min-h-[400px]">
+              <div className="flex-1 min-h-100">
                 <ActiveSwarm
                   devices={devices}
                   onBenchmark={runLocalBenchmark}

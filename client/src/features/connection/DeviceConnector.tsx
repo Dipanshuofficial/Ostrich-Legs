@@ -1,7 +1,16 @@
 import { QRCodeSVG } from "qrcode.react";
-import { X, Copy, RefreshCw, LogOut, ArrowRight } from "lucide-react";
+import {
+  X,
+  Copy,
+  RefreshCw,
+  LogOut,
+  ArrowRight,
+  Camera,
+  Smartphone,
+} from "lucide-react";
 import { Card } from "../../components/Card";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { Html5Qrcode } from "html5-qrcode";
 
 interface DeviceConnectorProps {
   readonly isOpen: boolean;
@@ -23,6 +32,8 @@ export const DeviceConnector = ({
   const [token, setToken] = useState<string>("");
   const [inputCode, setInputCode] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
 
   const joinUrl = token
     ? `${window.location.origin}/?invite=${token}`
@@ -40,6 +51,45 @@ export const DeviceConnector = ({
       setIsLoading(false);
     }
   }, [onRegenerateToken, isGuest, isLoading]);
+  const startScanner = useCallback(async () => {
+    setIsScanning(true);
+    const html5QrCode = new Html5Qrcode("reader");
+    scannerRef.current = html5QrCode;
+
+    try {
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+          // Extract token from URL or use raw text
+          const code = decodedText.includes("invite=")
+            ? decodedText.split("invite=")[1]
+            : decodedText;
+
+          stopScanner();
+          onManualJoin(code);
+          onClose();
+        },
+        () => {}, // Silent on errors
+      );
+    } catch (err) {
+      console.error("Camera failed", err);
+      setIsScanning(false);
+    }
+  }, [onManualJoin, onClose]);
+
+  const stopScanner = useCallback(async () => {
+    if (scannerRef.current && scannerRef.current.isScanning) {
+      await scannerRef.current.stop();
+      scannerRef.current.clear();
+    }
+    setIsScanning(false);
+  }, []);
+
+  // Clean up scanner on close
+  useEffect(() => {
+    if (!isOpen && isScanning) stopScanner();
+  }, [isOpen, isScanning, stopScanner]);
 
   // FIXED: No more generating 10 tokens per second.
   useEffect(() => {
@@ -79,46 +129,86 @@ export const DeviceConnector = ({
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="relative inline-block p-4 bg-white border border-border-soft rounded-3xl shadow-sm">
-                {isLoading && (
-                  <div className="absolute inset-0 z-10 bg-white/80 flex items-center justify-center rounded-3xl">
-                    <RefreshCw
-                      size={24}
-                      className="animate-spin text-brand-orange"
-                    />
-                  </div>
-                )}
-                <QRCodeSVG value={joinUrl} size={160} level="M" includeMargin />
+            <div className="space-y-6">
+              {/* Mode Toggle Tabs */}
+              <div className="flex bg-gray-100/80 p-1 rounded-2xl shadow-inner border border-gray-200/50 mx-auto w-fit">
+                <button
+                  onClick={() => {
+                    stopScanner();
+                    setIsScanning(false);
+                  }}
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${!isScanning ? "bg-white text-brand-orange shadow-sm border border-gray-100" : "text-text-muted hover:text-text-main"}`}
+                >
+                  <Smartphone size={12} /> Share
+                </button>
+                <button
+                  onClick={startScanner}
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${isScanning ? "bg-white text-brand-orange shadow-sm border border-gray-100" : "text-text-muted hover:text-text-main"}`}
+                >
+                  <Camera size={12} /> Scan
+                </button>
               </div>
 
-              <div className="bg-gray-100 p-3 rounded-xl border border-dashed flex items-center justify-between">
-                <div className="text-left">
-                  <p className="text-[9px] font-black text-gray-400 uppercase">
-                    Your Join Code
-                  </p>
-                  <p className="font-mono font-bold text-brand-orange">
-                    {token || "..."}
-                  </p>
-                </div>
-                <div className="flex gap-1">
-                  <button
-                    onClick={handleRegenerate}
-                    className="p-2 hover:bg-white rounded-lg transition-colors"
-                  >
-                    <RefreshCw
-                      size={16}
-                      className={isLoading ? "animate-spin" : ""}
+              {!isScanning ? (
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="relative inline-block p-4 bg-white border border-border-soft rounded-3xl shadow-sm">
+                    {isLoading && (
+                      <div className="absolute inset-0 z-10 bg-white/80 flex items-center justify-center rounded-3xl">
+                        <RefreshCw
+                          size={24}
+                          className="animate-spin text-brand-orange"
+                        />
+                      </div>
+                    )}
+                    <QRCodeSVG
+                      value={joinUrl}
+                      size={160}
+                      level="M"
+                      includeMargin
                     />
-                  </button>
-                  <button
-                    onClick={() => navigator.clipboard.writeText(token)}
-                    className="p-2 hover:bg-white rounded-lg transition-colors"
-                  >
-                    <Copy size={16} />
-                  </button>
+                  </div>
+
+                  <div className="bg-gray-100 p-3 rounded-xl border border-dashed flex items-center justify-between">
+                    <div className="text-left">
+                      <p className="text-[9px] font-black text-gray-400 uppercase">
+                        Your Join Code
+                      </p>
+                      <p className="font-mono font-bold text-brand-orange">
+                        {token || "..."}
+                      </p>
+                    </div>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={handleRegenerate}
+                        className="p-2 hover:bg-white rounded-lg transition-colors"
+                      >
+                        <RefreshCw
+                          size={16}
+                          className={isLoading ? "animate-spin" : ""}
+                        />
+                      </button>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(token)}
+                        className="p-2 hover:bg-white rounded-lg transition-colors"
+                      >
+                        <Copy size={16} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="animate-in fade-in zoom-in-95 duration-300">
+                  {/* Skeuomorphic Lens Container */}
+                  <div className="relative w-full aspect-square max-w-60 mx-auto bg-black rounded-[40px] border-8 border-surface-white shadow-[10px_10px_20px_#d1d5db,-10px_-10px_20px_#ffffff,inset_0_2px_10px_rgba(0,0,0,0.5)] overflow-hidden">
+                    <div id="reader" className="w-full h-full" />
+                    <div className="absolute inset-0 border-2 border-brand-orange/30 rounded-3xl pointer-events-none" />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border border-white/20 rounded-2xl pointer-events-none" />
+                  </div>
+                  <p className="text-[10px] font-bold text-text-muted uppercase mt-4 tracking-widest">
+                    Point at a Swarm QR Code
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>

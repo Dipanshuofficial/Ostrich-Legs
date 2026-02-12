@@ -46,6 +46,8 @@ client/.gitignore
 client/eslint.config.js
 client/index.html
 client/package.json
+client/public/favicon.svg
+client/public/logo.svg
 client/README.md
 client/src/App.tsx
 client/src/components/Card.tsx
@@ -81,47 +83,54 @@ server/tsconfig.json
 <files>
 This section contains the contents of the repository's files.
 
-<file path="server/src/managers/AuthManager.ts">
-export class AuthManager {
-  // Map token -> { swarmId: string, expiresAt: number }
-  private activeTokens = new Map<
-    string,
-    { swarmId: string; expiresAt: number }
-  >();
-  private readonly TOKEN_TTL_MS = 5 * 60 * 1000; // 5 Minutes for better UX
+<file path="client/public/favicon.svg">
+<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="leg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff7d54" />
+      <stop offset="100%" style="stop-color:#ffb09c" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="150%" height="150%">
+      <stop offset="0%" style="stop-color:#ff7d54" />
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  <circle cx="50" cy="50" r="45" fill="#fcfcfd" stroke="rgba(0,0,0,0.05)" stroke-width="2" />
+  <path d="M35 25L50 45L65 25" stroke="url(#leg-grad)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" filter="url(#shadow)"/>
+  <path d="M50 45V75" stroke="url(#leg-grad)" stroke-width="8" stroke-linecap="round" filter="url(#shadow)"/>
+  <circle cx="50" cy="45" r="5" fill="#1a1a1e" />
+</svg>
+</file>
 
-  constructor() {
-    setInterval(() => this.cleanup(), 10000);
-  }
+<file path="client/public/logo.svg">
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="metal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fcfcfd" />
+      <stop offset="100%" style="stop-color:#d1d5db" />
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#ff7d54" />
+      <stop offset="100%" style="stop-color:#ffb09c" />
+    </radialGradient>
+    <filter id="neo-shadow" x="-20%" y="-20%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="12" stdDeviation="15" flood-color="#ff7d54" flood-opacity="0.2"/>
+    </filter>
+  </defs>
 
-  public generateToken(swarmId: string): string {
-    const token = Math.random().toString(36).substring(2, 8).toUpperCase();
-    this.activeTokens.set(token, {
-      swarmId,
-      expiresAt: Date.now() + this.TOKEN_TTL_MS,
-    });
-    return token;
-  }
+  <circle cx="256" cy="256" r="220" fill="url(#metal)" stroke="#ffffff" stroke-width="8" />
+  <circle cx="256" cy="256" r="200" fill="transparent" stroke="rgba(0,0,0,0.03)" stroke-width="20" />
 
-  public validateToken(token: string): string | null {
-    const data = this.activeTokens.get(token);
-    if (!data) return null;
+  <g filter="url(#neo-shadow)">
+    <path d="M256 120V256M256 256L140 380M256 256L372 380" stroke="#1a1a1e" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M256 130V256M256 256L150 370M256 256L362 370" stroke="url(#glow)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 
-    if (Date.now() > data.expiresAt) {
-      this.activeTokens.delete(token);
-      return null;
-    }
-
-    return data.swarmId;
-  }
-
-  private cleanup() {
-    const now = Date.now();
-    for (const [token, data] of this.activeTokens.entries()) {
-      if (now > data.expiresAt) this.activeTokens.delete(token);
-    }
-  }
-}
+  <circle cx="256" cy="256" r="50" fill="#1a1a1e" />
+  <circle cx="256" cy="256" r="30" fill="url(#glow)">
+    <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" />
+  </circle>
+</svg>
 </file>
 
 <file path=".gitignore">
@@ -607,9 +616,9 @@ export default defineConfig([
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>client</title>
+    <title>Ostrich Legs</title>
   </head>
   <body>
     <div id="root"></div>
@@ -768,180 +777,6 @@ export const Card = ({
     @apply bg-gray-200 rounded-full hover:bg-gray-300;
   }
 }
-</file>
-
-<file path="client/src/core/types.ts">
-/** * @priority Latest TypeScript Docs
- * Strict Domain Model for Ostrich Swarm
- */
-
-export type SwarmStatus = "IDLE" | "RUNNING" | "PAUSED" | "STOPPED";
-export type DeviceType = "DESKTOP" | "MOBILE" | "COLAB" | "SERVER";
-export type JobType = "MATH_STRESS" | "MAT_MUL" | "TEXT_TOKENIZE";
-
-export interface DeviceCapabilities {
-  cpuCores: number;
-  memoryGB: number;
-  gpuAvailable: boolean;
-  gpuName?: string; // Added for detail
-}
-
-export interface DeviceInfo {
-  id: string;
-  name: string;
-  type: DeviceType;
-  status: "ONLINE" | "BUSY" | "OFFLINE" | "DISABLED";
-  capabilities: DeviceCapabilities;
-  opsScore: number;
-  totalJobsCompleted: number;
-  lastHeartbeat: number;
-}
-
-export interface SwarmResources {
-  totalCores: number;
-  totalMemory: number;
-  totalGPUs: number; // Added GPU tracking
-  onlineCount: number;
-}
-
-export interface SwarmSnapshot {
-  runState: "IDLE" | "RUNNING" | "PAUSED" | "STOPPED";
-  devices: Record<string, DeviceInfo>;
-  stats: {
-    totalJobs: number;
-    activeJobs: number;
-    pendingJobs: number;
-    completedJobs: number;
-    globalVelocity: number;
-  };
-  resources: SwarmResources; // <--- The missing property
-}
-</file>
-
-<file path="client/src/features/dashboard/ActiveSwarm.tsx">
-import { Smartphone, Laptop, Server, Cpu, Play } from "lucide-react";
-import { Card } from "../../components/Card";
-import { type DeviceInfo } from "../../core/types";
-
-interface ActiveSwarmProps {
-  devices: DeviceInfo[];
-  onBenchmark: () => void;
-  onToggle: (id: string, state: boolean) => void;
-}
-
-export const ActiveSwarm = ({
-  devices,
-  onBenchmark,
-  onToggle,
-}: ActiveSwarmProps) => {
-  const getIcon = (type: string) => {
-    switch (type) {
-      case "MOBILE":
-        return <Smartphone size={18} />;
-      case "SERVER":
-        return <Server size={18} />;
-      case "COLAB":
-        return <Cpu size={18} />;
-      default:
-        return <Laptop size={18} />;
-    }
-  };
-
-  return (
-    <Card className="flex flex-col h-full bg-surface-white relative overflow-hidden group p-1">
-      <div className="flex justify-between items-center mb-6 px-2 pt-2">
-        <div>
-          <h3 className="font-bold text-lg text-text-main">Swarm Nodes</h3>
-          <p className="text-xs text-text-muted">Manage active resources</p>
-        </div>
-        <button
-          onClick={onBenchmark}
-          className="flex items-center gap-2 bg-gray-900 hover:bg-black text-white px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-lg shadow-gray-900/20"
-        >
-          <Play size={12} fill="currentColor" />
-          Benchmark
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar px-1">
-        {devices.map((device) => {
-          const isDisabled = device.status === "DISABLED";
-          const isLocal = device.name === "Local Host";
-
-          return (
-            <div
-              key={device.id}
-              className={`flex items-center justify-between p-3 rounded-2xl border transition-all duration-300 ${isDisabled ? "bg-gray-50 border-transparent opacity-60" : "bg-white border-gray-100 hover:border-brand-orange/30 shadow-sm"}`}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className={`p-3 rounded-xl ${isDisabled ? "bg-gray-200 text-gray-400" : "bg-surface-muted text-brand-orange"}`}
-                >
-                  {getIcon(device.type)}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-bold text-text-main">
-                      {device.name}
-                    </h4>
-                    {isLocal && (
-                      <span className="text-[9px] bg-brand-orange/10 text-brand-orange px-1.5 rounded font-bold border border-brand-orange/20">
-                        YOU
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full ${isDisabled ? "bg-gray-400" : device.status === "ONLINE" ? "bg-green-500" : "bg-amber-500"}`}
-                    />
-                    <span className="text-[10px] font-bold text-text-muted uppercase">
-                      {device.status === "ONLINE"
-                        ? `${device.capabilities.cpuCores} Cores`
-                        : device.status}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                {/* Job Counter */}
-                <div className="text-right hidden sm:block">
-                  <div className="font-mono text-sm font-black text-text-main">
-                    {/* Placeholder for Job Count - will connect to real state later */}
-                    {device.totalJobsCompleted || 0}
-                  </div>
-                  <div className="text-[9px] font-bold text-text-muted uppercase">
-                    Jobs Done
-                  </div>
-                </div>
-
-                <div className="text-right hidden sm:block min-w-15">
-                  <div className="font-mono text-sm font-black text-brand-orange">
-                    {device.opsScore > 0
-                      ? device.opsScore.toLocaleString()
-                      : "---"}
-                  </div>
-                  <div className="text-[9px] font-bold text-text-muted uppercase">
-                    OPS Score
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => onToggle(device.id, isDisabled)}
-                  className={`w-10 h-6 rounded-full p-1 transition-colors relative ${!isDisabled ? "bg-green-500" : "bg-gray-300"}`}
-                >
-                  <div
-                    className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${!isDisabled ? "translate-x-4" : "translate-x-0"}`}
-                  />
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-};
 </file>
 
 <file path="client/src/features/dashboard/JobGauge.tsx">
@@ -1157,37 +992,6 @@ export const ThrottleControl = ({
     </Card>
   );
 };
-</file>
-
-<file path="client/tsconfig.app.json">
-{
-  "compilerOptions": {
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
-    "target": "ES2022",
-    "useDefineForClassFields": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "types": ["vite/client"],
-    "skipLibCheck": true,
-
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-    "jsx": "react-jsx",
-
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
-  },
-  "include": ["src"]
-}
 </file>
 
 <file path="client/tsconfig.json">
@@ -1605,6 +1409,49 @@ export const ThrottleControl = ({
 }
 </file>
 
+<file path="server/src/managers/AuthManager.ts">
+export class AuthManager {
+  // Map token -> { swarmId: string, expiresAt: number }
+  private activeTokens = new Map<
+    string,
+    { swarmId: string; expiresAt: number }
+  >();
+  private readonly TOKEN_TTL_MS = 5 * 60 * 1000; // 5 Minutes for better UX
+
+  constructor() {
+    setInterval(() => this.cleanup(), 10000);
+  }
+
+  public generateToken(swarmId: string): string {
+    const token = Math.random().toString(36).substring(2, 8).toUpperCase();
+    this.activeTokens.set(token, {
+      swarmId,
+      expiresAt: Date.now() + this.TOKEN_TTL_MS,
+    });
+    return token;
+  }
+
+  public validateToken(token: string): string | null {
+    const data = this.activeTokens.get(token);
+    if (!data) return null;
+
+    if (Date.now() > data.expiresAt) {
+      this.activeTokens.delete(token);
+      return null;
+    }
+
+    return data.swarmId;
+  }
+
+  private cleanup() {
+    const now = Date.now();
+    for (const [token, data] of this.activeTokens.entries()) {
+      if (now > data.expiresAt) this.activeTokens.delete(token);
+    }
+  }
+}
+</file>
+
 <file path="server/src/managers/JobScheduler.ts">
 import { type Job, type DeviceInfo } from "../core/types";
 
@@ -1703,6 +1550,7 @@ export class JobScheduler {
     "@tailwindcss/vite": "^4.1.18",
     "clsx": "^2.1.1",
     "framer-motion": "^12.33.0",
+    "html5-qrcode": "^2.3.8",
     "lucide-react": "^0.563.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
@@ -1729,167 +1577,214 @@ export class JobScheduler {
 }
 </file>
 
-<file path="client/src/features/connection/DeviceConnector.tsx">
-import { QRCodeSVG } from "qrcode.react";
-import { X, Copy, RefreshCw, LogOut, ArrowRight } from "lucide-react";
-import { Card } from "../../components/Card";
-import { useEffect, useState, useCallback } from "react";
+<file path="client/src/core/types.ts">
+/** * Strict Domain Model for Ostrich Swarm
+ */
 
-interface DeviceConnectorProps {
-  readonly isOpen: boolean;
-  readonly onClose: () => void;
-  readonly onRegenerateToken: () => Promise<string>;
-  readonly onManualJoin: (code: string) => void;
-  readonly onLeave: () => void;
-  readonly isGuest: boolean;
+export type SwarmStatus = "IDLE" | "RUNNING" | "PAUSED" | "STOPPED";
+export type DeviceType = "DESKTOP" | "MOBILE" | "COLAB" | "SERVER";
+export type JobType = "MATH_STRESS" | "MAT_MUL" | "TEXT_TOKENIZE";
+
+export interface DeviceCapabilities {
+  cpuCores: number;
+  memoryGB: number;
+  gpuAvailable: boolean;
+  gpuName?: string;
 }
 
-const CODE_LIFETIME_SEC = 60;
+export interface DeviceInfo {
+  id: string;
+  name: string;
+  type: DeviceType;
+  status: "ONLINE" | "BUSY" | "OFFLINE" | "DISABLED";
+  capabilities: DeviceCapabilities;
+  opsScore: number;
+  totalJobsCompleted: number;
+  lastHeartbeat: number;
+}
 
-export const DeviceConnector = ({
-  isOpen,
-  onClose,
-  onRegenerateToken,
-  onManualJoin,
-  onLeave,
-  isGuest,
-}: DeviceConnectorProps) => {
-  const [token, setToken] = useState<string>("");
-  const [inputCode, setInputCode] = useState<string>("");
-  const [timeLeft, setTimeLeft] = useState(CODE_LIFETIME_SEC);
-  const [isLoading, setIsLoading] = useState(false);
+export interface SwarmResources {
+  totalCores: number;
+  totalMemory: number;
+  totalGPUs: number;
+  onlineCount: number;
+}
 
-  const joinUrl = token
-    ? `${window.location.origin}/?invite=${token}`
-    : window.location.origin;
+export interface Job {
+  id: string;
+  type: JobType;
+  complexity: number;
+  data: any;
+}
 
-  const handleRegenerate = useCallback(async () => {
-    if (isGuest) return; // Guests can't generate tokens for the host
-    setIsLoading(true);
-    try {
-      const newToken = await onRegenerateToken();
-      setToken(newToken);
-      setTimeLeft(CODE_LIFETIME_SEC);
-    } catch (err) {
-      console.error("Token error", err);
-    } finally {
-      setIsLoading(false);
+export interface SwarmSnapshot {
+  runState: SwarmStatus;
+  devices: Record<string, DeviceInfo>;
+  stats: {
+    totalJobs: number;
+    activeJobs: number;
+    pendingJobs: number;
+    completedJobs: number;
+    globalVelocity: number;
+    globalThrottle?: number;
+  };
+  resources: SwarmResources;
+}
+</file>
+
+<file path="client/src/features/dashboard/ActiveSwarm.tsx">
+import { Smartphone, Laptop, Server, Cpu, Play } from "lucide-react";
+import { Card } from "../../components/Card";
+import { type DeviceInfo } from "../../core/types";
+
+interface ActiveSwarmProps {
+  devices: DeviceInfo[];
+  onBenchmark: () => void;
+  onToggle: (id: string, state: boolean) => void;
+}
+
+export const ActiveSwarm = ({
+  devices,
+  onBenchmark,
+  onToggle,
+}: ActiveSwarmProps) => {
+  const getIcon = (type: string) => {
+    switch (type) {
+      case "MOBILE":
+        return <Smartphone size={18} />;
+      case "SERVER":
+        return <Server size={18} />;
+      case "COLAB":
+        return <Cpu size={18} />;
+      default:
+        return <Laptop size={18} />;
     }
-  }, [onRegenerateToken, isGuest]);
-
-  useEffect(() => {
-    if (isOpen && !isGuest) handleRegenerate();
-  }, [isOpen, isGuest, handleRegenerate]);
-
-  useEffect(() => {
-    if (!isOpen || timeLeft <= 0 || isGuest) return;
-    const interval = setInterval(() => setTimeLeft((t) => t - 1), 1000);
-    return () => clearInterval(interval);
-  }, [isOpen, timeLeft, isGuest]);
-
-  if (!isOpen) return null;
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-md p-6">
-      <Card
-        className="max-w-sm w-full relative animate-in zoom-in-95 duration-200 overflow-hidden p-6"
-        variant="elevated"
-      >
+    <Card className="flex flex-col h-full bg-surface-white relative overflow-hidden p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <div>
+          <h3 className="font-bold text-lg text-text-main">Swarm Nodes</h3>
+          <p className="text-xs text-text-muted">Manage active resources</p>
+        </div>
         <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
+          onClick={onBenchmark}
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 hover:bg-black text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-lg shadow-gray-900/20"
         >
-          <X size={18} className="text-text-muted" />
+          <Play size={12} fill="currentColor" />
+          Benchmark All
         </button>
+      </div>
 
-        <div className="text-center space-y-6">
-          <div className="space-y-1">
-            <h3 className="text-xl font-bold">Swarm Access</h3>
-            <p className="text-xs text-text-muted">Manage node connections</p>
-          </div>
+      <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+        {devices.map((device) => {
+          const isDisabled = device.status === "DISABLED";
+          const isLocal =
+            device.id.includes("node-") || device.name === "Local Host";
 
-          {/* SECTION A: Current Swarm (Host vs Guest) */}
-          <div className="space-y-4">
-            {isGuest ? (
-              <div className="p-4 bg-red-50 border border-red-100 rounded-2xl space-y-3">
-                <p className="text-[10px] font-black text-red-500 uppercase">
-                  You are a Guest
-                </p>
-                <button
-                  onClick={onLeave}
-                  className="w-full flex items-center justify-center gap-2 bg-red-500 text-white py-3 rounded-xl font-bold text-xs hover:bg-red-600 transition-all shadow-lg shadow-red-500/20"
+          return (
+            <div
+              key={device.id}
+              className={`flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl border transition-all duration-300 gap-4 ${
+                isDisabled
+                  ? "bg-gray-50 border-transparent opacity-60"
+                  : "bg-white border-gray-100 hover:border-brand-orange/30 shadow-sm"
+              }`}
+            >
+              {/* Left Section: Identity */}
+              <div className="flex items-center gap-3">
+                <div
+                  className={`p-3 rounded-xl shrink-0 ${
+                    isDisabled
+                      ? "bg-gray-200 text-gray-400"
+                      : "bg-surface-muted text-brand-orange"
+                  }`}
                 >
-                  <LogOut size={14} /> Exit Current Swarm
+                  {getIcon(device.type)}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="text-sm font-bold text-text-main truncate">
+                      {device.name}
+                    </h4>
+                    {isLocal && (
+                      <span className="text-[9px] bg-brand-orange/10 text-brand-orange px-1.5 py-0.5 rounded font-bold border border-brand-orange/20 uppercase tracking-tighter">
+                        YOU
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                        isDisabled
+                          ? "bg-gray-400"
+                          : device.status === "ONLINE"
+                            ? "bg-green-500"
+                            : "bg-amber-500"
+                      }`}
+                    />
+                    <span className="text-[10px] font-bold text-text-muted uppercase truncate">
+                      {device.status === "ONLINE"
+                        ? `${device.capabilities.cpuCores} Cores Online`
+                        : device.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Section: Stats & Toggle */}
+              <div className="flex items-center justify-between md:justify-end gap-4 md:gap-8 border-t md:border-t-0 pt-3 md:pt-0">
+                <div className="flex gap-6">
+                  {/* Job Counter */}
+                  <div className="text-left md:text-right min-w-15">
+                    <div className="font-mono text-sm font-black text-text-main">
+                      {device.totalJobsCompleted || 0}
+                    </div>
+                    <div className="text-[9px] font-bold text-text-muted uppercase tracking-tighter">
+                      Jobs
+                    </div>
+                  </div>
+
+                  {/* OPS Score */}
+                  <div className="text-left md:text-right min-w-17.5">
+                    <div className="font-mono text-sm font-black text-brand-orange">
+                      {device.opsScore > 0
+                        ? device.opsScore.toLocaleString()
+                        : "---"}
+                    </div>
+                    <div className="text-[9px] font-bold text-text-muted uppercase tracking-tighter">
+                      OPS Score
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => onToggle(device.id, isDisabled)}
+                  className={`w-11 h-6 rounded-full p-1 transition-colors relative shrink-0 ${
+                    !isDisabled ? "bg-green-500" : "bg-gray-300"
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                      !isDisabled ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
                 </button>
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="relative inline-block p-4 bg-white border border-border-soft rounded-3xl shadow-sm">
-                  {isLoading && (
-                    <div className="absolute inset-0 z-10 bg-white/80 flex items-center justify-center rounded-3xl">
-                      <RefreshCw
-                        size={24}
-                        className="animate-spin text-brand-orange"
-                      />
-                    </div>
-                  )}
-                  <QRCodeSVG
-                    value={joinUrl}
-                    size={160}
-                    level="M"
-                    includeMargin
-                  />
-                </div>
-
-                <div className="bg-gray-50 p-3 rounded-xl border border-dashed flex items-center justify-between">
-                  <div className="text-left">
-                    <p className="text-[9px] font-black text-gray-400 uppercase">
-                      Your Join Code
-                    </p>
-                    <p className="font-mono font-bold text-brand-orange">
-                      {token || "---"}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => navigator.clipboard.writeText(token)}
-                    className="p-2 hover:bg-white rounded-lg"
-                  >
-                    <Copy size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* SECTION B: Join Another Swarm */}
-          <div className="border-t pt-6 space-y-3">
-            <p className="text-[10px] font-black text-text-muted uppercase tracking-widest text-left">
-              Join Remote Swarm
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                maxLength={6}
-                value={inputCode}
-                onChange={(e) => setInputCode(e.target.value.toUpperCase())}
-                placeholder="ENTER CODE"
-                className="flex-1 bg-gray-100 border border-border-soft rounded-xl px-4 py-3 font-mono font-bold text-sm focus:outline-brand-orange"
-              />
-              <button
-                onClick={() => {
-                  onManualJoin(inputCode);
-                  onClose();
-                }}
-                disabled={inputCode.length < 4}
-                className="bg-gray-900 text-white p-3 rounded-xl disabled:opacity-50 hover:bg-black transition-all"
-              >
-                <ArrowRight size={20} />
-              </button>
             </div>
+          );
+        })}
+
+        {devices.length === 0 && (
+          <div className="text-center py-10">
+            <p className="text-sm text-text-muted italic">
+              Waiting for swarm nodes...
+            </p>
           </div>
-        </div>
-      </Card>
-    </div>
+        )}
+      </div>
+    </Card>
   );
 };
 </file>
@@ -1950,18 +1845,37 @@ export const SwarmControls = ({
         </button>
 
         {/* Stop Button - Tactile Feel */}
+        {/* Kill Button - High Intensity Visuals */}
+        {/* Kill Button - High Intensity Visuals */}
         <button
-          onClick={onStop}
-          className="
+          onClick={() => {
+            if (
+              window.confirm(
+                "KILL PROCESS? This will terminate all active local threads and reset the compute kernel.",
+              )
+            ) {
+              onStop();
+            }
+          }}
+          className={`
             h-20 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98]
-            bg-surface-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] border border-white hover:bg-red-50 group
-          "
+            border hover:bg-red-50 group
+            ${
+              status === "STOPPED"
+                ? "bg-red-50 border-red-200 opacity-80"
+                : "bg-surface-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] border-white"
+            }
+          `}
         >
-          <div className="p-2 text-text-muted group-hover:text-red-500 transition-colors">
+          <div
+            className={`p-2 transition-colors ${status === "STOPPED" ? "text-red-600" : "text-text-muted group-hover:text-red-500"}`}
+          >
             <Square size={24} fill="currentColor" />
           </div>
-          <span className="text-[10px] font-black uppercase text-text-muted group-hover:text-red-500">
-            Kill Process
+          <span
+            className={`text-[10px] font-black uppercase ${status === "STOPPED" ? "text-red-600" : "text-text-muted group-hover:text-red-500"}`}
+          >
+            {status === "STOPPED" ? "System Killed" : "Kill Process"}
           </span>
         </button>
       </div>
@@ -2368,7 +2282,12 @@ const createSubWorker = (_wId: number) => {
       return true;
     }
 
-    initWebGPU().then(ok => gpuReady = ok);
+    const initPromise = initWebGPU().then(ok => {
+      gpuReady = ok;
+      self.postMessage({ log: "GPU Kernel Ready" });
+    });
+
+    
 
     async function runGpuMatrix(size) {
       if (!gpuReady || !device) return runCpuMatrix(size);
@@ -2422,6 +2341,7 @@ const createSubWorker = (_wId: number) => {
     self.postMessage({ log: "Worker Thread Ready" });
 
     self.onmessage = async (e) => {
+      await initPromise; // Wait for GPU check before processing any jobs
       // 1. INPUT: Unwrap the message
       // The hook sends: { type: "EXECUTE_JOB", payload: { id, type, data } }
       let { type, data, payload, _throttle, throttleLevel: altThrottle } = e.data;
@@ -2592,26 +2512,59 @@ self.onmessage = async (e) => {
     const thread = threadPool.get(selectedId)!;
     thread.busy = true;
 
-    const originalHandler = thread.worker.onmessage;
-    thread.worker.onmessage = (ev) => {
+    const originalHandler = (thread.worker.onmessage = (ev) => {
       thread.busy = false;
       thread.worker.onmessage = originalHandler;
 
+      // FIX: Check if the sub-worker explicitly sent a JOB_COMPLETE type
+      const isActuallyComplete = ev.data.type === "JOB_COMPLETE";
+
       self.postMessage({
-        type: ev.data.success ? "JOB_COMPLETE" : "JOB_ERROR",
+        type: isActuallyComplete ? "JOB_COMPLETE" : "JOB_ERROR",
         chunkId: jobData.id,
         result: ev.data.result,
         error: ev.data.error,
       });
-    };
+    });
 
     thread.worker.postMessage({
-      type: jobData.type,
-      data: jobData.data,
+      type: "EXECUTE_JOB", // Explicitly telling the sub-worker this is a job
+      payload: jobData, // Passing the full job object (id, type, data)
       _throttle: throttleLimit,
     });
   }
 };
+</file>
+
+<file path="client/tsconfig.app.json">
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "types": ["vite/client", "node"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["src"]
+}
 </file>
 
 <file path="server/package.json">
@@ -2636,6 +2589,282 @@ self.onmessage = async (e) => {
     "typescript": "^5.1.6"
   }
 }
+</file>
+
+<file path="client/src/features/connection/DeviceConnector.tsx">
+import { QRCodeSVG } from "qrcode.react";
+import {
+  X,
+  Copy,
+  RefreshCw,
+  LogOut,
+  ArrowRight,
+  Camera,
+  Smartphone,
+} from "lucide-react";
+import { Card } from "../../components/Card";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { Html5Qrcode } from "html5-qrcode";
+
+interface DeviceConnectorProps {
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly onRegenerateToken: () => Promise<string>;
+  readonly onManualJoin: (code: string) => void;
+  readonly onLeave: () => void;
+  readonly isGuest: boolean;
+}
+
+export const DeviceConnector = ({
+  isOpen,
+  onClose,
+  onRegenerateToken,
+  onManualJoin,
+  onLeave,
+  isGuest,
+}: DeviceConnectorProps) => {
+  const [token, setToken] = useState<string>("");
+  const [inputCode, setInputCode] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+
+  const joinUrl = token
+    ? `${window.location.origin}/?invite=${token}`
+    : window.location.origin;
+
+  const handleRegenerate = useCallback(async () => {
+    if (isGuest || isLoading) return;
+    setIsLoading(true);
+    try {
+      const newToken = await onRegenerateToken();
+      setToken(newToken);
+    } catch (err) {
+      console.error("Token failed", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [onRegenerateToken, isGuest, isLoading]);
+  const startScanner = useCallback(async () => {
+    setIsScanning(true);
+    const html5QrCode = new Html5Qrcode("reader");
+    scannerRef.current = html5QrCode;
+
+    try {
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+          // Extract token from URL or use raw text
+          const code = decodedText.includes("invite=")
+            ? decodedText.split("invite=")[1]
+            : decodedText;
+
+          stopScanner();
+          onManualJoin(code);
+          onClose();
+        },
+        () => {}, // Silent on errors
+      );
+    } catch (err) {
+      console.error("Camera failed", err);
+      setIsScanning(false);
+    }
+  }, [onManualJoin, onClose]);
+
+  const stopScanner = useCallback(async () => {
+    if (scannerRef.current && scannerRef.current.isScanning) {
+      await scannerRef.current.stop();
+      scannerRef.current.clear();
+    }
+    setIsScanning(false);
+  }, []);
+
+  // Clean up scanner on close
+  useEffect(() => {
+    if (!isOpen && isScanning) stopScanner();
+  }, [isOpen, isScanning, stopScanner]);
+
+  // FIXED: No more generating 10 tokens per second.
+  useEffect(() => {
+    if (isOpen && !isGuest && !token && !isLoading) {
+      handleRegenerate();
+    }
+  }, [isOpen, isGuest, token, isLoading, handleRegenerate]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-md p-6">
+      <Card
+        className="max-w-sm w-full relative p-6 space-y-6"
+        variant="elevated"
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
+        >
+          <X size={18} className="text-text-muted" />
+        </button>
+
+        <div className="text-center space-y-4">
+          <h3 className="text-xl font-bold">Swarm Access</h3>
+
+          {isGuest ? (
+            <div className="p-4 bg-red-50 border border-red-100 rounded-2xl space-y-3">
+              <p className="text-[10px] font-black text-red-500 uppercase">
+                Swarm Guest Mode
+              </p>
+              <button
+                onClick={onLeave}
+                className="w-full flex items-center justify-center gap-2 bg-red-500 text-white py-3 rounded-xl font-bold text-xs hover:bg-red-600 transition-all"
+              >
+                <LogOut size={14} /> Exit Swarm
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Mode Toggle Tabs */}
+              <div className="flex bg-gray-100/80 p-1 rounded-2xl shadow-inner border border-gray-200/50 mx-auto w-fit">
+                <button
+                  onClick={() => {
+                    stopScanner();
+                    setIsScanning(false);
+                  }}
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${!isScanning ? "bg-white text-brand-orange shadow-sm border border-gray-100" : "text-text-muted hover:text-text-main"}`}
+                >
+                  <Smartphone size={12} /> Share
+                </button>
+                <button
+                  onClick={startScanner}
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${isScanning ? "bg-white text-brand-orange shadow-sm border border-gray-100" : "text-text-muted hover:text-text-main"}`}
+                >
+                  <Camera size={12} /> Scan
+                </button>
+              </div>
+
+              {!isScanning ? (
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="relative inline-block p-4 bg-white border border-border-soft rounded-3xl shadow-sm">
+                    {isLoading && (
+                      <div className="absolute inset-0 z-10 bg-white/80 flex items-center justify-center rounded-3xl">
+                        <RefreshCw
+                          size={24}
+                          className="animate-spin text-brand-orange"
+                        />
+                      </div>
+                    )}
+                    <QRCodeSVG
+                      value={joinUrl}
+                      size={160}
+                      level="M"
+                      includeMargin
+                    />
+                  </div>
+
+                  <div className="bg-gray-100 p-3 rounded-xl border border-dashed flex items-center justify-between">
+                    <div className="text-left">
+                      <p className="text-[9px] font-black text-gray-400 uppercase">
+                        Your Join Code
+                      </p>
+                      <p className="font-mono font-bold text-brand-orange">
+                        {token || "..."}
+                      </p>
+                    </div>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={handleRegenerate}
+                        className="p-2 hover:bg-white rounded-lg transition-colors"
+                      >
+                        <RefreshCw
+                          size={16}
+                          className={isLoading ? "animate-spin" : ""}
+                        />
+                      </button>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(token)}
+                        className="p-2 hover:bg-white rounded-lg transition-colors"
+                      >
+                        <Copy size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="animate-in fade-in zoom-in-95 duration-300">
+                  {/* Skeuomorphic Lens Container */}
+                  <div className="relative w-full aspect-square max-w-60 mx-auto bg-black rounded-[40px] border-8 border-surface-white shadow-[10px_10px_20px_#d1d5db,-10px_-10px_20px_#ffffff,inset_0_2px_10px_rgba(0,0,0,0.5)] overflow-hidden">
+                    <div id="reader" className="w-full h-full" />
+                    <div className="absolute inset-0 border-2 border-brand-orange/30 rounded-3xl pointer-events-none" />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border border-white/20 rounded-2xl pointer-events-none" />
+                  </div>
+                  <p className="text-[10px] font-bold text-text-muted uppercase mt-4 tracking-widest">
+                    Point at a Swarm QR Code
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t pt-6 space-y-3">
+          <p className="text-[10px] font-black text-text-muted uppercase text-left tracking-widest">
+            Join Remote Swarm
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              maxLength={6}
+              value={inputCode}
+              onChange={(e) => setInputCode(e.target.value.toUpperCase())}
+              placeholder="ENTER CODE"
+              className="flex-1 bg-gray-100 border border-border-soft rounded-xl px-4 py-3 font-mono font-bold text-sm focus:outline-brand-orange"
+            />
+            <button
+              onClick={() => {
+                onManualJoin(inputCode);
+                onClose();
+              }}
+              disabled={inputCode.length < 4}
+              className="bg-gray-900 text-white p-3 rounded-xl disabled:opacity-50 hover:bg-black transition-all"
+            >
+              <ArrowRight size={20} />
+            </button>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+};
+</file>
+
+<file path="client/vite.config.ts">
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react-swc";
+import tailwindcss from "@tailwindcss/vite";
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  server: {
+    allowedHosts: true,
+    host: true,
+    proxy: {
+      // Forward all requests starting with /api to the backend
+      "/api": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+      },
+      // Also proxy the socket.io connection
+      "/socket.io": {
+        target: "http://localhost:3000",
+        secure: false,
+        changeOrigin: true,
+        ws: true,
+      },
+    },
+  },
+});
 </file>
 
 <file path="server/src/core/types.ts">
@@ -2685,6 +2914,7 @@ export interface SwarmSnapshot {
     pendingJobs: number;
     completedJobs: number;
     globalVelocity: number;
+    globalThrottle: number;
   };
   resources: SwarmResources;
 }
@@ -2696,12 +2926,11 @@ import { type DeviceInfo, type DeviceCapabilities } from "../core/types";
 export class DeviceManager {
   private devices = new Map<string, DeviceInfo>();
 
-  // TIMEOUTS
-  private OFFLINE_THRESHOLD = 10000; // 10s: Mark as Offline (Red)
-  private DELETE_THRESHOLD = 60000; // 60s: Garbage Collect (Delete)
+  // RELAXED THRESHOLDS for Tunneled Connections
+  private readonly OFFLINE_THRESHOLD = 30000; // 30s: Mark as Offline
+  private readonly DELETE_THRESHOLD = 90000; // 90s: Remove from memory
 
   constructor() {
-    // Run the reaper every 5 seconds
     setInterval(() => this.cleanup(), 5000);
   }
 
@@ -2722,54 +2951,42 @@ export class DeviceManager {
       totalJobsCompleted: existing?.totalJobsCompleted || 0,
       lastHeartbeat: Date.now(),
       lastUserInteraction: Date.now(),
-      swarmId, // IMPORTANT: Store this in your DeviceInfo interface in types.ts
-    } as any);
+      swarmId,
+    });
   }
 
   public heartbeat(id: string, data?: { lastInteraction: number }) {
     const device = this.devices.get(id);
-    if (device) {
-      device.lastHeartbeat = Date.now();
+    if (!device) return;
 
-      // Update interaction time if provided
-      if (data?.lastInteraction) {
-        device.lastUserInteraction = data.lastInteraction; // (Add this to your DeviceInfo type if you want to display it)
-      }
+    device.lastHeartbeat = Date.now();
+    if (data?.lastInteraction)
+      device.lastUserInteraction = data.lastInteraction;
 
-      // Revive if it was offline (but not disabled)
-      if (device.status === "OFFLINE") {
-        device.status = "ONLINE";
-      }
+    // Revive if it was marked offline
+    if (device.status === "OFFLINE") {
+      device.status = "ONLINE";
     }
-  }
-
-  // Called when tab closes (Immediate removal)
-  public remove(id: string) {
-    this.devices.delete(id);
   }
 
   public toggleDevice(id: string, enabled: boolean) {
     const device = this.devices.get(id);
-    if (device) {
-      device.status = enabled ? "ONLINE" : "DISABLED";
-    }
+    if (device) device.status = enabled ? "ONLINE" : "DISABLED";
   }
 
   public updateScore(id: string, score: number) {
     const device = this.devices.get(id);
     if (device) device.opsScore = score;
   }
+
   public getDevicesBySwarm(swarmId: string) {
     return Array.from(this.devices.values()).filter(
-      (d: any) => d.swarmId === swarmId,
+      (d) => d.swarmId === swarmId,
     );
   }
 
   public getAvailableResources(swarmId: string) {
-    let totalCores = 0;
-    let totalMemory = 0;
-    let totalGPUs = 0;
-    let onlineCount = 0;
+    let [totalCores, totalMemory, totalGPUs, onlineCount] = [0, 0, 0, 0];
 
     this.getDevicesBySwarm(swarmId).forEach((d) => {
       if (d.status === "ONLINE" || d.status === "BUSY") {
@@ -2786,219 +3003,27 @@ export class DeviceManager {
   public getDevice(id: string) {
     return this.devices.get(id);
   }
-  // --- THE GARBAGE COLLECTOR ---
+
+  public remove(id: string) {
+    this.devices.delete(id);
+  }
+
   private cleanup() {
     const now = Date.now();
-
     this.devices.forEach((device, id) => {
-      const timeSinceHeartbeat = now - device.lastHeartbeat;
+      const diff = now - device.lastHeartbeat;
 
-      // 1. Hard Delete (Zombie Removal)
-      if (timeSinceHeartbeat > this.DELETE_THRESHOLD) {
-        console.log(`[REAPER] Removing dead node: ${device.name} (${id})`);
+      if (diff > this.DELETE_THRESHOLD) {
         this.devices.delete(id);
-        return;
-      }
-
-      // 2. Soft Offline (Mark Red)
-      if (
+      } else if (
         device.status !== "DISABLED" &&
-        timeSinceHeartbeat > this.OFFLINE_THRESHOLD
+        diff > this.OFFLINE_THRESHOLD
       ) {
-        if (device.status !== "OFFLINE") {
-          // console.log(`[WARN] Node offline: ${device.name}`);
-          device.status = "OFFLINE";
-        }
+        device.status = "OFFLINE";
       }
     });
   }
 }
-</file>
-
-<file path="client/src/hooks/useSwarmEngine.ts">
-import { useEffect, useRef, useState, useCallback } from "react";
-import { io, Socket } from "socket.io-client";
-import { type SwarmSnapshot, type SwarmStatus } from "../core/types";
-import ComputeWorker from "../utils/compute.worker?worker";
-import { usePersistentIdentity } from "./usePersistentIdentity";
-
-const getLocalSpecs = () => ({
-  cpuCores: navigator.hardwareConcurrency || 4,
-  memoryGB: (navigator as any).deviceMemory || 8,
-  gpuAvailable: true,
-  gpuName: "WebGPU Adapter",
-});
-
-export const useSwarmEngine = (persistentId: string) => {
-  const [snapshot, setSnapshot] = useState<SwarmSnapshot | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [logs, setLogs] = useState<string[]>([]);
-  const identity = usePersistentIdentity();
-  const lastInteractionRef = useRef(Date.now());
-
-  const socketRef = useRef<Socket | null>(null);
-  const workerRef = useRef<Worker | null>(null);
-
-  const addLog = useCallback((msg: string) => {
-    const time = new Date().toLocaleTimeString().split(" ")[0];
-    setLogs((prev) => [...prev.slice(-19), `[${time}] ${msg}`]);
-  }, []);
-
-  const leaveSwarm = useCallback(() => {
-    window.location.href = window.location.origin;
-  }, []);
-
-  const connect = useCallback(
-    (manualToken?: string) => {
-      if (socketRef.current) socketRef.current.disconnect();
-      if (!persistentId || persistentId === "loading-identity") return;
-
-      const params = new URLSearchParams(window.location.search);
-      const inviteToken = manualToken || params.get("invite");
-
-      const isTunnel = window.location.hostname.includes("trycloudflare.com");
-      const serverUrl = isTunnel ? "/" : "http://localhost:3000";
-
-      socketRef.current = io(serverUrl, {
-        query: { persistentId },
-        auth: { token: inviteToken },
-        transports: ["websocket", "polling"],
-        reconnection: true,
-        path: "/socket.io/",
-      });
-
-      socketRef.current.on("connect", () => {
-        setIsConnected(true);
-        addLog(`[NET] Connected to ${inviteToken ? "Swarm" : "Local Host"}`);
-        socketRef.current?.emit("device:register", {
-          name: identity.name,
-          capabilities: getLocalSpecs(),
-        });
-      });
-
-      socketRef.current.on("swarm:snapshot", (data: SwarmSnapshot) => {
-        setSnapshot(data);
-      });
-
-      socketRef.current.on(
-        "job:batch",
-        (jobs: Array<{ id: string; type: string; data: any }>) => {
-          jobs.forEach((job) =>
-            workerRef.current?.postMessage({
-              type: "EXECUTE_JOB",
-              payload: job,
-            }),
-          );
-        },
-      );
-
-      socketRef.current.on("connect_error", (err) => {
-        addLog(`[AUTH] Access Denied: ${err.message}`);
-      });
-    },
-    [persistentId, identity.name, addLog],
-  );
-
-  // Heartbeat Loop
-  useEffect(() => {
-    if (!isConnected) return;
-    const beatInterval = setInterval(() => {
-      socketRef.current?.emit("heartbeat", {
-        lastInteraction: lastInteractionRef.current,
-      });
-    }, 2000);
-    return () => clearInterval(beatInterval);
-  }, [isConnected]);
-  useEffect(() => {
-    const worker = new ComputeWorker();
-    workerRef.current = worker;
-
-    worker.onmessage = (e) => {
-      const { type, score, chunkId, result, error } = e.data;
-      if (type === "BENCHMARK_COMPLETE") {
-        socketRef.current?.emit("benchmark:result", { score });
-      } else if (type === "JOB_COMPLETE") {
-        socketRef.current?.emit("job:complete", {
-          chunkId,
-          result,
-          workerId: persistentId,
-        });
-        socketRef.current?.emit("job:request_batch");
-      } else if (type === "JOB_ERROR") {
-        socketRef.current?.emit("job:complete", {
-          chunkId,
-          error,
-          workerId: persistentId,
-        });
-      }
-    };
-
-    connect();
-    return () => {
-      worker.terminate();
-      socketRef.current?.disconnect();
-    };
-  }, [connect, persistentId]);
-
-  return {
-    snapshot,
-    devices: snapshot ? Object.values(snapshot.devices) : [],
-    setRunState: (s: SwarmStatus) =>
-      socketRef.current?.emit("cmd:set_run_state", s),
-    runLocalBenchmark: () =>
-      workerRef.current?.postMessage({ type: "BENCHMARK" }),
-    isConnected,
-    leaveSwarm,
-    manualJoin: (code: string) => connect(code),
-    toggleDevice: (id: string, enabled: boolean) =>
-      socketRef.current?.emit("cmd:toggle_device", { id, enabled }),
-    updateThrottle: (v: number) =>
-      workerRef.current?.postMessage({
-        type: "CONFIG_UPDATE",
-        payload: { throttle: v / 100 },
-      }),
-    generateInviteToken: () =>
-      new Promise<string>((res) =>
-        socketRef.current?.emit("auth:generate_token", res),
-      ),
-    totalResources: snapshot?.resources || {
-      totalCores: 0,
-      totalMemory: 0,
-      totalGPUs: 0,
-      onlineCount: 0,
-    },
-    logs,
-  };
-};
-</file>
-
-<file path="client/vite.config.ts">
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
-import tailwindcss from "@tailwindcss/vite";
-
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  server: {
-    allowedHosts: true,
-    host: true,
-    proxy: {
-      // Forward all requests starting with /api to the backend
-      "/api": {
-        target: "http://localhost:3000",
-        changeOrigin: true,
-      },
-      // Also proxy the socket.io connection
-      "/socket.io": {
-        target: "http://localhost:3000",
-        secure: false,
-        changeOrigin: true,
-        ws: true,
-      },
-    },
-  },
-});
 </file>
 
 <file path="client/src/hooks/usePersistentIdentity.ts">
@@ -3032,6 +3057,258 @@ export const usePersistentIdentity = () => {
 };
 </file>
 
+<file path="client/src/hooks/useSwarmEngine.ts">
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { io, Socket } from "socket.io-client";
+import {
+  type SwarmSnapshot,
+  type SwarmStatus,
+  type Job,
+  type SwarmResources,
+} from "../core/types";
+import ComputeWorker from "../utils/compute.worker?worker";
+import { usePersistentIdentity } from "./usePersistentIdentity";
+
+const getLocalSpecs = () => ({
+  cpuCores: navigator.hardwareConcurrency || 4,
+  memoryGB: (navigator as any).deviceMemory || 8,
+  gpuAvailable: true,
+  gpuName: "WebGPU Adapter",
+});
+
+export const useSwarmEngine = (persistentId: string) => {
+  const [snapshot, setSnapshot] = useState<SwarmSnapshot | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [logs, setLogs] = useState<string[]>([]);
+  const identity = usePersistentIdentity();
+
+  const lastInteractionRef = useRef<number>(Date.now());
+  const socketRef = useRef<Socket | null>(null);
+  const workerRef = useRef<Worker | null>(null);
+
+  // --- LOGGING ---
+  const addLog = useCallback((msg: string) => {
+    const time = new Date().toLocaleTimeString().split(" ")[0];
+    setLogs((prev) => [...prev.slice(-19), `[${time}] ${msg}`]);
+  }, []);
+
+  // --- WORKER EVENT HANDLER ---
+  const handleWorkerMessage = useCallback(
+    (e: MessageEvent) => {
+      const { type, score, chunkId, result, error } = e.data;
+
+      switch (type) {
+        case "BENCHMARK_COMPLETE":
+          socketRef.current?.emit("benchmark:result", { score });
+          addLog(`[CPU] Benchmark Complete: ${score.toLocaleString()} OPS`);
+          break;
+        case "JOB_COMPLETE":
+          socketRef.current?.emit("job:complete", {
+            chunkId,
+            result,
+            workerId: persistentId,
+          });
+          // CONTINUITY: One batch done, get the next one
+          socketRef.current?.emit("job:request_batch");
+          break;
+        case "JOB_ERROR":
+          addLog(`[ERR] Job ${chunkId} failed: ${error}`);
+          socketRef.current?.emit("job:complete", {
+            chunkId,
+            error,
+            workerId: persistentId,
+          });
+          // RECOVERY: Ask for more jobs to keep the pipeline from drying up
+          socketRef.current?.emit("job:request_batch");
+          break;
+      }
+    },
+    [persistentId, addLog],
+  );
+
+  // --- CORE ACTIONS ---
+  const sendHeartbeat = useCallback(() => {
+    if (socketRef.current?.connected) {
+      socketRef.current.emit("heartbeat", {
+        lastInteraction: lastInteractionRef.current,
+      });
+    }
+  }, []);
+
+  const runLocalBenchmark = useCallback(() => {
+    addLog("[SYS] Starting local stress test...");
+    workerRef.current?.postMessage({ type: "BENCHMARK" });
+  }, [addLog]);
+
+  const updateThrottle = useCallback((v: number) => {
+    workerRef.current?.postMessage({
+      type: "CONFIG_UPDATE",
+      payload: { throttle: v / 100 },
+    });
+  }, []);
+
+  const setRunState = useCallback(
+    (s: SwarmStatus) => {
+      // 1. Tell server the state changed
+      socketRef.current?.emit("cmd:set_run_state", s);
+
+      // 2. If Killing, perform a hard hardware reset
+      if (s === "STOPPED") {
+        workerRef.current?.terminate();
+
+        // Instantiate fresh kernel
+        const newWorker = new ComputeWorker();
+        workerRef.current = newWorker;
+
+        // CRITICAL: Re-bind the message handler or the pipeline dies here
+        newWorker.onmessage = handleWorkerMessage;
+
+        addLog("[SYS] Kernel reset. Compute pipeline re-initialized.");
+      }
+
+      // 3. If starting, kick the server to send the first batch
+      if (s === "RUNNING") {
+        socketRef.current?.emit("job:request_batch");
+      }
+    },
+    [handleWorkerMessage, addLog],
+  );
+
+  const connect = useCallback(
+    (manualToken?: string) => {
+      if (socketRef.current) socketRef.current.disconnect();
+
+      const params = new URLSearchParams(window.location.search);
+      const inviteToken = manualToken || params.get("invite");
+      const isTunnel = window.location.hostname.includes("trycloudflare.com");
+      const serverUrl = isTunnel ? "/" : "http://localhost:3000";
+
+      socketRef.current = io(serverUrl, {
+        query: { persistentId },
+        auth: { token: inviteToken },
+        transports: ["websocket", "polling"],
+        reconnection: true,
+        path: "/socket.io/",
+      });
+
+      socketRef.current.on("connect", () => {
+        setIsConnected(true);
+        addLog(`[NET] Swarm Link Established`);
+        socketRef.current?.emit("device:register", {
+          name: identity.name,
+          capabilities: getLocalSpecs(),
+        });
+        sendHeartbeat();
+        workerRef.current?.postMessage({ type: "BENCHMARK" });
+
+        // KICKSTART: If we join and it's already running, ask for work immediately
+        socketRef.current?.emit("job:request_batch");
+      });
+
+      // LISTEN FOR JOBS
+      socketRef.current.on("job:batch", (jobs: Job[]) => {
+        jobs.forEach((job) => {
+          workerRef.current?.postMessage({ type: "EXECUTE_JOB", payload: job });
+        });
+      });
+
+      socketRef.current.on("swarm:throttle_sync", (value: number) => {
+        updateThrottle(value);
+      });
+
+      socketRef.current.on("swarm:snapshot", (data: SwarmSnapshot) => {
+        const wasRunning = snapshot?.runState === "RUNNING";
+        const isNowRunning = data.runState === "RUNNING";
+
+        setSnapshot(data);
+
+        // if the state just switched to RUNNING, kick off the first request
+        if (!wasRunning && isNowRunning && isConnected) {
+          addLog("[SYS] Swarm Ignition: Requesting initial batch...");
+          socketRef.current?.emit("job:request_batch");
+        }
+      });
+
+      socketRef.current.on("job:batch", (jobs: Job[]) => {
+        jobs.forEach((job) =>
+          workerRef.current?.postMessage({ type: "EXECUTE_JOB", payload: job }),
+        );
+      });
+
+      socketRef.current.on("connect_error", (err) => {
+        addLog(`[NET] Offline Mode: ${err.message}`);
+        setIsConnected(false);
+      });
+
+      socketRef.current.on("disconnect", () => {
+        setIsConnected(false);
+        addLog("[NET] Connection Lost");
+      });
+    },
+    [persistentId, identity.name, addLog, sendHeartbeat, updateThrottle],
+  );
+
+  // --- INITIALIZATION ---
+  useEffect(() => {
+    const worker = new ComputeWorker();
+    workerRef.current = worker;
+    worker.onmessage = handleWorkerMessage;
+
+    // Load connection only when ID is ready, but worker is ALWAYS ready
+    if (persistentId && persistentId !== "loading-identity") {
+      connect();
+    }
+
+    return () => {
+      worker.terminate();
+      socketRef.current?.disconnect();
+    };
+  }, [connect, persistentId, handleWorkerMessage]);
+
+  useEffect(() => {
+    const interval = setInterval(sendHeartbeat, 3000);
+    return () => clearInterval(interval);
+  }, [sendHeartbeat]);
+
+  // --- MEMOIZED RESOURCES (Fallback for Offline) ---
+  const totalResources = useMemo(
+    () =>
+      snapshot?.resources ||
+      ({
+        totalCores: getLocalSpecs().cpuCores,
+        totalMemory: getLocalSpecs().memoryGB,
+        totalGPUs: 1,
+        onlineCount: 1,
+      } as SwarmResources),
+    [snapshot],
+  );
+
+  return {
+    snapshot,
+    devices: snapshot ? Object.values(snapshot.devices) : [],
+    isConnected,
+    logs,
+    totalResources,
+    setRunState,
+    runLocalBenchmark,
+    updateThrottle,
+    leaveSwarm: () => {
+      window.location.href = window.location.origin;
+    },
+    manualJoin: (code: string) => connect(code),
+    toggleDevice: (id: string, enabled: boolean) =>
+      socketRef.current?.emit("cmd:toggle_device", { id, enabled }),
+    generateInviteToken: () =>
+      new Promise<string>((res) =>
+        socketRef.current?.emit("auth:generate_token", res),
+      ),
+    setGlobalThrottle: (val: number) => {
+      socketRef.current?.emit("cmd:set_throttle", val);
+    },
+  };
+};
+</file>
+
 <file path="server/src/index.ts">
 import { Server } from "socket.io";
 import { DeviceManager } from "./managers/DeviceManager";
@@ -3048,9 +3325,9 @@ const deviceManager = new DeviceManager();
 const jobScheduler = new JobScheduler();
 const authManager = new AuthManager();
 
-// Track run states per swarm room
 const swarmStates = new Map<string, SwarmSnapshot["runState"]>();
 const swarmCompletedCounts = new Map<string, number>();
+const swarmThrottles = new Map<string, number>();
 
 console.log("🚀 Ostrich Swarm Coordinator Online");
 
@@ -3063,14 +3340,14 @@ io.use((socket, next) => {
     origin.includes("localhost") || origin.includes("127.0.0.1");
 
   if (isTrulyLocal) {
-    socket.data.swarmId = persistentId; // Host is the owner of their room
+    socket.data.swarmId = persistentId;
     return next();
   }
 
   if (token) {
     const targetSwarm = authManager.validateToken(token);
     if (targetSwarm) {
-      socket.data.swarmId = targetSwarm; // Guest joins the host's room
+      socket.data.swarmId = targetSwarm;
       return next();
     }
   }
@@ -3084,24 +3361,69 @@ io.on("connection", (socket) => {
 
   socket.join(swarmId);
 
-  // Initialize swarm state if new
   if (!swarmStates.has(swarmId)) {
     swarmStates.set(swarmId, "STOPPED");
     swarmCompletedCounts.set(swarmId, 0);
   }
+
+  socket.on("cmd:set_throttle", (value: number) => {
+    swarmThrottles.set(swarmId, value);
+    // Broadcast to everyone in the room
+    io.to(swarmId).emit("swarm:throttle_sync", value);
+  });
 
   socket.on("auth:generate_token", (callback) => {
     const token = authManager.generateToken(swarmId);
     if (typeof callback === "function") callback(token);
   });
 
-  socket.on("heartbeat", (data) => deviceManager.heartbeat(persistentId, data));
-
-  socket.on("device:register", (data) => {
-    deviceManager.register(persistentId, data.name, data.capabilities, swarmId);
-    broadcastState();
+  // FIX: Tie heartbeat specifically to the persistentId
+  socket.on("heartbeat", (data) => {
+    deviceManager.heartbeat(persistentId, data);
   });
 
+  // --- THE MISSING DISPATCHER ---
+  socket.on("job:request_batch", () => {
+    const currentState = swarmStates.get(swarmId);
+    // 1. Only give jobs if the swarm is actually RUNNING
+    if (currentState !== "RUNNING") return;
+
+    const device = deviceManager.getDevice(persistentId);
+    if (!device || device.status !== "ONLINE") return;
+
+    // 2. Pull jobs from the scheduler specifically for this device
+    const batch = [];
+    const BATCH_SIZE = 5;
+
+    for (let i = 0; i < BATCH_SIZE; i++) {
+      const job = jobScheduler.getJobForDevice(device);
+      if (job) batch.push(job);
+    }
+
+    // 3. Dispatch to client
+    if (batch.length > 0) {
+      socket.emit("job:batch", batch);
+    }
+  });
+
+  socket.on("job:complete", (payload: { chunkId: string; error?: string }) => {
+    // 1. Increment Global Stats
+    if (!payload.error) {
+      swarmCompletedCounts.set(
+        swarmId,
+        (swarmCompletedCounts.get(swarmId) || 0) + 1,
+      );
+    }
+
+    // 2. Increment Device-Specific Stats (FIXES THE "0 JOBS DONE" ON NODES)
+    const device = deviceManager.getDevice(persistentId);
+    if (device && !payload.error) {
+      device.totalJobsCompleted++;
+    }
+
+    // 3. Trigger immediate broadcast to keep UI snappy
+    broadcastState();
+  });
   socket.on("cmd:set_run_state", (state) => {
     swarmStates.set(swarmId, state);
     broadcastState();
@@ -3111,21 +3433,31 @@ io.on("connection", (socket) => {
     deviceManager.toggleDevice(id, enabled);
     broadcastState();
   });
-
-  socket.on("job:complete", (_data) => {
-    swarmCompletedCounts.set(
-      swarmId,
-      (swarmCompletedCounts.get(swarmId) || 0) + 1,
-    );
+  socket.on("device:register", (data) => {
+    deviceManager.register(persistentId, data.name, data.capabilities, swarmId);
+    // Explicitly revive status if it was stuck in OFFLINE/DISABLED
     const device = deviceManager.getDevice(persistentId);
-    if (device) device.totalJobsCompleted++;
+    if (device) device.status = "ONLINE";
+
+    console.log(
+      `[REG] Node ${data.name} (${persistentId}) joined swarm ${swarmId}`,
+    );
+    broadcastState();
   });
 
   socket.on("job:request_batch", () => {
-    if (swarmStates.get(swarmId) !== "RUNNING") return;
-
+    const currentState = swarmStates.get(swarmId);
     const device = deviceManager.getDevice(persistentId);
-    if (!device || device.status !== "ONLINE") return;
+
+    if (currentState !== "RUNNING") {
+      // Quiet return, we don't want to spam if paused
+      return;
+    }
+
+    if (!device) {
+      console.log(`[ERR] Request from unknown device: ${persistentId}`);
+      return;
+    }
 
     const batch = [];
     for (let i = 0; i < 5; i++) {
@@ -3133,16 +3465,19 @@ io.on("connection", (socket) => {
       if (job) batch.push(job);
     }
 
-    if (batch.length > 0) socket.emit("job:batch", batch);
+    if (batch.length > 0) {
+      console.log(
+        `[JOBS] Dispatched ${batch.length} tasks to ${device.name} (${persistentId})`,
+      );
+      socket.emit("job:batch", batch);
+    } else {
+      // Log this so you know if the JobScheduler is empty
+      console.log(`[WARN] Queue empty for ${device.name}`);
+    }
   });
 
   socket.on("benchmark:result", (data) => {
     deviceManager.updateScore(persistentId, data.score);
-    broadcastState();
-  });
-
-  socket.on("device:disconnect", ({ id }) => {
-    deviceManager.remove(id);
     broadcastState();
   });
 
@@ -3152,6 +3487,7 @@ io.on("connection", (socket) => {
     const allDevices = deviceManager.getDevicesBySwarm(swarmId);
     const currentState = swarmStates.get(swarmId) || "STOPPED";
     const completedCount = swarmCompletedCounts.get(swarmId) || 0;
+    const currentThrottle = swarmThrottles.get(swarmId) || 40;
 
     const totalOpsScore = allDevices
       .filter((d) => d.status === "ONLINE" || d.status === "BUSY")
@@ -3166,6 +3502,7 @@ io.on("connection", (socket) => {
         pendingJobs: queue.pending,
         completedJobs: completedCount,
         globalVelocity: currentState === "RUNNING" ? totalOpsScore : 0,
+        globalThrottle: currentThrottle,
       },
       resources,
     };
@@ -3173,14 +3510,19 @@ io.on("connection", (socket) => {
     io.to(swarmId).emit("swarm:snapshot", snapshot);
   }
 
-  const syncInterval = setInterval(broadcastState, 1000);
-  socket.on("disconnect", () => clearInterval(syncInterval));
+  // Periodic room broadcast
+  const syncInterval = setInterval(broadcastState, 2000);
+
+  socket.on("disconnect", () => {
+    clearInterval(syncInterval);
+    // Note: deviceManager.cleanup() handles removing offline devices after a delay
+  });
 });
 </file>
 
 <file path="client/src/App.tsx">
-import { useState, useEffect, useMemo } from "react";
-import { Zap, Wifi, WifiOff, Share2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Wifi, WifiOff, Share2, LogOut } from "lucide-react";
 import { useSwarmEngine } from "./hooks/useSwarmEngine";
 import { VelocityMonitor } from "./features/dashboard/VelocityMonitor";
 import { ActiveSwarm } from "./features/dashboard/ActiveSwarm";
@@ -3208,14 +3550,18 @@ const EMPTY_SNAPSHOT: SwarmSnapshot = {
     pendingJobs: 0,
     completedJobs: 0,
     globalVelocity: 0,
+    globalThrottle: 40,
   },
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState("Dashboard");
-  const [throttle, setThrottle] = useState(40);
+  const [activeTab, setActiveTab] = useState("Dashboard"); // Restore usage
   const [isModalOpen, setIsModalOpen] = useState(false);
   const identity = usePersistentIdentity();
+
+  // Optimistic UI state for snappy slider
+  const [localThrottle, setLocalThrottle] = useState(40);
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
   const {
     snapshot: serverSnapshot,
@@ -3224,8 +3570,8 @@ export default function App() {
     runLocalBenchmark,
     isConnected,
     toggleDevice,
-    updateThrottle,
-    generateInviteToken,
+    setGlobalThrottle,
+    generateInviteToken, // Destructured correctly
     totalResources,
     logs,
     leaveSwarm,
@@ -3234,55 +3580,100 @@ export default function App() {
 
   const snapshot = serverSnapshot || EMPTY_SNAPSHOT;
   const isRunning = snapshot.runState === "RUNNING";
+  const isGuest = new URLSearchParams(window.location.search).has("invite");
 
-  // Check if we arrived here via an invite link
-  const isGuest = useMemo(() => {
-    return new URLSearchParams(window.location.search).has("invite");
-  }, []);
-
+  // Sync slider if someone else changes the global throttle
   useEffect(() => {
-    updateThrottle(throttle);
-  }, [throttle, updateThrottle]);
+    if (snapshot.stats.globalThrottle !== undefined) {
+      setLocalThrottle(snapshot.stats.globalThrottle);
+    }
+  }, [snapshot.stats.globalThrottle]);
+
+  const handleThrottleChange = (val: number) => {
+    setLocalThrottle(val); // Update UI instantly
+
+    // Only send the final value after scrolling stops (300ms debounce)
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      setGlobalThrottle(val);
+    }, 300);
+  };
 
   return (
-    <div className="min-h-screen bg-surface-muted p-4 md:p-8 font-sans antialiased text-text-main selection:bg-brand-orange/20">
-      <header className="max-w-7xl mx-auto flex flex-wrap md:flex-nowrap items-center justify-between mb-8 bg-surface-white/90 backdrop-blur-md px-6 py-4 rounded-[28px] border border-white shadow-lg shadow-gray-200/50 sticky top-4 z-50 gap-y-4">
-        <div className="flex items-center gap-3 order-1">
-          <div className="w-10 h-10 bg-linear-to-br from-brand-orange to-[#ff9f7c] rounded-xl flex items-center justify-center shadow-lg shadow-brand-orange/30 border-t border-white/20 shrink-0">
-            <Zap className="text-white fill-white" size={22} />
+    <div className="min-h-screen bg-surface-muted p-4 md:p-8 font-sans antialiased text-text-main">
+      <header className="max-w-7xl mx-auto flex items-center justify-between mb-8 bg-surface-white/90 backdrop-blur-md px-6 py-4 rounded-[28px] border border-white shadow-lg sticky top-4 z-50">
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="w-12 h-12 bg-surface-white rounded-2xl flex items-center justify-center shadow-[4px_4px_10px_#d1d5db,-4px_-4px_10px_#ffffff] border border-white relative overflow-hidden group">
+            <svg
+              viewBox="0 0 512 512"
+              className="w-10 h-10 transition-transform duration-500 group-hover:scale-110"
+            >
+              <path
+                d="M256 120V256M256 256L140 380M256 256L372 380"
+                stroke="#1a1a1e"
+                strokeWidth="48"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M256 130V256M256 256L150 370M256 256L362 370"
+                stroke="#ff7d54"
+                strokeWidth="24"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <circle cx="256" cy="256" r="55" fill="#1a1a1e" />
+              <circle
+                cx="256"
+                cy="256"
+                r="30"
+                fill="#ff7d54"
+                className="animate-pulse"
+              />
+            </svg>
           </div>
-          <span className="text-lg md:text-xl font-black tracking-tighter text-gray-800 hidden sm:block">
-            Ostrich-Legs
-          </span>
-          <div
-            className={`ml-2 md:ml-4 px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5 border transition-colors ${isConnected ? "bg-green-50 text-green-600 border-green-200" : "bg-red-50 text-red-500 border-red-200"}`}
-          >
-            {isConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
-            {isConnected ? "ONLINE" : "OFFLINE"}
+          <div className="hidden sm:block">
+            <span className="text-lg md:text-xl font-black tracking-tighter text-gray-800">
+              Ostrich-Legs
+            </span>
+            <div
+              className={`flex items-center gap-1.5 text-[9px] font-bold ${isConnected ? "text-green-600" : "text-red-500"}`}
+            >
+              {isConnected ? <Wifi size={10} /> : <WifiOff size={10} />}
+              {isConnected ? "CONNECTED" : "OFFLINE"}
+            </div>
           </div>
         </div>
 
-        <nav className="flex items-center gap-1 bg-gray-100/80 p-1.5 rounded-2xl shadow-inner border border-gray-200/50 order-3 md:order-2 w-full md:w-auto">
+        {/* --- THE BEAUTIFUL TABS ARE BACK --- */}
+        <nav className="hidden md:flex items-center gap-1 bg-gray-100/80 p-1.5 rounded-2xl shadow-inner border border-gray-200/50">
           {["Dashboard", "Monitoring"].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 md:flex-none px-4 md:px-6 py-2 rounded-xl text-xs font-bold transition-all duration-200 text-center ${activeTab === tab ? "bg-white text-brand-orange shadow-sm border border-gray-100 scale-100" : "text-text-muted hover:text-text-main hover:bg-white/50 scale-95"}`}
+              className={`px-6 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${activeTab === tab ? "bg-white text-brand-orange shadow-sm border border-gray-100" : "text-text-muted hover:text-text-main"}`}
             >
               {tab}
             </button>
           ))}
         </nav>
 
-        <div className="flex items-center gap-4 order-2 md:order-3">
+        <div className="flex items-center gap-2">
+          {/* Persistent Leave button for all connected states */}
+          {isConnected && (
+            <button
+              onClick={leaveSwarm}
+              className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-xl text-[10px] font-black border border-red-100 hover:bg-red-100 transition-all mr-2 uppercase tracking-widest shadow-sm active:scale-95"
+            >
+              <LogOut size={14} />
+              {isGuest ? "Leave Swarm" : "Exit Session"}
+            </button>
+          )}
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 group cursor-pointer hover:bg-gray-100 p-2 rounded-xl transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
           >
-            <Share2
-              size={20}
-              className="text-text-muted group-hover:scale-110 transition-transform"
-            />
+            <Share2 size={20} className="text-text-muted" />
           </button>
         </div>
       </header>
@@ -3290,16 +3681,16 @@ export default function App() {
       <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 pb-12">
         {activeTab === "Dashboard" ? (
           <>
-            <div className="lg:col-span-8 space-y-8 min-w-0 flex flex-col">
+            <div className="lg:col-span-8 space-y-8 flex flex-col">
               <VelocityMonitor
                 velocity={snapshot.stats.globalVelocity}
-                throttle={throttle}
+                throttle={localThrottle}
               />
               <ResourceStats
                 stats={snapshot.stats}
                 onlineCount={devices.length}
               />
-              <div className="flex-1 min-h-75">
+              <div className="flex-1 min-h-100">
                 <ActiveSwarm
                   devices={devices}
                   onBenchmark={runLocalBenchmark}
@@ -3308,7 +3699,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="lg:col-span-4 space-y-8 min-w-0">
+            <div className="lg:col-span-4 space-y-8">
               <JobGauge
                 total={snapshot.stats.totalJobs}
                 completed={snapshot.stats.completedJobs}
@@ -3319,8 +3710,8 @@ export default function App() {
                 onStop={() => setRunState("STOPPED")}
               />
               <ThrottleControl
-                value={throttle}
-                onChange={setThrottle}
+                value={localThrottle}
+                onChange={handleThrottleChange}
                 totalGPUs={totalResources.totalGPUs}
                 totalCores={totalResources.totalCores}
                 totalMemory={totalResources.totalMemory}

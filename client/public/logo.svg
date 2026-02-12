@@ -1,0 +1,28 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="metal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fcfcfd" />
+      <stop offset="100%" style="stop-color:#d1d5db" />
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#ff7d54" />
+      <stop offset="100%" style="stop-color:#ffb09c" />
+    </radialGradient>
+    <filter id="neo-shadow" x="-20%" y="-20%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="12" stdDeviation="15" flood-color="#ff7d54" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <circle cx="256" cy="256" r="220" fill="url(#metal)" stroke="#ffffff" stroke-width="8" />
+  <circle cx="256" cy="256" r="200" fill="transparent" stroke="rgba(0,0,0,0.03)" stroke-width="20" />
+
+  <g filter="url(#neo-shadow)">
+    <path d="M256 120V256M256 256L140 380M256 256L372 380" stroke="#1a1a1e" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M256 130V256M256 256L150 370M256 256L362 370" stroke="url(#glow)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <circle cx="256" cy="256" r="50" fill="#1a1a1e" />
+  <circle cx="256" cy="256" r="30" fill="url(#glow)">
+    <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" />
+  </circle>
+</svg>

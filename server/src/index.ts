@@ -19,28 +19,25 @@ const swarmThrottles = new Map<string, number>();
 
 console.log("🚀 Ostrich Swarm Coordinator Online");
 
+// server/src/index.ts - Line 113
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
   const persistentId = socket.handshake.query.persistentId as string;
-  const origin = socket.handshake.headers.origin || "";
 
-  const isTrulyLocal =
-    origin.includes("localhost") || origin.includes("127.0.0.1");
-
-  if (isTrulyLocal) {
+  // If no token, this user is the "Host" of their own swarm (based on their ID)
+  if (!token) {
     socket.data.swarmId = persistentId;
     return next();
   }
 
-  if (token) {
-    const targetSwarm = authManager.validateToken(token);
-    if (targetSwarm) {
-      socket.data.swarmId = targetSwarm;
-      return next();
-    }
+  // If token exists, validate it to join someone else's swarm
+  const targetSwarm = authManager.validateToken(token);
+  if (targetSwarm) {
+    socket.data.swarmId = targetSwarm;
+    return next();
   }
 
-  return next(new Error("AUTH_REQUIRED"));
+  return next(new Error("INVALID_TOKEN"));
 });
 
 io.on("connection", (socket) => {
@@ -70,11 +67,48 @@ io.on("connection", (socket) => {
     deviceManager.heartbeat(persistentId, data);
   });
 
-  socket.on("device:register", (data) => {
-    deviceManager.register(persistentId, data.name, data.capabilities, swarmId);
-    broadcastState();
+  // --- THE MISSING DISPATCHER ---
+  socket.on("job:request_batch", () => {
+    const currentState = swarmStates.get(swarmId);
+    // 1. Only give jobs if the swarm is actually RUNNING
+    if (currentState !== "RUNNING") return;
+
+    const device = deviceManager.getDevice(persistentId);
+    if (!device || device.status !== "ONLINE") return;
+
+    // 2. Pull jobs from the scheduler specifically for this device
+    const batch = [];
+    const BATCH_SIZE = 5;
+
+    for (let i = 0; i < BATCH_SIZE; i++) {
+      const job = jobScheduler.getJobForDevice(device);
+      if (job) batch.push(job);
+    }
+
+    // 3. Dispatch to client
+    if (batch.length > 0) {
+      socket.emit("job:batch", batch);
+    }
   });
 
+  socket.on("job:complete", (payload: { chunkId: string; error?: string }) => {
+    // 1. Increment Global Stats
+    if (!payload.error) {
+      swarmCompletedCounts.set(
+        swarmId,
+        (swarmCompletedCounts.get(swarmId) || 0) + 1,
+      );
+    }
+
+    // 2. Increment Device-Specific Stats (FIXES THE "0 JOBS DONE" ON NODES)
+    const device = deviceManager.getDevice(persistentId);
+    if (device && !payload.error) {
+      device.totalJobsCompleted++;
+    }
+
+    // 3. Trigger immediate broadcast to keep UI snappy
+    broadcastState();
+  });
   socket.on("cmd:set_run_state", (state) => {
     swarmStates.set(swarmId, state);
     broadcastState();
@@ -84,21 +118,31 @@ io.on("connection", (socket) => {
     deviceManager.toggleDevice(id, enabled);
     broadcastState();
   });
-
-  socket.on("job:complete", () => {
-    swarmCompletedCounts.set(
-      swarmId,
-      (swarmCompletedCounts.get(swarmId) || 0) + 1,
-    );
+  socket.on("device:register", (data) => {
+    deviceManager.register(persistentId, data.name, data.capabilities, swarmId);
+    // Explicitly revive status if it was stuck in OFFLINE/DISABLED
     const device = deviceManager.getDevice(persistentId);
-    if (device) device.totalJobsCompleted++;
+    if (device) device.status = "ONLINE";
+
+    console.log(
+      `[REG] Node ${data.name} (${persistentId}) joined swarm ${swarmId}`,
+    );
+    broadcastState();
   });
 
   socket.on("job:request_batch", () => {
-    if (swarmStates.get(swarmId) !== "RUNNING") return;
-
+    const currentState = swarmStates.get(swarmId);
     const device = deviceManager.getDevice(persistentId);
-    if (!device || device.status !== "ONLINE") return;
+
+    if (currentState !== "RUNNING") {
+      // Quiet return, we don't want to spam if paused
+      return;
+    }
+
+    if (!device) {
+      console.log(`[ERR] Request from unknown device: ${persistentId}`);
+      return;
+    }
 
     const batch = [];
     for (let i = 0; i < 5; i++) {
@@ -106,7 +150,15 @@ io.on("connection", (socket) => {
       if (job) batch.push(job);
     }
 
-    if (batch.length > 0) socket.emit("job:batch", batch);
+    if (batch.length > 0) {
+      console.log(
+        `[JOBS] Dispatched ${batch.length} tasks to ${device.name} (${persistentId})`,
+      );
+      socket.emit("job:batch", batch);
+    } else {
+      // Log this so you know if the JobScheduler is empty
+      console.log(`[WARN] Queue empty for ${device.name}`);
+    }
   });
 
   socket.on("benchmark:result", (data) => {
