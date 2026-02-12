@@ -129,6 +129,17 @@ io.on("connection", (socket) => {
     }
   });
 
+  // --- ADD THIS HANDLER ---
+  socket.on("auth:generate_token", (callback: (token: string) => void) => {
+    try {
+      const token = authManager.generateToken(swarmId);
+      systemLog(swarmId, "SYS", `Generated new invite code: ${token}`, "AUTH");
+      callback(token);
+    } catch (err) {
+      console.error("Token generation error:", err);
+      callback("");
+    }
+  });
   // Swarm Controls
   socket.on(SocketEvents.SWARM_SET_STATE, (state) => {
     swarmStates.set(swarmId, state);
@@ -150,6 +161,33 @@ io.on("connection", (socket) => {
       persistentId,
     );
     broadcastState(swarmId);
+  });
+  // server/src/index.ts -> inside io.on("connection")
+
+  // server/src/index.ts -> inside io.on("connection")
+
+  // --- ADD THIS HANDLER TO THE SERVER ---
+  socket.on(
+    "cmd:toggle_device",
+    ({ id, enabled }: { id: string; enabled: boolean }) => {
+      deviceManager.toggleDevice(id, enabled);
+
+      systemLog(
+        swarmId,
+        enabled ? "SYS" : "WARN",
+        `Node ${id.slice(0, 8)} was ${enabled ? "enabled" : "disabled"} by Master`,
+        "ORCHESTRATOR",
+      );
+
+      // Force update to all nodes so the UI updates immediately
+      broadcastState(swarmId);
+    },
+  );
+
+  // --- ADD THIS HANDLER FOR THE GENERATOR ---
+  socket.on("auth:generate_token", (callback: (token: string) => void) => {
+    const token = authManager.generateToken(swarmId);
+    callback(token);
   });
 
   socket.on("disconnect", () => {

@@ -58,15 +58,17 @@ export const useSwarmEngine = (persistentId: string) => {
       const inviteToken =
         manualToken ||
         new URLSearchParams(window.location.search).get("invite");
-      const serverUrl = window.location.hostname.includes("trycloudflare.com")
-        ? "/"
-        : "http://localhost:3000";
+      // Cloudflare Tunnel Detection
+      const isTunnel = window.location.hostname.includes("trycloudflare.com");
+      const serverUrl = isTunnel ? "/" : "http://localhost:3000";
 
       socketRef.current = io(serverUrl, {
         query: { persistentId },
         auth: { token: inviteToken },
-        transports: ["websocket", "polling"],
+        transports: ["websocket"], // ❌ REMOVED 'polling' to prevent Cloudflare proxy overhead
         reconnection: true,
+        reconnectionAttempts: 15, // High for mobile stability
+        reconnectionDelay: 1000,
         path: "/socket.io/",
       });
 
@@ -105,20 +107,27 @@ export const useSwarmEngine = (persistentId: string) => {
         (data: SwarmSnapshot) => {
           const wasRunning = snapshot?.runState === "RUNNING";
           const isNowRunning = data.runState === "RUNNING";
-
           setSnapshot(data);
 
-          // KICKSTART: If swarm just started, request work
           if (!wasRunning && isNowRunning) {
-            addLog("SYS", "Swarm active. Requesting initial jobs...");
-            socketRef.current?.emit(SocketEvents.JOB_REQUEST_BATCH);
+            // 🚨 STAGGERED START: Don't choke the tunnel on mobile
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(
+              navigator.userAgent,
+            );
+            setTimeout(
+              () => {
+                socketRef.current?.emit(SocketEvents.JOB_REQUEST_BATCH);
+              },
+              isMobile ? 800 : 0,
+            );
           }
         },
       );
 
-      socketRef.current.on(SocketEvents.DISCONNECT, () => {
+      socketRef.current.on("disconnect", (reason) => {
         setIsConnected(false);
-        addLog("NET", "Connection Lost");
+        addLog("NET", `Link unstable: ${reason}. Attempting recovery...`);
+        // ❌ REMOVED: Do NOT redirect to home on disconnect
       });
     },
     [persistentId, addLog, snapshot?.runState],
@@ -156,9 +165,16 @@ export const useSwarmEngine = (persistentId: string) => {
     leaveSwarm: () => {
       window.location.href = window.location.origin;
     },
+    // client/src/hooks/useSwarmEngine.ts
     generateInviteToken: () =>
-      new Promise<string>((res) =>
-        socketRef.current?.emit("auth:generate_token", res),
-      ),
+      new Promise<string>((res) => {
+        if (socketRef.current?.connected) {
+          socketRef.current.emit("auth:generate_token", (token: string) => {
+            res(token);
+          });
+        } else {
+          res("");
+        }
+      }),
   };
 };

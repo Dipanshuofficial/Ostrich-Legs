@@ -86,90 +86,6 @@ shared/socket/states.ts
 <files>
 This section contains the contents of the repository's files.
 
-<file path="shared/socket/events.ts">
-export const SocketEvents = {
-  // Connection Lifecycle
-  CONNECT: "connect",
-  DISCONNECT: "disconnect",
-  CONNECTION_ERROR: "connect_error",
-
-  // Identity & Registration
-  DEVICE_REGISTER: "device:register",
-  DEVICE_READY: "device:ready",
-  HEARTBEAT: "heartbeat",
-
-  // Swarm Orchestration
-  SWARM_SNAPSHOT: "swarm:snapshot",
-  SWARM_SET_STATE: "cmd:set_run_state",
-  SWARM_SET_THROTTLE: "cmd:set_throttle",
-  SWARM_THROTTLE_SYNC: "swarm:throttle_sync",
-
-  // Job Pipeline
-  JOB_REQUEST_BATCH: "job:request_batch",
-  JOB_BATCH_DISPATCH: "job:batch",
-  JOB_COMPLETE: "job:complete",
-
-  // Diagnostics & Terminal
-  SYSTEM_LOG: "sys:log",
-  BENCHMARK_START: "cmd:run_benchmark",
-  BENCHMARK_RESULT: "benchmark:result",
-} as const;
-
-export type SocketEvent = (typeof SocketEvents)[keyof typeof SocketEvents];
-</file>
-
-<file path="shared/socket/payloads.ts">
-import { SwarmRunState, DeviceConnectionStatus, LogLevel } from "./states";
-
-export interface DeviceRegisterPayload {
-  name: string;
-  capabilities: {
-    cpuCores: number;
-    memoryGB: number;
-    gpuAvailable: boolean;
-    gpuName?: string;
-  };
-}
-
-export interface JobCompletePayload {
-  chunkId: string;
-  workerId: string;
-  result?: any;
-  error?: string;
-  durationMs?: number;
-}
-
-export interface SwarmSnapshotPayload {
-  runState: SwarmRunState;
-  devices: Record<string, any>; // Will be refined in Phase 2
-  stats: {
-    totalJobs: number;
-    completedJobs: number;
-    activeJobs: number;
-    globalVelocity: number;
-    globalThrottle: number;
-  };
-}
-</file>
-
-<file path="shared/socket/states.ts">
-// Strict states for the compute engine
-export type SwarmRunState = "IDLE" | "RUNNING" | "PAUSED" | "STOPPED";
-
-// Device lifecycle states
-export type DeviceConnectionStatus = "OFFLINE" | "ONLINE" | "BUSY" | "DISABLED";
-
-// Log levels for the Terminal
-export type LogLevel = "SYS" | "NET" | "CPU" | "GPU" | "ERR" | "WARN";
-
-export interface SystemLogPayload {
-  level: LogLevel;
-  message: string;
-  timestamp: number;
-  source?: string;
-}
-</file>
-
 <file path=".gitignore">
 node_modules/
 
@@ -1482,28 +1398,37 @@ export const ThrottleControl = ({
 
 <file path="server/src/managers/AuthManager.ts">
 export class AuthManager {
-  // Map token -> { swarmId: string, expiresAt: number }
   private activeTokens = new Map<
     string,
     { swarmId: string; expiresAt: number }
   >();
-  private readonly TOKEN_TTL_MS = 5 * 60 * 1000; // 5 Minutes for better UX
+  private readonly TOKEN_TTL_MS = 15 * 60 * 1000; // Increased to 15m for better UX
 
   constructor() {
-    setInterval(() => this.cleanup(), 10000);
+    setInterval(() => this.cleanup(), 30000);
   }
 
+  /**
+   * Generates a unique 6-digit alphanumeric token for a specific swarm.
+   */
   public generateToken(swarmId: string): string {
     const token = Math.random().toString(36).substring(2, 8).toUpperCase();
+
     this.activeTokens.set(token, {
       swarmId,
       expiresAt: Date.now() + this.TOKEN_TTL_MS,
     });
+
     return token;
   }
 
+  /**
+   * Validates a token and returns the associated swarmId.
+   * This is the "Party Join" mechanism.
+   */
   public validateToken(token: string): string | null {
     const data = this.activeTokens.get(token);
+
     if (!data) return null;
 
     if (Date.now() > data.expiresAt) {
@@ -1578,34 +1503,87 @@ export class JobScheduler {
 }
 </file>
 
-<file path="server/tsconfig.json">
-{
-  "compilerOptions": {
-    "target": "ES2023",
-    "lib": ["ES2023"],
-    "module": "ESNext",
-    "types": ["node"],
-    "skipLibCheck": true,
-    "baseUrl": ".",
-    "paths": {
-      "@shared/*": ["../shared/*"]
-    },
+<file path="shared/socket/events.ts">
+export const SocketEvents = {
+  // Connection Lifecycle
+  CONNECT: "connect",
+  DISCONNECT: "disconnect",
+  CONNECTION_ERROR: "connect_error",
 
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "moduleDetection": "force",
-    "noEmit": true,
+  // Identity & Registration
+  DEVICE_REGISTER: "device:register",
+  DEVICE_READY: "device:ready",
+  HEARTBEAT: "heartbeat",
 
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
-  }
+  // Swarm Orchestration
+  SWARM_SNAPSHOT: "swarm:snapshot",
+  SWARM_SET_STATE: "cmd:set_run_state",
+  SWARM_SET_THROTTLE: "cmd:set_throttle",
+  SWARM_THROTTLE_SYNC: "swarm:throttle_sync",
+
+  // Job Pipeline
+  JOB_REQUEST_BATCH: "job:request_batch",
+  JOB_BATCH_DISPATCH: "job:batch",
+  JOB_COMPLETE: "job:complete",
+
+  // Diagnostics & Terminal
+  SYSTEM_LOG: "sys:log",
+  BENCHMARK_START: "cmd:run_benchmark",
+  BENCHMARK_RESULT: "benchmark:result",
+} as const;
+
+export type SocketEvent = (typeof SocketEvents)[keyof typeof SocketEvents];
+</file>
+
+<file path="shared/socket/payloads.ts">
+import { SwarmRunState, DeviceConnectionStatus, LogLevel } from "./states";
+
+export interface DeviceRegisterPayload {
+  name: string;
+  capabilities: {
+    cpuCores: number;
+    memoryGB: number;
+    gpuAvailable: boolean;
+    gpuName?: string;
+  };
+}
+
+export interface JobCompletePayload {
+  chunkId: string;
+  workerId: string;
+  result?: any;
+  error?: string;
+  durationMs?: number;
+}
+
+export interface SwarmSnapshotPayload {
+  runState: SwarmRunState;
+  devices: Record<string, any>; // Will be refined in Phase 2
+  stats: {
+    totalJobs: number;
+    completedJobs: number;
+    activeJobs: number;
+    globalVelocity: number;
+    globalThrottle: number;
+  };
+}
+</file>
+
+<file path="shared/socket/states.ts">
+// Strict states for the compute engine
+export type SwarmRunState = "IDLE" | "RUNNING" | "PAUSED" | "STOPPED";
+
+// Device lifecycle states
+export type DeviceConnectionStatus = "OFFLINE" | "ONLINE" | "BUSY" | "DISABLED";
+
+// Log levels for the Terminal
+export type LogLevel = "SYS" | "NET" | "CPU" | "GPU" | "ERR" | "WARN";
+
+export interface SystemLogPayload {
+  level: LogLevel;
+  message: string;
+  timestamp: number;
+  source?: string;
 }
 </file>
 
@@ -1837,6 +1815,225 @@ export const ActiveSwarm = ({
 };
 </file>
 
+<file path="client/src/main.tsx">
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import "./core/theme.css";
+import App from "./App.tsx";
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+);
+</file>
+
+<file path="server/package.json">
+{
+  "name": "ostrich-server",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun src/index.ts"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "http": "^0.0.1-security",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.13",
+    "@types/express": "^4.17.17",
+    "@types/node": "^25.2.1",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.1.6"
+  }
+}
+</file>
+
+<file path="server/tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "types": ["node"],
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["../shared/*"]
+    },
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  }
+}
+</file>
+
+<file path="client/package.json">
+{
+  "name": "client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.33.0",
+    "html5-qrcode": "^2.3.8",
+    "lucide-react": "^0.563.0",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "recharts": "^3.7.0",
+    "socket.io-client": "^4.8.3",
+    "tailwind-merge": "^3.4.0",
+    "tailwindcss": "^4.1.18"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react-swc": "^4.2.2",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vite": "^7.2.4"
+  }
+}
+</file>
+
+<file path="client/src/features/dashboard/SwarmControls.tsx">
+import { Play, Pause, Square } from "lucide-react";
+import { Card } from "../../components/Card";
+
+interface SwarmControlsProps {
+  readonly status: "IDLE" | "RUNNING" | "PAUSED" | "STOPPED";
+  readonly onToggle: () => void;
+  readonly onStop: () => void;
+}
+
+export const SwarmControls = ({
+  status,
+  onToggle,
+  onStop,
+}: SwarmControlsProps) => {
+  // Use status prop directly, but add visual feedback
+  const isRunning = status === "RUNNING";
+
+  return (
+    <Card className="p-5 bg-surface-white">
+      <h3 className="font-bold text-sm text-text-muted uppercase tracking-widest mb-4">
+        Master Control
+      </h3>
+
+      <div className="grid grid-cols-2 gap-4">
+        <button
+          onClick={() => {
+            console.log("CLICKED TOGGLE"); // Debug log
+            onToggle();
+          }}
+          className={`
+            h-20 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-200 active:scale-[0.95]
+            ${
+              isRunning
+                ? "bg-surface-muted shadow-inner border border-transparent opacity-90"
+                : "bg-surface-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] border border-white hover:bg-gray-50"
+            }
+          `}
+        >
+          <div
+            className={`p-2 rounded-full transition-colors ${isRunning ? "bg-brand-orange text-white" : "text-text-muted bg-gray-100"}`}
+          >
+            {isRunning ? (
+              <Pause size={24} fill="currentColor" />
+            ) : (
+              <Play size={24} fill="currentColor" className="ml-0.5" />
+            )}
+          </div>
+          <span
+            className={`text-[10px] font-black uppercase ${isRunning ? "text-brand-orange" : "text-text-muted"}`}
+          >
+            {isRunning ? "Pause Swarm" : "Start Swarm"}
+          </span>
+        </button>
+
+        {/* Stop Button - Tactile Feel */}
+        {/* Kill Button - High Intensity Visuals */}
+        {/* Kill Button - High Intensity Visuals */}
+        <button
+          onClick={() => {
+            if (
+              window.confirm(
+                "KILL PROCESS? This will terminate all active local threads and reset the compute kernel.",
+              )
+            ) {
+              onStop();
+            }
+          }}
+          className={`
+            h-20 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98]
+            border hover:bg-red-50 group
+            ${
+              status === "STOPPED"
+                ? "bg-red-50 border-red-200 opacity-80"
+                : "bg-surface-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] border-white"
+            }
+          `}
+        >
+          <div
+            className={`p-2 transition-colors ${status === "STOPPED" ? "text-red-600" : "text-text-muted group-hover:text-red-500"}`}
+          >
+            <Square size={24} fill="currentColor" />
+          </div>
+          <span
+            className={`text-[10px] font-black uppercase ${status === "STOPPED" ? "text-red-600" : "text-text-muted group-hover:text-red-500"}`}
+          >
+            {status === "STOPPED" ? "System Killed" : "Kill Process"}
+          </span>
+        </button>
+      </div>
+
+      {/* Status LED Panel */}
+      <div className="mt-6 flex items-center justify-between bg-black/5 p-3 rounded-xl shadow-inner border border-black/5">
+        <span className="text-xs font-bold text-text-muted">System State</span>
+        <div className="flex items-center gap-2">
+          <div
+            className={`w-2 h-2 rounded-full ${isRunning ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]" : "bg-red-500"}`}
+          />
+          <span className="font-mono text-xs font-bold text-text-main">
+            {status}
+          </span>
+        </div>
+      </div>
+    </Card>
+  );
+};
+</file>
+
 <file path="client/src/features/dashboard/VelocityMonitor.tsx">
 import { useEffect, useRef } from "react";
 import { Card } from "../../components/Card";
@@ -2038,19 +2235,6 @@ export const LiveTerminal = ({ logs }: Props) => {
 };
 </file>
 
-<file path="client/src/main.tsx">
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
-import "./core/theme.css";
-import App from "./App.tsx";
-
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
-</file>
-
 <file path="client/tsconfig.app.json">
 {
   "compilerOptions": {
@@ -2085,178 +2269,285 @@ createRoot(document.getElementById("root")!).render(
 }
 </file>
 
-<file path="server/package.json">
-{
-  "name": "ostrich-server",
-  "version": "1.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "bun src/index.ts"
-  },
-  "dependencies": {
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
-    "http": "^0.0.1-security",
-    "socket.io": "^4.8.3"
-  },
-  "devDependencies": {
-    "@types/cors": "^2.8.13",
-    "@types/express": "^4.17.17",
-    "@types/node": "^25.2.1",
-    "ts-node": "^10.9.1",
-    "typescript": "^5.1.6"
-  }
-}
-</file>
-
-<file path="client/package.json">
-{
-  "name": "client",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite --host",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@tailwindcss/vite": "^4.1.18",
-    "clsx": "^2.1.1",
-    "framer-motion": "^12.33.0",
-    "html5-qrcode": "^2.3.8",
-    "lucide-react": "^0.563.0",
-    "qrcode.react": "^4.2.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "recharts": "^3.7.0",
-    "socket.io-client": "^4.8.3",
-    "tailwind-merge": "^3.4.0",
-    "tailwindcss": "^4.1.18"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "@types/node": "^24.10.1",
-    "@types/react": "^19.2.5",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react-swc": "^4.2.2",
-    "eslint": "^9.39.1",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.4.24",
-    "globals": "^16.5.0",
-    "typescript": "~5.9.3",
-    "typescript-eslint": "^8.46.4",
-    "vite": "^7.2.4"
-  }
-}
-</file>
-
-<file path="client/src/features/dashboard/SwarmControls.tsx">
-import { Play, Pause, Square } from "lucide-react";
+<file path="client/src/features/connection/DeviceConnector.tsx">
+import { QRCodeSVG } from "qrcode.react";
+import {
+  X,
+  Copy,
+  RefreshCw,
+  LogOut,
+  ArrowRight,
+  Camera,
+  Smartphone,
+} from "lucide-react";
 import { Card } from "../../components/Card";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { Html5Qrcode } from "html5-qrcode";
 
-interface SwarmControlsProps {
-  readonly status: "IDLE" | "RUNNING" | "PAUSED" | "STOPPED";
-  readonly onToggle: () => void;
-  readonly onStop: () => void;
+interface DeviceConnectorProps {
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly onRegenerateToken: () => Promise<string>;
+  readonly onManualJoin: (code: string) => void;
+  readonly onLeave: () => void;
+  readonly isGuest: boolean;
 }
 
-export const SwarmControls = ({
-  status,
-  onToggle,
-  onStop,
-}: SwarmControlsProps) => {
-  // Use status prop directly, but add visual feedback
-  const isRunning = status === "RUNNING";
+export const DeviceConnector = ({
+  isOpen,
+  onClose,
+  onRegenerateToken,
+  onManualJoin,
+  onLeave,
+  isGuest,
+}: DeviceConnectorProps) => {
+  const [token, setToken] = useState<string>("");
+  const [inputCode, setInputCode] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+
+  const handleRegenerate = useCallback(async () => {
+    if (isGuest || isLoading) return;
+    setIsLoading(true);
+    try {
+      const newToken = await onRegenerateToken();
+      setToken(newToken);
+    } catch (err) {
+      console.error("[UI] Token Generation Failed", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [onRegenerateToken, isGuest, isLoading]);
+
+  const stopScanner = useCallback(async () => {
+    if (scannerRef.current && scannerRef.current.isScanning) {
+      await scannerRef.current.stop();
+    }
+    setIsScanning(false);
+  }, []);
+
+  const startScanner = useCallback(async () => {
+    setIsScanning(true);
+    // Use a delay to ensure React has rendered the #reader div
+    setTimeout(async () => {
+      const element = document.getElementById("reader");
+      if (!element) {
+        console.error("[UI] Scanner div #reader not found");
+        setIsScanning(false);
+        return;
+      }
+
+      try {
+        const html5QrCode = new Html5Qrcode("reader");
+        scannerRef.current = html5QrCode;
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText) => {
+            const code = decodedText.includes("invite=")
+              ? decodedText.split("invite=")[1]
+              : decodedText;
+            stopScanner();
+            onManualJoin(code);
+            onClose();
+          },
+          () => {},
+        );
+      } catch (err) {
+        setIsScanning(false);
+      }
+    }, 150);
+  }, [onManualJoin, onClose, stopScanner]);
+
+  // Handle Token Generation on Open
+  useEffect(() => {
+    if (isOpen && !isGuest && !token && !isLoading) {
+      handleRegenerate();
+    }
+  }, [isOpen, isGuest, token, isLoading, handleRegenerate]);
+
+  // Cleanup Scanner on Close
+  useEffect(() => {
+    if (!isOpen && isScanning) {
+      stopScanner();
+    }
+  }, [isOpen, isScanning, stopScanner]);
+
+  if (!isOpen) return null;
 
   return (
-    <Card className="p-5 bg-surface-white">
-      <h3 className="font-bold text-sm text-text-muted uppercase tracking-widest mb-4">
-        Master Control
-      </h3>
-
-      <div className="grid grid-cols-2 gap-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-md p-6">
+      <Card
+        className="max-w-sm w-full relative p-6 space-y-6"
+        variant="elevated"
+      >
         <button
-          onClick={() => {
-            console.log("CLICKED TOGGLE"); // Debug log
-            onToggle();
-          }}
-          className={`
-            h-20 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-200 active:scale-[0.95]
-            ${
-              isRunning
-                ? "bg-surface-muted shadow-inner border border-transparent opacity-90"
-                : "bg-surface-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] border border-white hover:bg-gray-50"
-            }
-          `}
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
         >
-          <div
-            className={`p-2 rounded-full transition-colors ${isRunning ? "bg-brand-orange text-white" : "text-text-muted bg-gray-100"}`}
-          >
-            {isRunning ? (
-              <Pause size={24} fill="currentColor" />
-            ) : (
-              <Play size={24} fill="currentColor" className="ml-0.5" />
-            )}
-          </div>
-          <span
-            className={`text-[10px] font-black uppercase ${isRunning ? "text-brand-orange" : "text-text-muted"}`}
-          >
-            {isRunning ? "Pause Swarm" : "Start Swarm"}
-          </span>
+          <X size={18} className="text-text-muted" />
         </button>
 
-        {/* Stop Button - Tactile Feel */}
-        {/* Kill Button - High Intensity Visuals */}
-        {/* Kill Button - High Intensity Visuals */}
-        <button
-          onClick={() => {
-            if (
-              window.confirm(
-                "KILL PROCESS? This will terminate all active local threads and reset the compute kernel.",
-              )
-            ) {
-              onStop();
-            }
-          }}
-          className={`
-            h-20 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98]
-            border hover:bg-red-50 group
-            ${
-              status === "STOPPED"
-                ? "bg-red-50 border-red-200 opacity-80"
-                : "bg-surface-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] border-white"
-            }
-          `}
-        >
-          <div
-            className={`p-2 transition-colors ${status === "STOPPED" ? "text-red-600" : "text-text-muted group-hover:text-red-500"}`}
-          >
-            <Square size={24} fill="currentColor" />
-          </div>
-          <span
-            className={`text-[10px] font-black uppercase ${status === "STOPPED" ? "text-red-600" : "text-text-muted group-hover:text-red-500"}`}
-          >
-            {status === "STOPPED" ? "System Killed" : "Kill Process"}
-          </span>
-        </button>
-      </div>
+        <div className="text-center space-y-4">
+          <h3 className="text-xl font-bold">Swarm Access</h3>
 
-      {/* Status LED Panel */}
-      <div className="mt-6 flex items-center justify-between bg-black/5 p-3 rounded-xl shadow-inner border border-black/5">
-        <span className="text-xs font-bold text-text-muted">System State</span>
-        <div className="flex items-center gap-2">
-          <div
-            className={`w-2 h-2 rounded-full ${isRunning ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]" : "bg-red-500"}`}
-          />
-          <span className="font-mono text-xs font-bold text-text-main">
-            {status}
-          </span>
+          {isGuest ? (
+            <div className="p-4 bg-red-50 border border-red-100 rounded-2xl space-y-3">
+              <p className="text-[10px] font-black text-red-500 uppercase">
+                Swarm Guest Mode
+              </p>
+              <button
+                onClick={onLeave}
+                className="w-full flex items-center justify-center gap-2 bg-red-500 text-white py-3 rounded-xl font-bold text-xs hover:bg-red-600"
+              >
+                <LogOut size={14} /> Exit Swarm
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex bg-gray-100/80 p-1 rounded-2xl shadow-inner border border-gray-200/50 mx-auto w-fit">
+                <button
+                  onClick={stopScanner}
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${!isScanning ? "bg-white text-brand-orange shadow-sm" : "text-text-muted"}`}
+                >
+                  <Smartphone size={12} /> Share
+                </button>
+                <button
+                  onClick={startScanner}
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${isScanning ? "bg-white text-brand-orange shadow-sm" : "text-text-muted"}`}
+                >
+                  <Camera size={12} /> Scan
+                </button>
+              </div>
+
+              {!isScanning ? (
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                  <div className="relative inline-block p-4 bg-white border border-border-soft rounded-3xl shadow-sm">
+                    {isLoading && (
+                      <div className="absolute inset-0 z-10 bg-white/80 flex items-center justify-center rounded-3xl">
+                        <RefreshCw
+                          size={24}
+                          className="animate-spin text-brand-orange"
+                        />
+                      </div>
+                    )}
+                    {/* Fixed: QR only shows if token exists */}
+                    <QRCodeSVG
+                      value={
+                        token
+                          ? `${window.location.origin}/?invite=${token}`
+                          : "loading"
+                      }
+                      size={160}
+                      level="M"
+                      includeMargin
+                    />
+                  </div>
+
+                  <div className="bg-gray-100 p-3 rounded-xl border border-dashed flex items-center justify-between">
+                    <div className="text-left">
+                      <p className="text-[9px] font-black text-gray-400 uppercase">
+                        Join Code
+                      </p>
+                      <p className="font-mono font-bold text-brand-orange">
+                        {token || "GENERATING..."}
+                      </p>
+                    </div>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={handleRegenerate}
+                        className="p-2 hover:bg-white rounded-lg"
+                      >
+                        <RefreshCw
+                          size={16}
+                          className={isLoading ? "animate-spin" : ""}
+                        />
+                      </button>
+                      <button
+                        onClick={() =>
+                          token && navigator.clipboard.writeText(token)
+                        }
+                        className="p-2 hover:bg-white rounded-lg"
+                      >
+                        <Copy size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="animate-in fade-in zoom-in-95">
+                  <div className="relative w-full aspect-square max-w-60 mx-auto bg-black rounded-[40px] border-8 border-surface-white overflow-hidden shadow-inner">
+                    <div id="reader" className="w-full h-full" />
+                  </div>
+                  <p className="text-[10px] font-bold text-text-muted uppercase mt-4">
+                    Point at a Swarm QR Code
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      </div>
-    </Card>
+
+        <div className="border-t pt-6 space-y-3">
+          <p className="text-[10px] font-black text-text-muted uppercase tracking-widest text-left">
+            Manual Join
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              maxLength={6}
+              value={inputCode}
+              onChange={(e) => setInputCode(e.target.value.toUpperCase())}
+              placeholder="ENTER CODE"
+              className="flex-1 bg-gray-100 border border-border-soft rounded-xl px-4 py-3 font-mono font-bold text-sm focus:outline-brand-orange"
+            />
+            <button
+              onClick={() => {
+                onManualJoin(inputCode);
+                onClose();
+              }}
+              disabled={inputCode.length < 4}
+              className="bg-gray-900 text-white p-3 rounded-xl hover:bg-black disabled:opacity-50"
+            >
+              <ArrowRight size={20} />
+            </button>
+          </div>
+        </div>
+      </Card>
+    </div>
   );
+};
+</file>
+
+<file path="client/src/hooks/usePersistentIdentity.ts">
+import { useState, useEffect } from "react";
+
+export const usePersistentIdentity = () => {
+  const [identity, setIdentity] = useState({ id: "", name: "" });
+
+  useEffect(() => {
+    // 1. Check LocalStorage
+    let storedId = localStorage.getItem("ostrich_device_id");
+    let storedName = localStorage.getItem("ostrich_device_name");
+
+    // 2. Generate New ID if missing
+    if (!storedId) {
+      storedId = `node-${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem("ostrich_device_id", storedId);
+    }
+
+    // 3. Generate Name based on Platform
+    if (!storedName) {
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      storedName = isMobile ? "Mobile Node" : "Desktop Node";
+      localStorage.setItem("ostrich_device_name", storedName);
+    }
+
+    setIdentity({ id: storedId, name: storedName });
+  }, []);
+
+  return identity;
 };
 </file>
 
@@ -2267,10 +2558,7 @@ const TOTAL_CORES = navigator.hardwareConcurrency || 4;
 const RESERVED_CORES = TOTAL_CORES > 8 ? 2 : 1;
 const LOGICAL_CORES = Math.max(1, TOTAL_CORES - RESERVED_CORES);
 
-const threadPool = new Map<
-  number,
-  { worker: Worker; objectUrl: string; busy: boolean }
->();
+const threadPool = new Map();
 let throttleLimit = 0.3;
 let nextWorkerId = 0;
 
@@ -2296,6 +2584,7 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
 `;
 
 const createSubWorker = (_wId: number) => {
+  // CRITICAL: This block MUST be pure Vanilla JS. No TS 'as' or types.
   const code = `
     let device = null;
     let computePipeline = null;
@@ -2310,9 +2599,9 @@ const createSubWorker = (_wId: number) => {
     };
 
     async function initWebGPU() {
-      if (!(navigator).gpu) return false;
+      if (!navigator.gpu) return false;
       try {
-        const adapter = await (navigator as any).gpu.requestAdapter();
+        const adapter = await navigator.gpu.requestAdapter();
         if (!adapter) return false;
         device = await adapter.requestDevice();
         const shaderModule = device.createShaderModule({ code: \`${WGSL_SHADER}\` });
@@ -2337,11 +2626,8 @@ const createSubWorker = (_wId: number) => {
         const start = performance.now();
         let result = 0;
         try {
-          if (payload.type === "MAT_MUL" && gpuReady) {
-            result = 1; 
-          } else {
-            result = runCpuStress(payload.data?.iterations || 100000);
-          }
+          // Actual math execution
+          result = runCpuStress(payload.data?.iterations || 100000);
           self.postMessage({ type: "JOB_COMPLETE", chunkId: payload.id, result, durationMs: performance.now() - start });
         } catch (err) {
           self.postMessage({ type: "JOB_ERROR", chunkId: payload.id, error: err.message });
@@ -2373,16 +2659,6 @@ const applyConfig = () => {
       worker.onmessage = (ev) => self.postMessage(ev.data);
       threadPool.set(wId, { worker, objectUrl, busy: false });
     }
-  } else if (targetThreadCount < threadPool.size) {
-    const ids = Array.from(threadPool.keys()).slice(targetThreadCount);
-    ids.forEach((id) => {
-      const t = threadPool.get(id);
-      if (t) {
-        t.worker.terminate();
-        URL.revokeObjectURL(t.objectUrl);
-        threadPool.delete(id);
-      }
-    });
   }
 };
 
@@ -2396,11 +2672,14 @@ self.onmessage = (e) => {
     return;
   }
 
-  const freeWorker = Array.from(threadPool.values()).find((t) => !t.busy);
+  // Find free worker
+  const workers = Array.from(threadPool.values());
+  const freeWorker = workers.find((t) => !t.busy) || workers[0]; // Fallback to first if all busy
+
   if (freeWorker) {
     if (type === "EXECUTE_JOB") freeWorker.busy = true;
     const originalHandler = freeWorker.worker.onmessage;
-    freeWorker.worker.onmessage = (ev) => {
+    freeWorker.worker.onmessage = (ev: any) => {
       freeWorker.busy = false;
       freeWorker.worker.onmessage = originalHandler;
       self.postMessage(ev.data);
@@ -2575,7 +2854,11 @@ export class DeviceManager {
     let [totalCores, totalMemory, totalGPUs, onlineCount] = [0, 0, 0, 0];
 
     this.getDevicesBySwarm(swarmId).forEach((d) => {
-      if (d.status === "ONLINE" || d.status === "BUSY") {
+      if (
+        d.status === "ONLINE" ||
+        d.status === "BUSY" ||
+        d.status === "REGISTERED"
+      ) {
         totalCores += d.capabilities.cpuCores;
         totalMemory += d.capabilities.memoryGB;
         if (d.capabilities.gpuAvailable) totalGPUs++;
@@ -2612,284 +2895,6 @@ export class DeviceManager {
 }
 </file>
 
-<file path="client/src/features/connection/DeviceConnector.tsx">
-import { QRCodeSVG } from "qrcode.react";
-import {
-  X,
-  Copy,
-  RefreshCw,
-  LogOut,
-  ArrowRight,
-  Camera,
-  Smartphone,
-} from "lucide-react";
-import { Card } from "../../components/Card";
-import { useEffect, useState, useCallback, useRef } from "react";
-import { Html5Qrcode } from "html5-qrcode";
-
-interface DeviceConnectorProps {
-  readonly isOpen: boolean;
-  readonly onClose: () => void;
-  readonly onRegenerateToken: () => Promise<string>;
-  readonly onManualJoin: (code: string) => void;
-  readonly onLeave: () => void;
-  readonly isGuest: boolean;
-}
-
-export const DeviceConnector = ({
-  isOpen,
-  onClose,
-  onRegenerateToken,
-  onManualJoin,
-  onLeave,
-  isGuest,
-}: DeviceConnectorProps) => {
-  const [token, setToken] = useState<string>("");
-  const [inputCode, setInputCode] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-
-  const joinUrl = token
-    ? `${window.location.origin}/?invite=${token}`
-    : window.location.origin;
-
-  const handleRegenerate = useCallback(async () => {
-    if (isGuest || isLoading) return;
-    setIsLoading(true);
-    try {
-      const newToken = await onRegenerateToken();
-      setToken(newToken);
-    } catch (err) {
-      console.error("Token failed", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [onRegenerateToken, isGuest, isLoading]);
-  const startScanner = useCallback(async () => {
-    setIsScanning(true);
-    const html5QrCode = new Html5Qrcode("reader");
-    scannerRef.current = html5QrCode;
-
-    try {
-      await html5QrCode.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => {
-          // Extract token from URL or use raw text
-          const code = decodedText.includes("invite=")
-            ? decodedText.split("invite=")[1]
-            : decodedText;
-
-          stopScanner();
-          onManualJoin(code);
-          onClose();
-        },
-        () => {}, // Silent on errors
-      );
-    } catch (err) {
-      console.error("Camera failed", err);
-      setIsScanning(false);
-    }
-  }, [onManualJoin, onClose]);
-
-  const stopScanner = useCallback(async () => {
-    if (scannerRef.current && scannerRef.current.isScanning) {
-      await scannerRef.current.stop();
-      scannerRef.current.clear();
-    }
-    setIsScanning(false);
-  }, []);
-
-  // Clean up scanner on close
-  useEffect(() => {
-    if (!isOpen && isScanning) stopScanner();
-  }, [isOpen, isScanning, stopScanner]);
-
-  // FIXED: No more generating 10 tokens per second.
-  useEffect(() => {
-    if (isOpen && !isGuest && !token && !isLoading) {
-      handleRegenerate();
-    }
-  }, [isOpen, isGuest, token, isLoading, handleRegenerate]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-md p-6">
-      <Card
-        className="max-w-sm w-full relative p-6 space-y-6"
-        variant="elevated"
-      >
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
-        >
-          <X size={18} className="text-text-muted" />
-        </button>
-
-        <div className="text-center space-y-4">
-          <h3 className="text-xl font-bold">Swarm Access</h3>
-
-          {isGuest ? (
-            <div className="p-4 bg-red-50 border border-red-100 rounded-2xl space-y-3">
-              <p className="text-[10px] font-black text-red-500 uppercase">
-                Swarm Guest Mode
-              </p>
-              <button
-                onClick={onLeave}
-                className="w-full flex items-center justify-center gap-2 bg-red-500 text-white py-3 rounded-xl font-bold text-xs hover:bg-red-600 transition-all"
-              >
-                <LogOut size={14} /> Exit Swarm
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* Mode Toggle Tabs */}
-              <div className="flex bg-gray-100/80 p-1 rounded-2xl shadow-inner border border-gray-200/50 mx-auto w-fit">
-                <button
-                  onClick={() => {
-                    stopScanner();
-                    setIsScanning(false);
-                  }}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${!isScanning ? "bg-white text-brand-orange shadow-sm border border-gray-100" : "text-text-muted hover:text-text-main"}`}
-                >
-                  <Smartphone size={12} /> Share
-                </button>
-                <button
-                  onClick={startScanner}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${isScanning ? "bg-white text-brand-orange shadow-sm border border-gray-100" : "text-text-muted hover:text-text-main"}`}
-                >
-                  <Camera size={12} /> Scan
-                </button>
-              </div>
-
-              {!isScanning ? (
-                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <div className="relative inline-block p-4 bg-white border border-border-soft rounded-3xl shadow-sm">
-                    {isLoading && (
-                      <div className="absolute inset-0 z-10 bg-white/80 flex items-center justify-center rounded-3xl">
-                        <RefreshCw
-                          size={24}
-                          className="animate-spin text-brand-orange"
-                        />
-                      </div>
-                    )}
-                    <QRCodeSVG
-                      value={joinUrl}
-                      size={160}
-                      level="M"
-                      includeMargin
-                    />
-                  </div>
-
-                  <div className="bg-gray-100 p-3 rounded-xl border border-dashed flex items-center justify-between">
-                    <div className="text-left">
-                      <p className="text-[9px] font-black text-gray-400 uppercase">
-                        Your Join Code
-                      </p>
-                      <p className="font-mono font-bold text-brand-orange">
-                        {token || "..."}
-                      </p>
-                    </div>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={handleRegenerate}
-                        className="p-2 hover:bg-white rounded-lg transition-colors"
-                      >
-                        <RefreshCw
-                          size={16}
-                          className={isLoading ? "animate-spin" : ""}
-                        />
-                      </button>
-                      <button
-                        onClick={() => navigator.clipboard.writeText(token)}
-                        className="p-2 hover:bg-white rounded-lg transition-colors"
-                      >
-                        <Copy size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="animate-in fade-in zoom-in-95 duration-300">
-                  {/* Skeuomorphic Lens Container */}
-                  <div className="relative w-full aspect-square max-w-60 mx-auto bg-black rounded-[40px] border-8 border-surface-white shadow-[10px_10px_20px_#d1d5db,-10px_-10px_20px_#ffffff,inset_0_2px_10px_rgba(0,0,0,0.5)] overflow-hidden">
-                    <div id="reader" className="w-full h-full" />
-                    <div className="absolute inset-0 border-2 border-brand-orange/30 rounded-3xl pointer-events-none" />
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border border-white/20 rounded-2xl pointer-events-none" />
-                  </div>
-                  <p className="text-[10px] font-bold text-text-muted uppercase mt-4 tracking-widest">
-                    Point at a Swarm QR Code
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="border-t pt-6 space-y-3">
-          <p className="text-[10px] font-black text-text-muted uppercase text-left tracking-widest">
-            Join Remote Swarm
-          </p>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              maxLength={6}
-              value={inputCode}
-              onChange={(e) => setInputCode(e.target.value.toUpperCase())}
-              placeholder="ENTER CODE"
-              className="flex-1 bg-gray-100 border border-border-soft rounded-xl px-4 py-3 font-mono font-bold text-sm focus:outline-brand-orange"
-            />
-            <button
-              onClick={() => {
-                onManualJoin(inputCode);
-                onClose();
-              }}
-              disabled={inputCode.length < 4}
-              className="bg-gray-900 text-white p-3 rounded-xl disabled:opacity-50 hover:bg-black transition-all"
-            >
-              <ArrowRight size={20} />
-            </button>
-          </div>
-        </div>
-      </Card>
-    </div>
-  );
-};
-</file>
-
-<file path="client/src/hooks/usePersistentIdentity.ts">
-import { useState, useEffect } from "react";
-
-export const usePersistentIdentity = () => {
-  const [identity, setIdentity] = useState({ id: "", name: "" });
-
-  useEffect(() => {
-    // 1. Check LocalStorage
-    let storedId = localStorage.getItem("ostrich_device_id");
-    let storedName = localStorage.getItem("ostrich_device_name");
-
-    // 2. Generate New ID if missing
-    if (!storedId) {
-      storedId = `node-${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem("ostrich_device_id", storedId);
-    }
-
-    // 3. Generate Name based on Platform
-    if (!storedName) {
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      storedName = isMobile ? "Mobile Node" : "Desktop Node";
-      localStorage.setItem("ostrich_device_name", storedName);
-    }
-
-    setIdentity({ id: storedId, name: storedName });
-  }, []);
-
-  return identity;
-};
-</file>
-
 <file path="client/src/hooks/useSwarmEngine.ts">
 import { useEffect, useRef, useState, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
@@ -2898,20 +2903,12 @@ import { type LogLevel, type SystemLogPayload } from "@shared/socket/states";
 import { type SwarmSnapshot, type SwarmStatus, type Job } from "../core/types";
 import ComputeWorker from "../utils/compute.worker?worker";
 
-const getLocalSpecs = () => ({
-  cpuCores: navigator.hardwareConcurrency || 4,
-  memoryGB: (navigator as any).deviceMemory || 8,
-  gpuAvailable: !!(navigator as any).gpu,
-  gpuName: !!(navigator as any).gpu ? "WebGPU Adapter" : "N/A",
-});
-
 export const useSwarmEngine = (persistentId: string) => {
   const [snapshot, setSnapshot] = useState<SwarmSnapshot | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const socketRef = useRef<Socket | null>(null);
   const workerRef = useRef<Worker | null>(null);
-  const lastInteractionRef = useRef<number>(Date.now());
 
   const addLog = useCallback((level: LogLevel, message: string) => {
     const time = new Date().toLocaleTimeString().split(" ")[0];
@@ -2936,7 +2933,7 @@ export const useSwarmEngine = (persistentId: string) => {
             result,
             workerId: persistentId,
           });
-          socketRef.current?.emit(SocketEvents.JOB_REQUEST_BATCH);
+          socketRef.current?.emit(SocketEvents.JOB_REQUEST_BATCH); // Keep pipeline full
           break;
         case "JOB_ERROR":
           addLog("ERR", `Job ${chunkId} failed: ${error}`);
@@ -2959,8 +2956,9 @@ export const useSwarmEngine = (persistentId: string) => {
       const inviteToken =
         manualToken ||
         new URLSearchParams(window.location.search).get("invite");
-      const isTunnel = window.location.hostname.includes("trycloudflare.com");
-      const serverUrl = isTunnel ? "/" : "http://localhost:3000";
+      const serverUrl = window.location.hostname.includes("trycloudflare.com")
+        ? "/"
+        : "http://localhost:3000";
 
       socketRef.current = io(serverUrl, {
         query: { persistentId },
@@ -2976,11 +2974,15 @@ export const useSwarmEngine = (persistentId: string) => {
 
         socketRef.current?.emit(SocketEvents.DEVICE_REGISTER, {
           name: localStorage.getItem("ostrich_device_name") || "Local Node",
-          capabilities: getLocalSpecs(),
+          capabilities: {
+            cpuCores: navigator.hardwareConcurrency || 4,
+            memoryGB: (navigator as any).deviceMemory || 8,
+            gpuAvailable: !!(navigator as any).gpu,
+          },
         });
+        socketRef.current?.emit(SocketEvents.JOB_REQUEST_BATCH);
 
         workerRef.current?.postMessage({ type: "BENCHMARK" });
-        socketRef.current?.emit(SocketEvents.JOB_REQUEST_BATCH);
       });
 
       socketRef.current.on(
@@ -2999,23 +3001,25 @@ export const useSwarmEngine = (persistentId: string) => {
       socketRef.current.on(
         SocketEvents.SWARM_SNAPSHOT,
         (data: SwarmSnapshot) => {
+          const wasRunning = snapshot?.runState === "RUNNING";
+          const isNowRunning = data.runState === "RUNNING";
+
           setSnapshot(data);
+
+          // KICKSTART: If swarm just started, request work
+          if (!wasRunning && isNowRunning) {
+            addLog("SYS", "Swarm active. Requesting initial jobs...");
+            socketRef.current?.emit(SocketEvents.JOB_REQUEST_BATCH);
+          }
         },
       );
-
-      socketRef.current.on(SocketEvents.SWARM_THROTTLE_SYNC, (val: number) => {
-        workerRef.current?.postMessage({
-          type: "CONFIG_UPDATE",
-          payload: { throttle: val / 100 },
-        });
-      });
 
       socketRef.current.on(SocketEvents.DISCONNECT, () => {
         setIsConnected(false);
         addLog("NET", "Connection Lost");
       });
     },
-    [persistentId, addLog],
+    [persistentId, addLog, snapshot?.runState],
   );
 
   useEffect(() => {
@@ -3027,18 +3031,9 @@ export const useSwarmEngine = (persistentId: string) => {
       connect();
     }
 
-    const hb = setInterval(() => {
-      if (socketRef.current?.connected) {
-        socketRef.current.emit(SocketEvents.HEARTBEAT, {
-          lastInteraction: lastInteractionRef.current,
-        });
-      }
-    }, 3000);
-
     return () => {
       worker.terminate();
       socketRef.current?.disconnect();
-      clearInterval(hb);
     };
   }, [connect, persistentId, handleWorkerMessage]);
 
@@ -3059,10 +3054,17 @@ export const useSwarmEngine = (persistentId: string) => {
     leaveSwarm: () => {
       window.location.href = window.location.origin;
     },
+    // client/src/hooks/useSwarmEngine.ts
     generateInviteToken: () =>
-      new Promise<string>((res) =>
-        socketRef.current?.emit("auth:generate_token", res),
-      ),
+      new Promise<string>((res) => {
+        if (socketRef.current?.connected) {
+          socketRef.current.emit("auth:generate_token", (token: string) => {
+            res(token);
+          });
+        } else {
+          res("");
+        }
+      }),
   };
 };
 </file>
@@ -3085,6 +3087,7 @@ const deviceManager = new DeviceManager();
 const jobScheduler = new JobScheduler();
 const authManager = new AuthManager();
 
+const activeSwarmIds = new Set<string>();
 const swarmStates = new Map<string, SwarmSnapshot["runState"]>();
 const swarmCompletedCounts = new Map<string, number>();
 const swarmThrottles = new Map<string, number>();
@@ -3129,6 +3132,7 @@ io.use((socket, next) => {
 io.on("connection", (socket) => {
   const persistentId = socket.handshake.query.persistentId as string;
   const swarmId = socket.data.swarmId;
+  activeSwarmIds.add(swarmId);
 
   socket.join(swarmId);
   systemLog(
@@ -3221,6 +3225,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    // Check if room is empty before removing swarmId from broadcaster
+    const room = io.sockets.adapter.rooms.get(swarmId);
+    if (!room || room.size === 0) {
+      activeSwarmIds.delete(swarmId);
+    }
     systemLog(
       swarmId,
       "NET",
@@ -3265,9 +3274,15 @@ function broadcastState(swarmId: string) {
 
 // Tick all active swarms every 2s
 setInterval(() => {
-  for (const swarmId of swarmStates.keys()) {
-    broadcastState(swarmId);
-  }
+  activeSwarmIds.forEach((id) => {
+    // Only broadcast if there are actually sockets in that room
+    const room = io.sockets.adapter.rooms.get(id);
+    if (room && room.size > 0) {
+      broadcastState(id);
+    } else {
+      activeSwarmIds.delete(id);
+    }
+  });
 }, 2000);
 
 console.log("🚀 Ostrich Swarm Coordinator [PHASE 2] Online");
