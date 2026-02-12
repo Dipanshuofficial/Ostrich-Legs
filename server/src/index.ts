@@ -1,134 +1,153 @@
 import { Server } from "socket.io";
 import { DeviceManager } from "./managers/DeviceManager";
 import { JobScheduler } from "./managers/JobScheduler";
+import { AuthManager } from "./managers/AuthManager";
 import { type SwarmSnapshot } from "./core/types";
 
 const io = new Server(3000, {
   cors: { origin: "*" },
   transports: ["websocket", "polling"],
 });
+
 const deviceManager = new DeviceManager();
 const jobScheduler = new JobScheduler();
+const authManager = new AuthManager();
 
-// GLOBAL STATS
-let globalRunState: SwarmSnapshot["runState"] = "STOPPED";
-let globalCompletedCount = 0;
+const swarmStates = new Map<string, SwarmSnapshot["runState"]>();
+const swarmCompletedCounts = new Map<string, number>();
+const swarmThrottles = new Map<string, number>();
 
 console.log("🚀 Ostrich Swarm Coordinator Online");
 
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+  const persistentId = socket.handshake.query.persistentId as string;
+  const origin = socket.handshake.headers.origin || "";
+
+  const isTrulyLocal =
+    origin.includes("localhost") || origin.includes("127.0.0.1");
+
+  if (isTrulyLocal) {
+    socket.data.swarmId = persistentId;
+    return next();
+  }
+
+  if (token) {
+    const targetSwarm = authManager.validateToken(token);
+    if (targetSwarm) {
+      socket.data.swarmId = targetSwarm;
+      return next();
+    }
+  }
+
+  return next(new Error("AUTH_REQUIRED"));
+});
+
 io.on("connection", (socket) => {
   const persistentId = socket.handshake.query.persistentId as string;
+  const swarmId = socket.data.swarmId;
 
-  socket.on("heartbeat", (data) => deviceManager.heartbeat(persistentId, data));
+  socket.join(swarmId);
+
+  if (!swarmStates.has(swarmId)) {
+    swarmStates.set(swarmId, "STOPPED");
+    swarmCompletedCounts.set(swarmId, 0);
+  }
+
+  socket.on("cmd:set_throttle", (value: number) => {
+    swarmThrottles.set(swarmId, value);
+    // Broadcast to everyone in the room
+    io.to(swarmId).emit("swarm:throttle_sync", value);
+  });
+
+  socket.on("auth:generate_token", (callback) => {
+    const token = authManager.generateToken(swarmId);
+    if (typeof callback === "function") callback(token);
+  });
+
+  // FIX: Tie heartbeat specifically to the persistentId
+  socket.on("heartbeat", (data) => {
+    deviceManager.heartbeat(persistentId, data);
+  });
 
   socket.on("device:register", (data) => {
-    console.log(
-      `[REG] Device: ${data.name} | Cores: ${data.capabilities.cpuCores}`,
-    );
-    deviceManager.register(persistentId, data.name, data.capabilities);
+    deviceManager.register(persistentId, data.name, data.capabilities, swarmId);
     broadcastState();
   });
 
   socket.on("cmd:set_run_state", (state) => {
-    console.log(`[CMD] Swarm State Change: ${globalRunState} -> ${state}`);
-    globalRunState = state;
+    swarmStates.set(swarmId, state);
     broadcastState();
   });
 
   socket.on("cmd:toggle_device", ({ id, enabled }) => {
-    console.log(`[CMD] Toggle Node ${id}: ${enabled ? "ON" : "OFF"}`);
     deviceManager.toggleDevice(id, enabled);
     broadcastState();
   });
 
-  socket.on("job:complete", (data) => {
-    globalCompletedCount++;
-    const device = deviceManager
-      .getAllDevices()
-      .find((d) => d.id === persistentId);
+  socket.on("job:complete", () => {
+    swarmCompletedCounts.set(
+      swarmId,
+      (swarmCompletedCounts.get(swarmId) || 0) + 1,
+    );
+    const device = deviceManager.getDevice(persistentId);
     if (device) device.totalJobsCompleted++;
-
-    // Log failures
-    if (data.error) {
-      console.log(`[JOB] Failed: ${data.error}`);
-    }
   });
 
-  socket.on("cmd:trigger_benchmark", () => {
-    console.log("[CMD] Broadcasting Benchmark Request");
-    io.emit("cmd:run_benchmark");
-  });
-
-  // --- JOB BATCH REQUEST HANDLER ---
   socket.on("job:request_batch", () => {
-    if (globalRunState !== "RUNNING") return;
+    if (swarmStates.get(swarmId) !== "RUNNING") return;
 
-    const device = deviceManager
-      .getAllDevices()
-      .find((d) => d.id === persistentId);
+    const device = deviceManager.getDevice(persistentId);
     if (!device || device.status !== "ONLINE") return;
 
-    // Send a batch of 5 jobs at a time
     const batch = [];
     for (let i = 0; i < 5; i++) {
       const job = jobScheduler.getJobForDevice(device);
       if (job) batch.push(job);
     }
 
-    if (batch.length > 0) {
-      socket.emit("job:batch", batch);
-    }
-  });
-  socket.on("cmd:trigger_benchmark", () => {
-    console.log("[CMD] Broadcasting Benchmark Request");
-    io.emit("cmd:run_benchmark");
+    if (batch.length > 0) socket.emit("job:batch", batch);
   });
 
-  // --- MISSING HANDLER FIXED BELOW ---
   socket.on("benchmark:result", (data) => {
-    // 1. Log it so we know it arrived
-    console.log(`[BENCH] Update for ${persistentId}: ${data.score} OPS`);
-
-    // 2. Update the internal store
     deviceManager.updateScore(persistentId, data.score);
-
-    // 3. Force immediate broadcast to all clients
     broadcastState();
-  });
-  socket.on("device:disconnect", ({ id }) => {
-    console.log(`[NET] Device Disconnected: ${id}`);
-    deviceManager.remove(id);
-    broadcastState();
-  });
-  socket.on("disconnect", (reason) => {
-    console.log(`[NET] Client Disconnect: ${reason}`);
   });
 
   function broadcastState() {
-    const resources = deviceManager.getAvailableResources();
+    const resources = deviceManager.getAvailableResources(swarmId);
     const queue = jobScheduler.getQueueStats();
-    const allDevices = deviceManager.getAllDevices();
+    const allDevices = deviceManager.getDevicesBySwarm(swarmId);
+    const currentState = swarmStates.get(swarmId) || "STOPPED";
+    const completedCount = swarmCompletedCounts.get(swarmId) || 0;
+    const currentThrottle = swarmThrottles.get(swarmId) || 40;
 
     const totalOpsScore = allDevices
       .filter((d) => d.status === "ONLINE" || d.status === "BUSY")
       .reduce((sum, d) => sum + (d.opsScore || 0), 0);
 
     const snapshot: SwarmSnapshot = {
-      runState: globalRunState,
+      runState: currentState,
       devices: allDevices.reduce((acc, d) => ({ ...acc, [d.id]: d }), {}),
       stats: {
-        totalJobs: globalCompletedCount + queue.pending,
-        activeJobs: globalRunState === "RUNNING" ? resources.onlineCount : 0,
+        totalJobs: completedCount + queue.pending,
+        activeJobs: currentState === "RUNNING" ? resources.onlineCount : 0,
         pendingJobs: queue.pending,
-        completedJobs: globalCompletedCount,
-        globalVelocity: globalRunState === "RUNNING" ? totalOpsScore : 0,
+        completedJobs: completedCount,
+        globalVelocity: currentState === "RUNNING" ? totalOpsScore : 0,
+        globalThrottle: currentThrottle,
       },
       resources,
     };
 
-    io.emit("swarm:snapshot", snapshot);
+    io.to(swarmId).emit("swarm:snapshot", snapshot);
   }
 
-  // Broadcast frequently to keep UI snappy
-  setInterval(broadcastState, 500);
+  // Periodic room broadcast
+  const syncInterval = setInterval(broadcastState, 2000);
+
+  socket.on("disconnect", () => {
+    clearInterval(syncInterval);
+    // Note: deviceManager.cleanup() handles removing offline devices after a delay
+  });
 });

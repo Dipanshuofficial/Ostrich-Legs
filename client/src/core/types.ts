@@ -1,5 +1,4 @@
-/** * @priority Latest TypeScript Docs
- * Strict Domain Model for Ostrich Swarm
+/** * Strict Domain Model for Ostrich Swarm
  */
 
 export type SwarmStatus = "IDLE" | "RUNNING" | "PAUSED" | "STOPPED";
@@ -10,7 +9,7 @@ export interface DeviceCapabilities {
   cpuCores: number;
   memoryGB: number;
   gpuAvailable: boolean;
-  gpuName?: string; // Added for detail
+  gpuName?: string;
 }
 
 export interface DeviceInfo {
@@ -27,12 +26,19 @@ export interface DeviceInfo {
 export interface SwarmResources {
   totalCores: number;
   totalMemory: number;
-  totalGPUs: number; // Added GPU tracking
+  totalGPUs: number;
   onlineCount: number;
 }
 
+export interface Job {
+  id: string;
+  type: JobType;
+  complexity: number;
+  data: any;
+}
+
 export interface SwarmSnapshot {
-  runState: "IDLE" | "RUNNING" | "PAUSED" | "STOPPED";
+  runState: SwarmStatus;
   devices: Record<string, DeviceInfo>;
   stats: {
     totalJobs: number;
@@ -40,6 +46,7 @@ export interface SwarmSnapshot {
     pendingJobs: number;
     completedJobs: number;
     globalVelocity: number;
+    globalThrottle?: number;
   };
-  resources: SwarmResources; // <--- The missing property
+  resources: SwarmResources;
 }

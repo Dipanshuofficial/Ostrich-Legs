@@ -18,6 +18,7 @@ export interface DeviceInfo {
   totalJobsCompleted: number;
   lastHeartbeat: number;
   lastUserInteraction: number;
+  swarmId?: string;
 }
 
 export interface SwarmResources {
@@ -43,6 +44,7 @@ export interface SwarmSnapshot {
     pendingJobs: number;
     completedJobs: number;
     globalVelocity: number;
+    globalThrottle: number;
   };
   resources: SwarmResources;
 }

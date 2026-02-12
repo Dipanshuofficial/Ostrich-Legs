@@ -3,16 +3,20 @@ import { type DeviceInfo, type DeviceCapabilities } from "../core/types";
 export class DeviceManager {
   private devices = new Map<string, DeviceInfo>();
 
-  // TIMEOUTS
-  private OFFLINE_THRESHOLD = 10000; // 10s: Mark as Offline (Red)
-  private DELETE_THRESHOLD = 60000; // 60s: Garbage Collect (Delete)
+  // RELAXED THRESHOLDS for Tunneled Connections
+  private readonly OFFLINE_THRESHOLD = 30000; // 30s: Mark as Offline
+  private readonly DELETE_THRESHOLD = 90000; // 90s: Remove from memory
 
   constructor() {
-    // Run the reaper every 5 seconds
     setInterval(() => this.cleanup(), 5000);
   }
 
-  public register(id: string, name: string, caps: DeviceCapabilities) {
+  public register(
+    id: string,
+    name: string,
+    caps: DeviceCapabilities,
+    swarmId: string,
+  ) {
     const existing = this.devices.get(id);
     this.devices.set(id, {
       id,
@@ -23,38 +27,28 @@ export class DeviceManager {
       opsScore: existing?.opsScore || 0,
       totalJobsCompleted: existing?.totalJobsCompleted || 0,
       lastHeartbeat: Date.now(),
-      // New field:
       lastUserInteraction: Date.now(),
+      swarmId,
     });
   }
 
   public heartbeat(id: string, data?: { lastInteraction: number }) {
     const device = this.devices.get(id);
-    if (device) {
-      device.lastHeartbeat = Date.now();
+    if (!device) return;
 
-      // Update interaction time if provided
-      if (data?.lastInteraction) {
-        device.lastUserInteraction = data.lastInteraction; // (Add this to your DeviceInfo type if you want to display it)
-      }
+    device.lastHeartbeat = Date.now();
+    if (data?.lastInteraction)
+      device.lastUserInteraction = data.lastInteraction;
 
-      // Revive if it was offline (but not disabled)
-      if (device.status === "OFFLINE") {
-        device.status = "ONLINE";
-      }
+    // Revive if it was marked offline
+    if (device.status === "OFFLINE") {
+      device.status = "ONLINE";
     }
-  }
-
-  // Called when tab closes (Immediate removal)
-  public remove(id: string) {
-    this.devices.delete(id);
   }
 
   public toggleDevice(id: string, enabled: boolean) {
     const device = this.devices.get(id);
-    if (device) {
-      device.status = enabled ? "ONLINE" : "DISABLED";
-    }
+    if (device) device.status = enabled ? "ONLINE" : "DISABLED";
   }
 
   public updateScore(id: string, score: number) {
@@ -62,13 +56,16 @@ export class DeviceManager {
     if (device) device.opsScore = score;
   }
 
-  public getAvailableResources() {
-    let totalCores = 0;
-    let totalMemory = 0;
-    let totalGPUs = 0;
-    let onlineCount = 0;
+  public getDevicesBySwarm(swarmId: string) {
+    return Array.from(this.devices.values()).filter(
+      (d) => d.swarmId === swarmId,
+    );
+  }
 
-    this.devices.forEach((d) => {
+  public getAvailableResources(swarmId: string) {
+    let [totalCores, totalMemory, totalGPUs, onlineCount] = [0, 0, 0, 0];
+
+    this.getDevicesBySwarm(swarmId).forEach((d) => {
       if (d.status === "ONLINE" || d.status === "BUSY") {
         totalCores += d.capabilities.cpuCores;
         totalMemory += d.capabilities.memoryGB;
@@ -80,33 +77,26 @@ export class DeviceManager {
     return { totalCores, totalMemory, totalGPUs, onlineCount };
   }
 
-  public getAllDevices() {
-    return Array.from(this.devices.values());
+  public getDevice(id: string) {
+    return this.devices.get(id);
   }
 
-  // --- THE GARBAGE COLLECTOR ---
+  public remove(id: string) {
+    this.devices.delete(id);
+  }
+
   private cleanup() {
     const now = Date.now();
-
     this.devices.forEach((device, id) => {
-      const timeSinceHeartbeat = now - device.lastHeartbeat;
+      const diff = now - device.lastHeartbeat;
 
-      // 1. Hard Delete (Zombie Removal)
-      if (timeSinceHeartbeat > this.DELETE_THRESHOLD) {
-        console.log(`[REAPER] Removing dead node: ${device.name} (${id})`);
+      if (diff > this.DELETE_THRESHOLD) {
         this.devices.delete(id);
-        return;
-      }
-
-      // 2. Soft Offline (Mark Red)
-      if (
+      } else if (
         device.status !== "DISABLED" &&
-        timeSinceHeartbeat > this.OFFLINE_THRESHOLD
+        diff > this.OFFLINE_THRESHOLD
       ) {
-        if (device.status !== "OFFLINE") {
-          // console.log(`[WARN] Node offline: ${device.name}`);
-          device.status = "OFFLINE";
-        }
+        device.status = "OFFLINE";
       }
     });
   }
