@@ -79,8 +79,21 @@ export const VelocityMonitor = ({
       requestRef.current = requestAnimationFrame(animate);
     };
 
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(requestRef.current);
+      } else {
+        requestRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     requestRef.current = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(requestRef.current);
+
+    return () => {
+      cancelAnimationFrame(requestRef.current);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [velocity, throttle]);
 
   return (

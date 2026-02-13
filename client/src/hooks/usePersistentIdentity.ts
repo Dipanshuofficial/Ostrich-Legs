@@ -9,9 +9,10 @@ export const usePersistentIdentity = () => {
     let storedName = localStorage.getItem("ostrich_device_name");
 
     // 2. Generate New ID if missing
-    if (!storedId) {
-      storedId = `node-${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem("ostrich_device_id", storedId);
+    if (!storedId || storedId === "undefined") {
+      const newId = `node-${Math.random().toString(36).substring(2, 11)}`;
+      localStorage.setItem("ostrich_device_id", newId);
+      storedId = newId;
     }
 
     // 3. Generate Name based on Platform

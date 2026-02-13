@@ -764,6 +764,17 @@ export const Card = ({
     @apply bg-gray-200 rounded-full hover:bg-gray-300;
   }
 }
+@keyframes scan {
+  0% {
+    top: 10%;
+  }
+  50% {
+    top: 90%;
+  }
+  100% {
+    top: 10%;
+  }
+}
 </file>
 
 <file path="client/src/features/dashboard/JobGauge.tsx">
@@ -1396,58 +1407,6 @@ export const ThrottleControl = ({
 }
 </file>
 
-<file path="server/src/managers/AuthManager.ts">
-export class AuthManager {
-  private activeTokens = new Map<
-    string,
-    { swarmId: string; expiresAt: number }
-  >();
-  private readonly TOKEN_TTL_MS = 15 * 60 * 1000; // Increased to 15m for better UX
-
-  constructor() {
-    setInterval(() => this.cleanup(), 30000);
-  }
-
-  /**
-   * Generates a unique 6-digit alphanumeric token for a specific swarm.
-   */
-  public generateToken(swarmId: string): string {
-    const token = Math.random().toString(36).substring(2, 8).toUpperCase();
-
-    this.activeTokens.set(token, {
-      swarmId,
-      expiresAt: Date.now() + this.TOKEN_TTL_MS,
-    });
-
-    return token;
-  }
-
-  /**
-   * Validates a token and returns the associated swarmId.
-   * This is the "Party Join" mechanism.
-   */
-  public validateToken(token: string): string | null {
-    const data = this.activeTokens.get(token);
-
-    if (!data) return null;
-
-    if (Date.now() > data.expiresAt) {
-      this.activeTokens.delete(token);
-      return null;
-    }
-
-    return data.swarmId;
-  }
-
-  private cleanup() {
-    const now = Date.now();
-    for (const [token, data] of this.activeTokens.entries()) {
-      if (now > data.expiresAt) this.activeTokens.delete(token);
-    }
-  }
-}
-</file>
-
 <file path="server/src/managers/JobScheduler.ts">
 import { type Job, type DeviceInfo } from "../core/types";
 
@@ -1852,6 +1811,58 @@ createRoot(document.getElementById("root")!).render(
 }
 </file>
 
+<file path="server/src/managers/AuthManager.ts">
+export class AuthManager {
+  private activeTokens = new Map<
+    string,
+    { swarmId: string; expiresAt: number }
+  >();
+  private readonly TOKEN_TTL_MS = 15 * 60 * 1000; // Increased to 15m for better UX
+
+  constructor() {
+    setInterval(() => this.cleanup(), 30000);
+  }
+
+  /**
+   * Generates a unique 6-digit alphanumeric token for a specific swarm.
+   */
+  public generateToken(swarmId: string): string {
+    const token = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    this.activeTokens.set(token, {
+      swarmId,
+      expiresAt: Date.now() + this.TOKEN_TTL_MS,
+    });
+
+    return token;
+  }
+
+  /**
+   * Validates a token and returns the associated swarmId.
+   * This is the "Party Join" mechanism.
+   */
+  public validateToken(token: string): string | null {
+    const data = this.activeTokens.get(token);
+
+    if (!data) return null;
+
+    if (Date.now() > data.expiresAt) {
+      this.activeTokens.delete(token);
+      return null;
+    }
+
+    return data.swarmId;
+  }
+
+  private cleanup() {
+    const now = Date.now();
+    for (const [token, data] of this.activeTokens.entries()) {
+      if (now > data.expiresAt) this.activeTokens.delete(token);
+    }
+  }
+}
+</file>
+
 <file path="server/tsconfig.json">
 {
   "compilerOptions": {
@@ -1941,7 +1952,6 @@ export const SwarmControls = ({
   onToggle,
   onStop,
 }: SwarmControlsProps) => {
-  // Use status prop directly, but add visual feedback
   const isRunning = status === "RUNNING";
 
   return (
@@ -1951,22 +1961,28 @@ export const SwarmControls = ({
       </h3>
 
       <div className="grid grid-cols-2 gap-4">
+        {/* Start/Pause: Orange by default, Emerald on Hover */}
         <button
           onClick={() => {
-            console.log("CLICKED TOGGLE"); // Debug log
+            console.log("CLICKED TOGGLE");
             onToggle();
           }}
           className={`
             h-20 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-200 active:scale-[0.95]
+            border group
             ${
               isRunning
-                ? "bg-surface-muted shadow-inner border border-transparent opacity-90"
-                : "bg-surface-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] border border-white hover:bg-gray-50"
+                ? "bg-brand-orange/5 border-brand-orange/20 shadow-inner"
+                : "bg-surface-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] border-white hover:bg-emerald-50 hover:border-emerald-100"
             }
           `}
         >
           <div
-            className={`p-2 rounded-full transition-colors ${isRunning ? "bg-brand-orange text-white" : "text-text-muted bg-gray-100"}`}
+            className={`p-2 rounded-full transition-colors ${
+              isRunning
+                ? "bg-brand-orange text-white shadow-[0_0_10px_rgba(255,125,84,0.4)]"
+                : "text-text-muted bg-gray-100 group-hover:bg-emerald-100 group-hover:text-emerald-600"
+            }`}
           >
             {isRunning ? (
               <Pause size={24} fill="currentColor" />
@@ -1975,20 +1991,22 @@ export const SwarmControls = ({
             )}
           </div>
           <span
-            className={`text-[10px] font-black uppercase ${isRunning ? "text-brand-orange" : "text-text-muted"}`}
+            className={`text-[10px] font-black uppercase transition-colors ${
+              isRunning
+                ? "text-brand-orange"
+                : "text-text-muted group-hover:text-emerald-600"
+            }`}
           >
             {isRunning ? "Pause Swarm" : "Start Swarm"}
           </span>
         </button>
 
-        {/* Stop Button - Tactile Feel */}
-        {/* Kill Button - High Intensity Visuals */}
-        {/* Kill Button - High Intensity Visuals */}
+        {/* Kill Process: Gray by default, Red on Hover */}
         <button
           onClick={() => {
             if (
               window.confirm(
-                "KILL PROCESS? This will terminate all active local threads and reset the compute kernel.",
+                "KILL PROCESS? This will terminate all active local threads.",
               )
             ) {
               onStop();
@@ -1996,21 +2014,29 @@ export const SwarmControls = ({
           }}
           className={`
             h-20 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98]
-            border hover:bg-red-50 group
+            border group
             ${
               status === "STOPPED"
-                ? "bg-red-50 border-red-200 opacity-80"
-                : "bg-surface-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] border-white"
+                ? "bg-red-50 border-red-200 shadow-inner"
+                : "bg-surface-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] border-white hover:bg-red-50 hover:border-red-100"
             }
           `}
         >
           <div
-            className={`p-2 transition-colors ${status === "STOPPED" ? "text-red-600" : "text-text-muted group-hover:text-red-500"}`}
+            className={`p-2 rounded-full transition-colors ${
+              status === "STOPPED"
+                ? "bg-red-500 text-white"
+                : "text-text-muted bg-gray-100 group-hover:bg-red-100 group-hover:text-red-500"
+            }`}
           >
             <Square size={24} fill="currentColor" />
           </div>
           <span
-            className={`text-[10px] font-black uppercase ${status === "STOPPED" ? "text-red-600" : "text-text-muted group-hover:text-red-500"}`}
+            className={`text-[10px] font-black uppercase transition-colors ${
+              status === "STOPPED"
+                ? "text-red-600"
+                : "text-text-muted group-hover:text-red-600"
+            }`}
           >
             {status === "STOPPED" ? "System Killed" : "Kill Process"}
           </span>
@@ -2022,7 +2048,11 @@ export const SwarmControls = ({
         <span className="text-xs font-bold text-text-muted">System State</span>
         <div className="flex items-center gap-2">
           <div
-            className={`w-2 h-2 rounded-full ${isRunning ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]" : "bg-red-500"}`}
+            className={`w-2 h-2 rounded-full ${
+              isRunning
+                ? "bg-brand-orange shadow-[0_0_8px_rgba(255,125,84,0.8)]"
+                : "bg-red-500"
+            }`}
           />
           <span className="font-mono text-xs font-bold text-text-main">
             {status}
@@ -2116,8 +2146,21 @@ export const VelocityMonitor = ({
       requestRef.current = requestAnimationFrame(animate);
     };
 
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(requestRef.current);
+      } else {
+        requestRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     requestRef.current = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(requestRef.current);
+
+    return () => {
+      cancelAnimationFrame(requestRef.current);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [velocity, throttle]);
 
   return (
@@ -2269,257 +2312,6 @@ export const LiveTerminal = ({ logs }: Props) => {
 }
 </file>
 
-<file path="client/src/features/connection/DeviceConnector.tsx">
-import { QRCodeSVG } from "qrcode.react";
-import {
-  X,
-  Copy,
-  RefreshCw,
-  LogOut,
-  ArrowRight,
-  Camera,
-  Smartphone,
-} from "lucide-react";
-import { Card } from "../../components/Card";
-import { useEffect, useState, useCallback, useRef } from "react";
-import { Html5Qrcode } from "html5-qrcode";
-
-interface DeviceConnectorProps {
-  readonly isOpen: boolean;
-  readonly onClose: () => void;
-  readonly onRegenerateToken: () => Promise<string>;
-  readonly onManualJoin: (code: string) => void;
-  readonly onLeave: () => void;
-  readonly isGuest: boolean;
-}
-
-export const DeviceConnector = ({
-  isOpen,
-  onClose,
-  onRegenerateToken,
-  onManualJoin,
-  onLeave,
-  isGuest,
-}: DeviceConnectorProps) => {
-  const [token, setToken] = useState<string>("");
-  const [inputCode, setInputCode] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-
-  const handleRegenerate = useCallback(async () => {
-    if (isGuest || isLoading) return;
-    setIsLoading(true);
-    try {
-      const newToken = await onRegenerateToken();
-      setToken(newToken);
-    } catch (err) {
-      console.error("[UI] Token Generation Failed", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [onRegenerateToken, isGuest, isLoading]);
-
-  const stopScanner = useCallback(async () => {
-    if (scannerRef.current && scannerRef.current.isScanning) {
-      await scannerRef.current.stop();
-    }
-    setIsScanning(false);
-  }, []);
-
-  const startScanner = useCallback(async () => {
-    setIsScanning(true);
-    // Use a delay to ensure React has rendered the #reader div
-    setTimeout(async () => {
-      const element = document.getElementById("reader");
-      if (!element) {
-        console.error("[UI] Scanner div #reader not found");
-        setIsScanning(false);
-        return;
-      }
-
-      try {
-        const html5QrCode = new Html5Qrcode("reader");
-        scannerRef.current = html5QrCode;
-        await html5QrCode.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          (decodedText) => {
-            const code = decodedText.includes("invite=")
-              ? decodedText.split("invite=")[1]
-              : decodedText;
-            stopScanner();
-            onManualJoin(code);
-            onClose();
-          },
-          () => {},
-        );
-      } catch (err) {
-        setIsScanning(false);
-      }
-    }, 150);
-  }, [onManualJoin, onClose, stopScanner]);
-
-  // Handle Token Generation on Open
-  useEffect(() => {
-    if (isOpen && !isGuest && !token && !isLoading) {
-      handleRegenerate();
-    }
-  }, [isOpen, isGuest, token, isLoading, handleRegenerate]);
-
-  // Cleanup Scanner on Close
-  useEffect(() => {
-    if (!isOpen && isScanning) {
-      stopScanner();
-    }
-  }, [isOpen, isScanning, stopScanner]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-md p-6">
-      <Card
-        className="max-w-sm w-full relative p-6 space-y-6"
-        variant="elevated"
-      >
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
-        >
-          <X size={18} className="text-text-muted" />
-        </button>
-
-        <div className="text-center space-y-4">
-          <h3 className="text-xl font-bold">Swarm Access</h3>
-
-          {isGuest ? (
-            <div className="p-4 bg-red-50 border border-red-100 rounded-2xl space-y-3">
-              <p className="text-[10px] font-black text-red-500 uppercase">
-                Swarm Guest Mode
-              </p>
-              <button
-                onClick={onLeave}
-                className="w-full flex items-center justify-center gap-2 bg-red-500 text-white py-3 rounded-xl font-bold text-xs hover:bg-red-600"
-              >
-                <LogOut size={14} /> Exit Swarm
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="flex bg-gray-100/80 p-1 rounded-2xl shadow-inner border border-gray-200/50 mx-auto w-fit">
-                <button
-                  onClick={stopScanner}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${!isScanning ? "bg-white text-brand-orange shadow-sm" : "text-text-muted"}`}
-                >
-                  <Smartphone size={12} /> Share
-                </button>
-                <button
-                  onClick={startScanner}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${isScanning ? "bg-white text-brand-orange shadow-sm" : "text-text-muted"}`}
-                >
-                  <Camera size={12} /> Scan
-                </button>
-              </div>
-
-              {!isScanning ? (
-                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                  <div className="relative inline-block p-4 bg-white border border-border-soft rounded-3xl shadow-sm">
-                    {isLoading && (
-                      <div className="absolute inset-0 z-10 bg-white/80 flex items-center justify-center rounded-3xl">
-                        <RefreshCw
-                          size={24}
-                          className="animate-spin text-brand-orange"
-                        />
-                      </div>
-                    )}
-                    {/* Fixed: QR only shows if token exists */}
-                    <QRCodeSVG
-                      value={
-                        token
-                          ? `${window.location.origin}/?invite=${token}`
-                          : "loading"
-                      }
-                      size={160}
-                      level="M"
-                      includeMargin
-                    />
-                  </div>
-
-                  <div className="bg-gray-100 p-3 rounded-xl border border-dashed flex items-center justify-between">
-                    <div className="text-left">
-                      <p className="text-[9px] font-black text-gray-400 uppercase">
-                        Join Code
-                      </p>
-                      <p className="font-mono font-bold text-brand-orange">
-                        {token || "GENERATING..."}
-                      </p>
-                    </div>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={handleRegenerate}
-                        className="p-2 hover:bg-white rounded-lg"
-                      >
-                        <RefreshCw
-                          size={16}
-                          className={isLoading ? "animate-spin" : ""}
-                        />
-                      </button>
-                      <button
-                        onClick={() =>
-                          token && navigator.clipboard.writeText(token)
-                        }
-                        className="p-2 hover:bg-white rounded-lg"
-                      >
-                        <Copy size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="animate-in fade-in zoom-in-95">
-                  <div className="relative w-full aspect-square max-w-60 mx-auto bg-black rounded-[40px] border-8 border-surface-white overflow-hidden shadow-inner">
-                    <div id="reader" className="w-full h-full" />
-                  </div>
-                  <p className="text-[10px] font-bold text-text-muted uppercase mt-4">
-                    Point at a Swarm QR Code
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="border-t pt-6 space-y-3">
-          <p className="text-[10px] font-black text-text-muted uppercase tracking-widest text-left">
-            Manual Join
-          </p>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              maxLength={6}
-              value={inputCode}
-              onChange={(e) => setInputCode(e.target.value.toUpperCase())}
-              placeholder="ENTER CODE"
-              className="flex-1 bg-gray-100 border border-border-soft rounded-xl px-4 py-3 font-mono font-bold text-sm focus:outline-brand-orange"
-            />
-            <button
-              onClick={() => {
-                onManualJoin(inputCode);
-                onClose();
-              }}
-              disabled={inputCode.length < 4}
-              className="bg-gray-900 text-white p-3 rounded-xl hover:bg-black disabled:opacity-50"
-            >
-              <ArrowRight size={20} />
-            </button>
-          </div>
-        </div>
-      </Card>
-    </div>
-  );
-};
-</file>
-
 <file path="client/src/hooks/usePersistentIdentity.ts">
 import { useState, useEffect } from "react";
 
@@ -2644,7 +2436,13 @@ const createSubWorker = (_wId: number) => {
   `;
   const blob = new Blob([code], { type: "application/javascript" });
   const objectUrl = URL.createObjectURL(blob);
-  return { worker: new Worker(objectUrl), objectUrl };
+  const worker = new Worker(objectUrl);
+
+  // Cleanup the URL immediately after the worker is initialized to free memory
+  // The worker remains active as the browser has already loaded the script
+  URL.revokeObjectURL(objectUrl);
+
+  return { worker, objectUrl: "" }; // objectUrl no longer needed
 };
 
 const applyConfig = () => {
@@ -2895,12 +2693,286 @@ export class DeviceManager {
 }
 </file>
 
+<file path="client/src/features/connection/DeviceConnector.tsx">
+import { QRCodeSVG } from "qrcode.react";
+import {
+  X,
+  Copy,
+  RefreshCw,
+  LogOut,
+  ArrowRight,
+  Camera,
+  Smartphone,
+} from "lucide-react";
+import { Card } from "../../components/Card";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { Html5Qrcode } from "html5-qrcode";
+interface CameraConstraints extends MediaTrackConstraints {
+  focusMode?: string;
+  zoom?: number;
+}
+interface DeviceConnectorProps {
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly onRegenerateToken: () => Promise<string>;
+  readonly onManualJoin: (code: string) => void;
+  readonly onLeave: () => void;
+  readonly isConnected: boolean;
+  readonly isGuest: boolean;
+}
+
+export const DeviceConnector = ({
+  isOpen,
+  onClose,
+  onRegenerateToken,
+  onManualJoin,
+  onLeave,
+  isConnected,
+  isGuest,
+}: DeviceConnectorProps) => {
+  const [token, setToken] = useState<string>("");
+  const [inputCode, setInputCode] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+
+  const handleRegenerate = useCallback(async () => {
+    if (isGuest || isLoading) return;
+    setIsLoading(true);
+    try {
+      const newToken = await onRegenerateToken();
+      setToken(newToken);
+    } catch (err) {
+      console.error("[UI] Token Generation Failed", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [onRegenerateToken, isGuest, isLoading]);
+
+  const stopScanner = useCallback(async () => {
+    if (scannerRef.current && scannerRef.current.isScanning) {
+      await scannerRef.current.stop();
+    }
+    setIsScanning(false);
+  }, []);
+
+  const startScanner = useCallback(async () => {
+    setIsScanning(true);
+    // Use a delay to ensure React has rendered the #reader div
+    setTimeout(async () => {
+      const element = document.getElementById("reader");
+      if (!element) {
+        console.error("[UI] Scanner div #reader not found");
+        setIsScanning(false);
+        return;
+      }
+
+      try {
+        const html5QrCode = new Html5Qrcode("reader");
+        scannerRef.current = html5QrCode;
+        await html5QrCode.start(
+          { facingMode: { exact: "environment" } }, // Force back camera
+          {
+            fps: 20,
+            qrbox: { width: 220, height: 220 },
+            aspectRatio: 1.0,
+            videoConstraints: {
+              focusMode: "continuous",
+              zoom: 1.5, // Attempt to start slightly zoomed in for better focus
+            } as CameraConstraints,
+          },
+          (decodedText) => {
+            // Trim whitespace and handle potential full URLs if people use old codes
+            const code = decodedText.includes("invite=")
+              ? decodedText.split("invite=")[1].split("&")[0]
+              : decodedText.trim();
+
+            stopScanner();
+            onManualJoin(code); // Directly trigger the connection
+            onClose();
+          },
+          () => {},
+        );
+      } catch (err) {
+        setIsScanning(false);
+      }
+    }, 150);
+  }, [onManualJoin, onClose, stopScanner]);
+
+  // Handle Token Generation on Open
+  useEffect(() => {
+    if (isOpen && !isGuest && !token && !isLoading) {
+      handleRegenerate();
+    }
+  }, [isOpen, isGuest, token, isLoading, handleRegenerate]);
+
+  // Cleanup Scanner on Close
+  useEffect(() => {
+    if (!isOpen && isScanning) {
+      stopScanner();
+    }
+  }, [isOpen, isScanning, stopScanner]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-md p-6">
+      <Card
+        className="max-w-sm w-full relative p-6 space-y-6"
+        variant="elevated"
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
+        >
+          <X size={18} className="text-text-muted" />
+        </button>
+
+        <div className="text-center space-y-4">
+          <h3 className="text-xl font-bold">Swarm Access</h3>
+
+          {isGuest ? (
+            <div className="p-4 bg-red-50 border border-red-100 rounded-2xl space-y-3">
+              <p className="text-[10px] font-black text-red-500 uppercase">
+                Swarm Guest Mode
+              </p>
+              <button
+                onClick={onLeave}
+                className="w-full flex items-center justify-center gap-2 bg-red-500 text-white py-3 rounded-xl font-bold text-xs hover:bg-red-600"
+              >
+                <LogOut size={14} /> Exit Swarm
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex bg-gray-100/80 p-1 rounded-2xl shadow-inner border border-gray-200/50 mx-auto w-fit">
+                <button
+                  onClick={stopScanner}
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${!isScanning ? "bg-white text-brand-orange shadow-sm" : "text-text-muted"}`}
+                >
+                  <Smartphone size={12} /> Share
+                </button>
+                <button
+                  onClick={startScanner}
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${isScanning ? "bg-white text-brand-orange shadow-sm" : "text-text-muted"}`}
+                >
+                  <Camera size={12} /> Scan
+                </button>
+              </div>
+
+              {!isScanning ? (
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                  <div className="relative inline-block p-4 bg-white border border-border-soft rounded-3xl shadow-sm">
+                    {isLoading && (
+                      <div className="absolute inset-0 z-10 bg-white/80 flex items-center justify-center rounded-3xl">
+                        <RefreshCw
+                          size={24}
+                          className="animate-spin text-brand-orange"
+                        />
+                      </div>
+                    )}
+                    {/* Fixed: QR only shows if token exists */}
+                    <QRCodeSVG
+                      value={token || "OSTRICH_WAITING"} // Encode ONLY the token
+                      size={180}
+                      level="M"
+                      includeMargin
+                    />
+                  </div>
+
+                  <div className="bg-gray-100 p-3 rounded-xl border border-dashed flex items-center justify-between">
+                    <div className="text-left">
+                      <p className="text-[9px] font-black text-gray-400 uppercase">
+                        Join Code
+                      </p>
+                      <p className="font-mono font-bold text-brand-orange">
+                        {token || "GENERATING..."}
+                      </p>
+                    </div>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={handleRegenerate}
+                        className="p-2 hover:bg-white rounded-lg"
+                      >
+                        <RefreshCw
+                          size={16}
+                          className={isLoading ? "animate-spin" : ""}
+                        />
+                      </button>
+                      <button
+                        onClick={() =>
+                          token && navigator.clipboard.writeText(token)
+                        }
+                        className="p-2 hover:bg-white rounded-lg"
+                      >
+                        <Copy size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="animate-in fade-in zoom-in-95">
+                  <div className="relative w-full aspect-square max-w-60 mx-auto bg-black rounded-[40px] border-8 border-surface-white overflow-hidden shadow-inner">
+                    <div
+                      id="reader"
+                      className="w-full h-full [&_video]:object-cover [&_video]:rounded-[32px]"
+                    />
+                    {/* Scan overlay line */}
+                    <div className="absolute inset-0 border-2 border-brand-orange/30 rounded-[32px] pointer-events-none">
+                      <div className="absolute top-0 left-0 w-full h-2 bg-brand-orange/50 shadow-[0_0_15px_rgba(255,125,84,0.8)] animate-[scan_2s_linear_indefinite]" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] font-bold text-text-muted uppercase mt-4">
+                    Point at a Swarm QR Code
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t pt-6 space-y-3">
+          <p className="text-[10px] font-black text-text-muted uppercase tracking-widest text-left">
+            Manual Join
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              maxLength={6}
+              value={inputCode}
+              onChange={(e) => setInputCode(e.target.value.toUpperCase())}
+              placeholder="ENTER CODE"
+              className="flex-1 bg-gray-100 border border-border-soft rounded-xl px-4 py-3 font-mono font-bold text-sm focus:outline-brand-orange"
+            />
+            <button
+              onClick={() => {
+                onManualJoin(inputCode);
+                // Don't close immediately so user sees "Connecting"
+              }}
+              disabled={inputCode.length < 4 || !isConnected} // Optional: visual state
+              className="bg-gray-900 text-white p-3 rounded-xl hover:bg-black disabled:opacity-50 relative"
+            >
+              {!isConnected && inputCode.length >= 4 ? (
+                <RefreshCw size={20} className="animate-spin" />
+              ) : (
+                <ArrowRight size={20} />
+              )}
+            </button>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+};
+</file>
+
 <file path="client/src/hooks/useSwarmEngine.ts">
 import { useEffect, useRef, useState, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 import { SocketEvents } from "@shared/socket/events";
 import { type LogLevel, type SystemLogPayload } from "@shared/socket/states";
 import { type SwarmSnapshot, type SwarmStatus, type Job } from "../core/types";
+// Import the constructor directly
 import ComputeWorker from "../utils/compute.worker?worker";
 
 export const useSwarmEngine = (persistentId: string) => {
@@ -2949,30 +3021,50 @@ export const useSwarmEngine = (persistentId: string) => {
     [persistentId, addLog],
   );
 
+  // Track the current token to prevent redundant connections
+  const currentTokenRef = useRef<string | null>(null);
+
   const connect = useCallback(
     (manualToken?: string) => {
-      if (socketRef.current) socketRef.current.disconnect();
-
+      // If we are already connected to this specific token/swarm, do nothing
       const inviteToken =
         manualToken ||
-        new URLSearchParams(window.location.search).get("invite");
-      const serverUrl = window.location.hostname.includes("trycloudflare.com")
-        ? "/"
-        : "http://localhost:3000";
+        new URLSearchParams(window.location.search).get("invite") ||
+        "";
+      if (
+        socketRef.current?.connected &&
+        currentTokenRef.current === inviteToken &&
+        !manualToken
+      ) {
+        return;
+      }
 
-      socketRef.current = io(serverUrl, {
-        query: { persistentId },
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+
+      currentTokenRef.current = inviteToken;
+      const isTunnel = window.location.hostname.includes("trycloudflare.com");
+      const serverUrl = isTunnel
+        ? "/"
+        : `http://${window.location.hostname}:3000`;
+
+      const socket = io(serverUrl, {
+        query: { persistentId, token: inviteToken },
         auth: { token: inviteToken },
-        transports: ["websocket", "polling"],
+        transports: ["websocket"],
         reconnection: true,
+        reconnectionAttempts: 15,
         path: "/socket.io/",
       });
 
-      socketRef.current.on(SocketEvents.CONNECT, () => {
+      socketRef.current = socket;
+
+      socket.on(SocketEvents.CONNECT, () => {
         setIsConnected(true);
         addLog("NET", "Swarm Link Established");
 
-        socketRef.current?.emit(SocketEvents.DEVICE_REGISTER, {
+        socket.emit(SocketEvents.DEVICE_REGISTER, {
           name: localStorage.getItem("ostrich_device_name") || "Local Node",
           capabilities: {
             cpuCores: navigator.hardwareConcurrency || 4,
@@ -2980,62 +3072,96 @@ export const useSwarmEngine = (persistentId: string) => {
             gpuAvailable: !!(navigator as any).gpu,
           },
         });
-        socketRef.current?.emit(SocketEvents.JOB_REQUEST_BATCH);
 
+        // --- ADD HEARTBEAT EMITTER ---
+        const hbInterval = setInterval(() => {
+          if (socket.connected) {
+            socket.emit(SocketEvents.HEARTBEAT, {
+              lastInteraction: Date.now(),
+            });
+          }
+        }, 10000); // Every 10s
+
+        socket.on("disconnect", () => clearInterval(hbInterval));
+        // -----------------------------
+
+        socket.emit(SocketEvents.JOB_REQUEST_BATCH);
         workerRef.current?.postMessage({ type: "BENCHMARK" });
       });
 
-      socketRef.current.on(
-        SocketEvents.SYSTEM_LOG,
-        (payload: SystemLogPayload) => {
-          addLog(payload.level, payload.message);
-        },
-      );
+      // Add error feedback
+      socket.on("connect_error", (err) => {
+        setIsConnected(false);
+        addLog("ERR", `Connection failed: ${err.message}`);
+      });
 
-      socketRef.current.on(SocketEvents.JOB_BATCH_DISPATCH, (jobs: Job[]) => {
+      socket.on(SocketEvents.SYSTEM_LOG, (payload: SystemLogPayload) => {
+        addLog(payload.level, payload.message);
+      });
+
+      socket.on(SocketEvents.JOB_BATCH_DISPATCH, (jobs: Job[]) => {
         jobs.forEach((job) =>
           workerRef.current?.postMessage({ type: "EXECUTE_JOB", payload: job }),
         );
       });
 
-      socketRef.current.on(
-        SocketEvents.SWARM_SNAPSHOT,
-        (data: SwarmSnapshot) => {
-          const wasRunning = snapshot?.runState === "RUNNING";
-          const isNowRunning = data.runState === "RUNNING";
-
-          setSnapshot(data);
-
-          // KICKSTART: If swarm just started, request work
-          if (!wasRunning && isNowRunning) {
-            addLog("SYS", "Swarm active. Requesting initial jobs...");
-            socketRef.current?.emit(SocketEvents.JOB_REQUEST_BATCH);
+      socket.on(SocketEvents.SWARM_SNAPSHOT, (data: SwarmSnapshot) => {
+        setSnapshot((prev) => {
+          // Check if we just transitioned to RUNNING
+          if (prev?.runState !== "RUNNING" && data.runState === "RUNNING") {
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(
+              navigator.userAgent,
+            );
+            setTimeout(
+              () => {
+                socketRef.current?.emit(SocketEvents.JOB_REQUEST_BATCH);
+              },
+              isMobile ? 800 : 0,
+            );
           }
-        },
-      );
+          return data;
+        });
+      });
 
-      socketRef.current.on(SocketEvents.DISCONNECT, () => {
+      socket.on("disconnect", (reason) => {
         setIsConnected(false);
-        addLog("NET", "Connection Lost");
+        if (reason !== "io client disconnect") {
+          addLog("NET", `Link unstable: ${reason}.`);
+        }
       });
     },
-    [persistentId, addLog, snapshot?.runState],
+    [persistentId, addLog], // snapshot?.runState REMOVED
   );
 
+  // 1. Initialize Worker once on mount
   useEffect(() => {
     const worker = new ComputeWorker();
     workerRef.current = worker;
-    worker.onmessage = handleWorkerMessage;
-
-    if (persistentId && persistentId !== "loading-identity") {
-      connect();
-    }
 
     return () => {
       worker.terminate();
-      socketRef.current?.disconnect();
     };
-  }, [connect, persistentId, handleWorkerMessage]);
+  }, []);
+
+  // 2. Sync worker message handler whenever it changes
+  useEffect(() => {
+    if (workerRef.current) {
+      workerRef.current.onmessage = handleWorkerMessage;
+    }
+  }, [handleWorkerMessage]);
+
+  // 3. Primary Connection Logic (Single instance)
+  useEffect(() => {
+    if (persistentId && persistentId !== "loading-identity") {
+      connect();
+    }
+    return () => {
+      // Disconnect socket only on unmount or ID change
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+    };
+  }, [persistentId, connect]);
 
   return {
     snapshot,
@@ -3113,20 +3239,27 @@ const systemLog = (
 
 // Auth Middleware (as we fixed in Phase 0)
 io.use((socket, next) => {
-  const token = socket.handshake.auth.token;
+  // Priority: 1. Handshake Auth, 2. Query Parameter (Fallback for stability)
+  const token = socket.handshake.auth.token || socket.handshake.query.token;
   const persistentId = socket.handshake.query.persistentId as string;
 
-  if (!token) {
+  if (!persistentId) return next(new Error("MISSING_PERSISTENT_ID"));
+
+  // If no token is provided anywhere, this device is its own Master
+  if (!token || token === "null" || token === "undefined" || token === "") {
     socket.data.swarmId = persistentId;
     return next();
   }
 
-  const targetSwarm = authManager.validateToken(token);
+  const targetSwarm = authManager.validateToken(token as string);
   if (targetSwarm) {
     socket.data.swarmId = targetSwarm;
     return next();
   }
-  return next(new Error("INVALID_TOKEN"));
+
+  // Fallback: If token exists but is invalid/expired, join own swarm instead of dropping
+  socket.data.swarmId = persistentId;
+  return next();
 });
 
 io.on("connection", (socket) => {
@@ -3146,6 +3279,7 @@ io.on("connection", (socket) => {
   socket.on(SocketEvents.DEVICE_REGISTER, (data) => {
     deviceManager.register(persistentId, data.name, data.capabilities, swarmId);
     systemLog(swarmId, "SYS", `Node Registered: ${data.name}`, "AUTH");
+    deviceManager.heartbeat(persistentId);
     broadcastState(swarmId);
   });
 
@@ -3201,6 +3335,17 @@ io.on("connection", (socket) => {
     }
   });
 
+  // --- ADD THIS HANDLER ---
+  socket.on("auth:generate_token", (callback: (token: string) => void) => {
+    try {
+      const token = authManager.generateToken(swarmId);
+      systemLog(swarmId, "SYS", `Generated new invite code: ${token}`, "AUTH");
+      callback(token);
+    } catch (err) {
+      console.error("Token generation error:", err);
+      callback("");
+    }
+  });
   // Swarm Controls
   socket.on(SocketEvents.SWARM_SET_STATE, (state) => {
     swarmStates.set(swarmId, state);
@@ -3222,6 +3367,33 @@ io.on("connection", (socket) => {
       persistentId,
     );
     broadcastState(swarmId);
+  });
+  // server/src/index.ts -> inside io.on("connection")
+
+  // server/src/index.ts -> inside io.on("connection")
+
+  // --- ADD THIS HANDLER TO THE SERVER ---
+  socket.on(
+    "cmd:toggle_device",
+    ({ id, enabled }: { id: string; enabled: boolean }) => {
+      deviceManager.toggleDevice(id, enabled);
+
+      systemLog(
+        swarmId,
+        enabled ? "SYS" : "WARN",
+        `Node ${id.slice(0, 8)} was ${enabled ? "enabled" : "disabled"} by Master`,
+        "ORCHESTRATOR",
+      );
+
+      // Force update to all nodes so the UI updates immediately
+      broadcastState(swarmId);
+    },
+  );
+
+  // --- ADD THIS HANDLER FOR THE GENERATOR ---
+  socket.on("auth:generate_token", (callback: (token: string) => void) => {
+    const token = authManager.generateToken(swarmId);
+    callback(token);
   });
 
   socket.on("disconnect", () => {
@@ -3290,7 +3462,7 @@ console.log("🚀 Ostrich Swarm Coordinator [PHASE 2] Online");
 
 <file path="client/src/App.tsx">
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Wifi, WifiOff, Share2, LogOut } from "lucide-react";
+import { Wifi, Share2, LogOut, RefreshCw } from "lucide-react";
 import { useSwarmEngine } from "./hooks/useSwarmEngine";
 import { VelocityMonitor } from "./features/dashboard/VelocityMonitor";
 import { ActiveSwarm } from "./features/dashboard/ActiveSwarm";
@@ -3368,8 +3540,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-surface-muted p-4 md:p-8 font-sans antialiased text-text-main">
-      <header className="max-w-7xl mx-auto flex items-center justify-between mb-8 bg-surface-white/90 backdrop-blur-md px-6 py-4 rounded-[28px] border border-white shadow-lg sticky top-4 z-50">
-        <div className="flex items-center gap-3 shrink-0">
+      <header className=" max-w-7xl mx-auto flex items-center mb-8 bg-surface-white/90 backdrop-blur-md px-6 py-4 rounded-[32px] border border-white shadow-lg sticky top-4 z-50 w-full">
+        {/* Left: Identity - Forced to grow from 0 to share space equally */}
+        <div className="flex items-center gap-4 flex-1 basis-0">
           <div className="w-12 h-12 bg-surface-white rounded-2xl flex items-center justify-center shadow-soft-depth border border-white relative overflow-hidden group">
             <svg
               viewBox="0 0 512 512"
@@ -3399,47 +3572,62 @@ export default function App() {
               />
             </svg>
           </div>
-          <div className="hidden sm:block">
-            <span className="text-lg md:text-xl font-black tracking-tighter text-gray-800">
+          <div className="hidden sm:flex flex-col justify-center -space-y-1">
+            <span className="text-lg md:text-xl font-black tracking-tighter text-gray-800 leading-tight">
               Ostrich-Legs
             </span>
             <div
-              className={`flex items-center gap-1.5 text-[9px] font-bold ${isConnected ? "text-green-600" : "text-red-500"}`}
+              className={`flex items-center gap-1.5 text-[9px] font-bold transition-colors ${
+                isConnected ? "text-green-600" : "text-amber-500 animate-pulse"
+              }`}
             >
-              {isConnected ? <Wifi size={10} /> : <WifiOff size={10} />}
-              {isConnected ? "CONNECTED" : "OFFLINE"}
+              {isConnected ? (
+                <Wifi size={10} />
+              ) : (
+                <RefreshCw size={10} className="animate-spin" />
+              )}
+              {isConnected ? "CONNECTED" : "ESTABLISHING LINK..."}
             </div>
           </div>
-        </div>
 
-        <nav className="hidden md:flex items-center gap-1 bg-gray-100/80 p-1.5 rounded-2xl shadow-inner border border-gray-200/50">
-          {["Dashboard", "Monitoring"].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-6 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${activeTab === tab ? "bg-white text-brand-orange shadow-sm border border-gray-100" : "text-text-muted hover:text-text-main"}`}
-            >
-              {tab}
-            </button>
-          ))}
-        </nav>
+          {/* Center: Navigation - shrink-0 ensures it stays centered and doesn't compress */}
+          <nav className="absolute left-1/2 -translate-x-1/2 hidden lg:flex items-center gap-1 bg-gray-100/80 p-1.5 rounded-2xl shadow-inner border border-gray-200/50">
+            {["Dashboard", "Monitoring"].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-6 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
+                  activeTab === tab
+                    ? "bg-white text-brand-orange shadow-sm border border-gray-100"
+                    : "text-text-muted hover:text-text-main"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </nav>
 
-        <div className="flex items-center gap-2">
-          {isConnected && (
+          {/* Right: Actions */}
+
+          <div className="ml-auto flex items-center gap-3">
+            {isConnected && (
+              <button
+                onClick={leaveSwarm}
+                className="flex items-center gap-2.5 bg-red-50 text-red-600 px-5 py-2.5 rounded-2xl text-[11px] font-bold border border-red-100 hover:bg-red-500 hover:text-white transition-all uppercase tracking-wider shadow-sm active:scale-95"
+              >
+                <LogOut size={16} />
+                <span className="hidden sm:inline">
+                  {isGuest ? "Leave Swarm" : "Exit Session"}
+                </span>
+              </button>
+            )}
             <button
-              onClick={leaveSwarm}
-              className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-xl text-[10px] font-black border border-red-100 hover:bg-red-100 transition-all mr-2 uppercase tracking-widest shadow-sm active:scale-95"
+              onClick={() => setIsModalOpen(true)}
+              className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
             >
-              <LogOut size={14} />
-              {isGuest ? "Leave Swarm" : "Exit Session"}
+              <Share2 size={20} className="text-text-muted" />
             </button>
-          )}
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
-          >
-            <Share2 size={20} className="text-text-muted" />
-          </button>
+          </div>
         </div>
       </header>
 
@@ -3490,6 +3678,7 @@ export default function App() {
 
       <DeviceConnector
         isOpen={isModalOpen}
+        isConnected
         onClose={() => setIsModalOpen(false)}
         onRegenerateToken={generateInviteToken}
         onManualJoin={manualJoin}

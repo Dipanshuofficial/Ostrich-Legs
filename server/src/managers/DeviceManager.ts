@@ -2,9 +2,9 @@ import { type DeviceInfo, type DeviceCapabilities } from "../core/types";
 
 export class DeviceManager {
   private devices = new Map<string, DeviceInfo>();
-  private readonly OFFLINE_THRESHOLD = 30000;
-  private readonly DELETE_THRESHOLD = 90000;
-
+  // 60s for offline (allows for long reloads/bad signal), 5mins for full deletion
+  private readonly OFFLINE_THRESHOLD = 60000;
+  private readonly DELETE_THRESHOLD = 300000;
   constructor() {
     setInterval(() => this.cleanup(), 5000);
   }
@@ -20,8 +20,7 @@ export class DeviceManager {
       id,
       name,
       type: caps.gpuAvailable ? "SERVER" : "DESKTOP",
-      // Set to REGISTERED immediately on handshake
-      status: "REGISTERED",
+      status: "ONLINE", // Move to ONLINE immediately if registering/re-registering
       capabilities: caps,
       opsScore: existing?.opsScore || 0,
       totalJobsCompleted: existing?.totalJobsCompleted || 0,

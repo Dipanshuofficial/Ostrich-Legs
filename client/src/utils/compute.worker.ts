@@ -90,7 +90,13 @@ const createSubWorker = (_wId: number) => {
   `;
   const blob = new Blob([code], { type: "application/javascript" });
   const objectUrl = URL.createObjectURL(blob);
-  return { worker: new Worker(objectUrl), objectUrl };
+  const worker = new Worker(objectUrl);
+
+  // Cleanup the URL immediately after the worker is initialized to free memory
+  // The worker remains active as the browser has already loaded the script
+  URL.revokeObjectURL(objectUrl);
+
+  return { worker, objectUrl: "" }; // objectUrl no longer needed
 };
 
 const applyConfig = () => {

@@ -12,7 +12,6 @@ export const SwarmControls = ({
   onToggle,
   onStop,
 }: SwarmControlsProps) => {
-  // Use status prop directly, but add visual feedback
   const isRunning = status === "RUNNING";
 
   return (
@@ -22,22 +21,28 @@ export const SwarmControls = ({
       </h3>
 
       <div className="grid grid-cols-2 gap-4">
+        {/* Start/Pause: Orange by default, Emerald on Hover */}
         <button
           onClick={() => {
-            console.log("CLICKED TOGGLE"); // Debug log
+            console.log("CLICKED TOGGLE");
             onToggle();
           }}
           className={`
             h-20 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-200 active:scale-[0.95]
+            border group
             ${
               isRunning
-                ? "bg-surface-muted shadow-inner border border-transparent opacity-90"
-                : "bg-surface-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] border border-white hover:bg-gray-50"
+                ? "bg-brand-orange/5 border-brand-orange/20 shadow-inner"
+                : "bg-surface-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] border-white hover:bg-emerald-50 hover:border-emerald-100"
             }
           `}
         >
           <div
-            className={`p-2 rounded-full transition-colors ${isRunning ? "bg-brand-orange text-white" : "text-text-muted bg-gray-100"}`}
+            className={`p-2 rounded-full transition-colors ${
+              isRunning
+                ? "bg-brand-orange text-white shadow-[0_0_10px_rgba(255,125,84,0.4)]"
+                : "text-text-muted bg-gray-100 group-hover:bg-emerald-100 group-hover:text-emerald-600"
+            }`}
           >
             {isRunning ? (
               <Pause size={24} fill="currentColor" />
@@ -46,20 +51,22 @@ export const SwarmControls = ({
             )}
           </div>
           <span
-            className={`text-[10px] font-black uppercase ${isRunning ? "text-brand-orange" : "text-text-muted"}`}
+            className={`text-[10px] font-black uppercase transition-colors ${
+              isRunning
+                ? "text-brand-orange"
+                : "text-text-muted group-hover:text-emerald-600"
+            }`}
           >
             {isRunning ? "Pause Swarm" : "Start Swarm"}
           </span>
         </button>
 
-        {/* Stop Button - Tactile Feel */}
-        {/* Kill Button - High Intensity Visuals */}
-        {/* Kill Button - High Intensity Visuals */}
+        {/* Kill Process: Gray by default, Red on Hover */}
         <button
           onClick={() => {
             if (
               window.confirm(
-                "KILL PROCESS? This will terminate all active local threads and reset the compute kernel.",
+                "KILL PROCESS? This will terminate all active local threads.",
               )
             ) {
               onStop();
@@ -67,21 +74,29 @@ export const SwarmControls = ({
           }}
           className={`
             h-20 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98]
-            border hover:bg-red-50 group
+            border group
             ${
               status === "STOPPED"
-                ? "bg-red-50 border-red-200 opacity-80"
-                : "bg-surface-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] border-white"
+                ? "bg-red-50 border-red-200 shadow-inner"
+                : "bg-surface-white shadow-[6px_6px_12px_#d1d5db,-6px_-6px_12px_#ffffff] border-white hover:bg-red-50 hover:border-red-100"
             }
           `}
         >
           <div
-            className={`p-2 transition-colors ${status === "STOPPED" ? "text-red-600" : "text-text-muted group-hover:text-red-500"}`}
+            className={`p-2 rounded-full transition-colors ${
+              status === "STOPPED"
+                ? "bg-red-500 text-white"
+                : "text-text-muted bg-gray-100 group-hover:bg-red-100 group-hover:text-red-500"
+            }`}
           >
             <Square size={24} fill="currentColor" />
           </div>
           <span
-            className={`text-[10px] font-black uppercase ${status === "STOPPED" ? "text-red-600" : "text-text-muted group-hover:text-red-500"}`}
+            className={`text-[10px] font-black uppercase transition-colors ${
+              status === "STOPPED"
+                ? "text-red-600"
+                : "text-text-muted group-hover:text-red-600"
+            }`}
           >
             {status === "STOPPED" ? "System Killed" : "Kill Process"}
           </span>
@@ -93,7 +108,11 @@ export const SwarmControls = ({
         <span className="text-xs font-bold text-text-muted">System State</span>
         <div className="flex items-center gap-2">
           <div
-            className={`w-2 h-2 rounded-full ${isRunning ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]" : "bg-red-500"}`}
+            className={`w-2 h-2 rounded-full ${
+              isRunning
+                ? "bg-brand-orange shadow-[0_0_8px_rgba(255,125,84,0.8)]"
+                : "bg-red-500"
+            }`}
           />
           <span className="font-mono text-xs font-bold text-text-main">
             {status}

@@ -41,20 +41,27 @@ const systemLog = (
 
 // Auth Middleware (as we fixed in Phase 0)
 io.use((socket, next) => {
-  const token = socket.handshake.auth.token;
+  // Priority: 1. Handshake Auth, 2. Query Parameter (Fallback for stability)
+  const token = socket.handshake.auth.token || socket.handshake.query.token;
   const persistentId = socket.handshake.query.persistentId as string;
 
-  if (!token) {
+  if (!persistentId) return next(new Error("MISSING_PERSISTENT_ID"));
+
+  // If no token is provided anywhere, this device is its own Master
+  if (!token || token === "null" || token === "undefined" || token === "") {
     socket.data.swarmId = persistentId;
     return next();
   }
 
-  const targetSwarm = authManager.validateToken(token);
+  const targetSwarm = authManager.validateToken(token as string);
   if (targetSwarm) {
     socket.data.swarmId = targetSwarm;
     return next();
   }
-  return next(new Error("INVALID_TOKEN"));
+
+  // Fallback: If token exists but is invalid/expired, join own swarm instead of dropping
+  socket.data.swarmId = persistentId;
+  return next();
 });
 
 io.on("connection", (socket) => {
@@ -74,6 +81,7 @@ io.on("connection", (socket) => {
   socket.on(SocketEvents.DEVICE_REGISTER, (data) => {
     deviceManager.register(persistentId, data.name, data.capabilities, swarmId);
     systemLog(swarmId, "SYS", `Node Registered: ${data.name}`, "AUTH");
+    deviceManager.heartbeat(persistentId);
     broadcastState(swarmId);
   });
 

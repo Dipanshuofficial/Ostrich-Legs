@@ -11,13 +11,17 @@ import {
 import { Card } from "../../components/Card";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-
+interface CameraConstraints extends MediaTrackConstraints {
+  focusMode?: string;
+  zoom?: number;
+}
 interface DeviceConnectorProps {
   readonly isOpen: boolean;
   readonly onClose: () => void;
   readonly onRegenerateToken: () => Promise<string>;
   readonly onManualJoin: (code: string) => void;
   readonly onLeave: () => void;
+  readonly isConnected: boolean;
   readonly isGuest: boolean;
 }
 
@@ -27,6 +31,7 @@ export const DeviceConnector = ({
   onRegenerateToken,
   onManualJoin,
   onLeave,
+  isConnected,
   isGuest,
 }: DeviceConnectorProps) => {
   const [token, setToken] = useState<string>("");
@@ -70,14 +75,24 @@ export const DeviceConnector = ({
         const html5QrCode = new Html5Qrcode("reader");
         scannerRef.current = html5QrCode;
         await html5QrCode.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+          { facingMode: { exact: "environment" } }, // Force back camera
+          {
+            fps: 20,
+            qrbox: { width: 220, height: 220 },
+            aspectRatio: 1.0,
+            videoConstraints: {
+              focusMode: "continuous",
+              zoom: 1.5, // Attempt to start slightly zoomed in for better focus
+            } as CameraConstraints,
+          },
           (decodedText) => {
+            // Trim whitespace and handle potential full URLs if people use old codes
             const code = decodedText.includes("invite=")
-              ? decodedText.split("invite=")[1]
-              : decodedText;
+              ? decodedText.split("invite=")[1].split("&")[0]
+              : decodedText.trim();
+
             stopScanner();
-            onManualJoin(code);
+            onManualJoin(code); // Directly trigger the connection
             onClose();
           },
           () => {},
@@ -87,6 +102,16 @@ export const DeviceConnector = ({
       }
     }, 150);
   }, [onManualJoin, onClose, stopScanner]);
+  // Auto-close modal when connection is successfully established
+  useEffect(() => {
+    if (isOpen && isConnected && inputCode.length >= 4) {
+      const timer = setTimeout(() => {
+        onClose();
+        setInputCode(""); // Reset for next time
+      }, 800); // Small delay so they see the "Success" state
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, isConnected, inputCode, onClose]);
 
   // Handle Token Generation on Open
   useEffect(() => {
@@ -162,12 +187,8 @@ export const DeviceConnector = ({
                     )}
                     {/* Fixed: QR only shows if token exists */}
                     <QRCodeSVG
-                      value={
-                        token
-                          ? `${window.location.origin}/?invite=${token}`
-                          : "loading"
-                      }
-                      size={160}
+                      value={token || "OSTRICH_WAITING"} // Encode ONLY the token
+                      size={180}
                       level="M"
                       includeMargin
                     />
@@ -206,7 +227,14 @@ export const DeviceConnector = ({
               ) : (
                 <div className="animate-in fade-in zoom-in-95">
                   <div className="relative w-full aspect-square max-w-60 mx-auto bg-black rounded-[40px] border-8 border-surface-white overflow-hidden shadow-inner">
-                    <div id="reader" className="w-full h-full" />
+                    <div
+                      id="reader"
+                      className="w-full h-full [&_video]:object-cover [&_video]:rounded-[32px]"
+                    />
+                    {/* Scan overlay line */}
+                    <div className="absolute inset-0 border-2 border-brand-orange/30 rounded-[32px] pointer-events-none">
+                      <div className="absolute top-0 left-0 w-full h-2 bg-brand-orange/50 shadow-[0_0_15px_rgba(255,125,84,0.8)] animate-[scan_2s_linear_indefinite]" />
+                    </div>
                   </div>
                   <p className="text-[10px] font-bold text-text-muted uppercase mt-4">
                     Point at a Swarm QR Code
@@ -231,14 +259,21 @@ export const DeviceConnector = ({
               className="flex-1 bg-gray-100 border border-border-soft rounded-xl px-4 py-3 font-mono font-bold text-sm focus:outline-brand-orange"
             />
             <button
-              onClick={() => {
-                onManualJoin(inputCode);
-                onClose();
-              }}
-              disabled={inputCode.length < 4}
-              className="bg-gray-900 text-white p-3 rounded-xl hover:bg-black disabled:opacity-50"
+              onClick={() => onManualJoin(inputCode)}
+              disabled={inputCode.length < 4 || (isLoading && !isConnected)}
+              className={`p-3 rounded-xl transition-all duration-200 ${
+                isConnected && inputCode.length >= 4
+                  ? "bg-green-500 text-white"
+                  : "bg-gray-900 text-white hover:bg-black"
+              } disabled:opacity-50 relative`}
             >
-              <ArrowRight size={20} />
+              {isConnected && inputCode.length >= 4 ? (
+                <div className="flex items-center gap-2">
+                  <RefreshCw size={20} className="animate-spin" />
+                </div>
+              ) : (
+                <ArrowRight size={20} />
+              )}
             </button>
           </div>
         </div>

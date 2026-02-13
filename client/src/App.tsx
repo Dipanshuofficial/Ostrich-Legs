@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Wifi, WifiOff, Share2, LogOut } from "lucide-react";
+import { Wifi, Share2, LogOut, RefreshCw } from "lucide-react";
 import { useSwarmEngine } from "./hooks/useSwarmEngine";
 import { VelocityMonitor } from "./features/dashboard/VelocityMonitor";
 import { ActiveSwarm } from "./features/dashboard/ActiveSwarm";
@@ -77,8 +77,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-surface-muted p-4 md:p-8 font-sans antialiased text-text-main">
-      <header className="max-w-7xl mx-auto flex items-center justify-between mb-8 bg-surface-white/90 backdrop-blur-md px-6 py-4 rounded-[28px] border border-white shadow-lg sticky top-4 z-50">
-        <div className="flex items-center gap-3 shrink-0">
+      <header className=" max-w-7xl mx-auto flex items-center mb-8 bg-surface-white/90 backdrop-blur-md px-6 py-4 rounded-[32px] border border-white shadow-lg sticky top-4 z-50 w-full">
+        {/* Left: Identity - Forced to grow from 0 to share space equally */}
+        <div className="flex items-center gap-4 flex-1 basis-0">
           <div className="w-12 h-12 bg-surface-white rounded-2xl flex items-center justify-center shadow-soft-depth border border-white relative overflow-hidden group">
             <svg
               viewBox="0 0 512 512"
@@ -108,47 +109,62 @@ export default function App() {
               />
             </svg>
           </div>
-          <div className="hidden sm:block">
-            <span className="text-lg md:text-xl font-black tracking-tighter text-gray-800">
+          <div className="flex flex-col justify-center -space-y-1">
+            <span className="text-lg md:text-xl font-black tracking-tighter text-gray-800 leading-tight">
               Ostrich-Legs
             </span>
             <div
-              className={`flex items-center gap-1.5 text-[9px] font-bold ${isConnected ? "text-green-600" : "text-red-500"}`}
+              className={`flex items-center gap-1.5 text-[9px] font-bold transition-colors ${
+                isConnected ? "text-green-600" : "text-amber-500 animate-pulse"
+              }`}
             >
-              {isConnected ? <Wifi size={10} /> : <WifiOff size={10} />}
-              {isConnected ? "CONNECTED" : "OFFLINE"}
+              {isConnected ? (
+                <Wifi size={10} />
+              ) : (
+                <RefreshCw size={10} className="animate-spin" />
+              )}
+              {isConnected ? "CONNECTED" : "ESTABLISHING LINK..."}
             </div>
           </div>
-        </div>
 
-        <nav className="hidden md:flex items-center gap-1 bg-gray-100/80 p-1.5 rounded-2xl shadow-inner border border-gray-200/50">
-          {["Dashboard", "Monitoring"].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-6 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${activeTab === tab ? "bg-white text-brand-orange shadow-sm border border-gray-100" : "text-text-muted hover:text-text-main"}`}
-            >
-              {tab}
-            </button>
-          ))}
-        </nav>
+          {/* Center: Navigation - shrink-0 ensures it stays centered and doesn't compress */}
+          <nav className="absolute left-1/2 -translate-x-1/2 hidden lg:flex items-center gap-1 bg-gray-100/80 p-1.5 rounded-2xl shadow-inner border border-gray-200/50">
+            {["Dashboard", "Monitoring"].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-6 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
+                  activeTab === tab
+                    ? "bg-white text-brand-orange shadow-sm border border-gray-100"
+                    : "text-text-muted hover:text-text-main"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </nav>
 
-        <div className="flex items-center gap-2">
-          {isConnected && (
+          {/* Right: Actions */}
+
+          <div className="ml-auto flex items-center gap-3">
+            {isConnected && (
+              <button
+                onClick={leaveSwarm}
+                className="flex items-center gap-2.5 bg-red-50 text-red-600 px-5 py-2.5 rounded-2xl text-[11px] font-bold border border-red-100 hover:bg-red-500 hover:text-white transition-all uppercase tracking-wider shadow-sm active:scale-95"
+              >
+                <LogOut size={16} />
+                <span className="hidden sm:inline">
+                  {isGuest ? "Leave Swarm" : "Exit Session"}
+                </span>
+              </button>
+            )}
             <button
-              onClick={leaveSwarm}
-              className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-xl text-[10px] font-black border border-red-100 hover:bg-red-100 transition-all mr-2 uppercase tracking-widest shadow-sm active:scale-95"
+              onClick={() => setIsModalOpen(true)}
+              className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
             >
-              <LogOut size={14} />
-              {isGuest ? "Leave Swarm" : "Exit Session"}
+              <Share2 size={20} className="text-text-muted" />
             </button>
-          )}
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
-          >
-            <Share2 size={20} className="text-text-muted" />
-          </button>
+          </div>
         </div>
       </header>
 
@@ -199,6 +215,7 @@ export default function App() {
 
       <DeviceConnector
         isOpen={isModalOpen}
+        isConnected
         onClose={() => setIsModalOpen(false)}
         onRegenerateToken={generateInviteToken}
         onManualJoin={manualJoin}
