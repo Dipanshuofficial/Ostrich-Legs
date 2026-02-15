@@ -104,7 +104,7 @@ export const SwarmControls = ({
       </div>
 
       {/* Status LED Panel */}
-      <div className="mt-6 flex items-center justify-between bg-black/5 p-3 rounded-xl shadow-inner border border-black/5">
+      <div className="mt-6 flex items-center justify-between soft-inset p-3 border border-black/5 dark:border-white/5">
         <span className="text-xs font-bold text-text-muted">System State</span>
         <div className="flex items-center gap-2">
           <div

@@ -1,4 +1,8 @@
-import { type DeviceInfo, type DeviceCapabilities } from "../core/types";
+import {
+  type DeviceInfo,
+  type DeviceCapabilities,
+  type DeviceType,
+} from "../core/types";
 
 export class DeviceManager {
   private devices = new Map<string, DeviceInfo>();
@@ -16,10 +20,19 @@ export class DeviceManager {
     swarmId: string,
   ) {
     const existing = this.devices.get(id);
+    let type: DeviceType = "DESKTOP";
+
+    if (name.toLowerCase().includes("mobile")) {
+      type = "MOBILE";
+    } else if (name.toLowerCase().includes("colab")) {
+      type = "COLAB";
+    } else if (caps.gpuAvailable && caps.memoryGB > 16) {
+      type = "SERVER";
+    }
     this.devices.set(id, {
       id,
       name,
-      type: caps.gpuAvailable ? "SERVER" : "DESKTOP",
+      type,
       status: "ONLINE", // Move to ONLINE immediately if registering/re-registering
       capabilities: caps,
       opsScore: existing?.opsScore || 0,

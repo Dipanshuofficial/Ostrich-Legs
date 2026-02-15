@@ -5,6 +5,7 @@ node_modules/
 # Markdowns for notes
 AGENTS.md
 PROJECT_CONTEXT.md
+Architecture.md
 
 # Repomix
 repomix.config.json

@@ -40,28 +40,33 @@ const systemLog = (
 };
 
 // Auth Middleware (as we fixed in Phase 0)
+// server/src/index.ts
+
 io.use((socket, next) => {
-  // Priority: 1. Handshake Auth, 2. Query Parameter (Fallback for stability)
   const token = socket.handshake.auth.token || socket.handshake.query.token;
   const persistentId = socket.handshake.query.persistentId as string;
 
   if (!persistentId) return next(new Error("MISSING_PERSISTENT_ID"));
 
-  // If no token is provided anywhere, this device is its own Master
-  if (!token || token === "null" || token === "undefined" || token === "") {
-    socket.data.swarmId = persistentId;
+  // Master Mode: No token provided or token is empty
+  const isEmptyToken =
+    !token || token === "null" || token === "undefined" || token === "";
+
+  if (isEmptyToken) {
+    socket.data.swarmId = persistentId; // Host joins their own swarm
     return next();
   }
 
+  // Worker Mode: Validate the invite code against active sessions
   const targetSwarm = authManager.validateToken(token as string);
+
   if (targetSwarm) {
-    socket.data.swarmId = targetSwarm;
+    socket.data.swarmId = targetSwarm; // Restore joined membership
     return next();
   }
 
-  // Fallback: If token exists but is invalid/expired, join own swarm instead of dropping
-  socket.data.swarmId = persistentId;
-  return next();
+  // Reject connection if the token is invalid or expired
+  return next(new Error("JOIN_CODE_INVALID"));
 });
 
 io.on("connection", (socket) => {
@@ -80,6 +85,10 @@ io.on("connection", (socket) => {
   // Protocol: Registration
   socket.on(SocketEvents.DEVICE_REGISTER, (data) => {
     deviceManager.register(persistentId, data.name, data.capabilities, swarmId);
+    // FIX: Register device in scheduler to initialize quotas
+    const device = deviceManager.getDevice(persistentId);
+    if (device) jobScheduler.registerDevice(device);
+
     systemLog(swarmId, "SYS", `Node Registered: ${data.name}`, "AUTH");
     deviceManager.heartbeat(persistentId);
     broadcastState(swarmId);
@@ -95,24 +104,11 @@ io.on("connection", (socket) => {
     const currentState = swarmStates.get(swarmId);
     const device = deviceManager.getDevice(persistentId);
 
-    // INVARIANT: Check if registered and running
-    if (!device || device.status === "OFFLINE") {
-      systemLog(
-        swarmId,
-        "ERR",
-        `Job request rejected: Node not registered.`,
-        persistentId,
-      );
+    if (!device || device.status === "OFFLINE" || currentState !== "RUNNING")
       return;
-    }
 
-    if (currentState !== "RUNNING") return;
-
-    const batch = [];
-    for (let i = 0; i < 5; i++) {
-      const job = jobScheduler.getJobForDevice(device);
-      if (job) batch.push(job);
-    }
+    // FIX: Use the new batch distribution method
+    const batch = jobScheduler.getJobBatchForDevice(device, 10); // Requesting larger batches for high-perf
 
     if (batch.length > 0) {
       socket.emit(SocketEvents.JOB_BATCH_DISPATCH, batch);
@@ -120,6 +116,8 @@ io.on("connection", (socket) => {
   });
 
   socket.on(SocketEvents.JOB_COMPLETE, (payload) => {
+    // FIX: Release the job slot in the scheduler regardless of success/error
+    jobScheduler.releaseJobSlot(persistentId);
     if (!payload.error) {
       swarmCompletedCounts.set(
         swarmId,
@@ -141,6 +139,16 @@ io.on("connection", (socket) => {
   socket.on("auth:generate_token", (callback: (token: string) => void) => {
     try {
       const token = authManager.generateToken(swarmId);
+      if (!token) {
+        systemLog(
+          swarmId,
+          "WARN",
+          "Invite code generation rate limited (5/min)",
+          "AUTH",
+        );
+        callback("");
+        return;
+      }
       systemLog(swarmId, "SYS", `Generated new invite code: ${token}`, "AUTH");
       callback(token);
     } catch (err) {
@@ -168,11 +176,10 @@ io.on("connection", (socket) => {
       `Benchmark: ${data.score.toLocaleString()} OPS`,
       persistentId,
     );
+    const device = deviceManager.getDevice(persistentId);
+    if (device) jobScheduler.registerDevice(device);
     broadcastState(swarmId);
   });
-  // server/src/index.ts -> inside io.on("connection")
-
-  // server/src/index.ts -> inside io.on("connection")
 
   // --- ADD THIS HANDLER TO THE SERVER ---
   socket.on(
@@ -193,10 +200,6 @@ io.on("connection", (socket) => {
   );
 
   // --- ADD THIS HANDLER FOR THE GENERATOR ---
-  socket.on("auth:generate_token", (callback: (token: string) => void) => {
-    const token = authManager.generateToken(swarmId);
-    callback(token);
-  });
 
   socket.on("disconnect", () => {
     // Check if room is empty before removing swarmId from broadcaster
@@ -217,33 +220,42 @@ io.on("connection", (socket) => {
  * Single Global Snapshot Loop
  * Prevents interval leaks
  */
+let broadcastDebounce: NodeJS.Timeout | null = null;
+
 function broadcastState(swarmId: string) {
-  const resources = deviceManager.getAvailableResources(swarmId);
-  const queue = jobScheduler.getQueueStats();
-  const allDevices = deviceManager.getDevicesBySwarm(swarmId);
-  const currentState = swarmStates.get(swarmId) || "STOPPED";
-  const completedCount = swarmCompletedCounts.get(swarmId) || 0;
-  const currentThrottle = swarmThrottles.get(swarmId) || 40;
+  if (broadcastDebounce) clearTimeout(broadcastDebounce);
 
-  const totalOpsScore = allDevices
-    .filter((d) => d.status !== "OFFLINE" && d.status !== "DISABLED")
-    .reduce((sum, d) => sum + (d.opsScore || 0), 0);
+  broadcastDebounce = setTimeout(() => {
+    const resources = deviceManager.getAvailableResources(swarmId);
+    const queue = jobScheduler.getQueueStats();
+    const allDevices = deviceManager.getDevicesBySwarm(swarmId);
+    const currentState = swarmStates.get(swarmId) || "STOPPED";
+    const completedCount = swarmCompletedCounts.get(swarmId) || 0;
+    const currentThrottle = swarmThrottles.get(swarmId) || 40;
 
-  const snapshot: SwarmSnapshot = {
-    runState: currentState,
-    devices: allDevices.reduce((acc, d) => ({ ...acc, [d.id]: d }), {}),
-    stats: {
-      totalJobs: completedCount + queue.pending,
-      activeJobs: currentState === "RUNNING" ? resources.onlineCount : 0,
-      pendingJobs: queue.pending,
-      completedJobs: completedCount,
-      globalVelocity: currentState === "RUNNING" ? totalOpsScore : 0,
-      globalThrottle: currentThrottle,
-    },
-    resources,
-  };
+    const totalOpsScore = allDevices
+      .filter((d) => d.status !== "OFFLINE" && d.status !== "DISABLED")
+      .reduce((sum, d) => sum + (d.opsScore || 0), 0);
 
-  io.to(swarmId).emit(SocketEvents.SWARM_SNAPSHOT, snapshot);
+    const snapshot: SwarmSnapshot = {
+      runState: currentState,
+      devices: allDevices.reduce((acc, d) => ({ ...acc, [d.id]: d }), {}),
+      stats: {
+        totalJobs: completedCount + queue.pending,
+        activeJobs: currentState === "RUNNING" ? resources.onlineCount : 0,
+        pendingJobs: queue.pending,
+        completedJobs: completedCount,
+        globalVelocity:
+          currentState === "RUNNING"
+            ? Math.round(totalOpsScore * (currentThrottle / 100))
+            : 0,
+        globalThrottle: currentThrottle,
+      },
+      resources,
+    };
+
+    io.to(swarmId).emit(SocketEvents.SWARM_SNAPSHOT, snapshot);
+  }, 50);
 }
 
 // Tick all active swarms every 2s
@@ -258,5 +270,16 @@ setInterval(() => {
     }
   });
 }, 2000);
-
+// Periodic Weight Recalculation (Every 10s)
+// Re-calculates device weights based on live benchmark (opsScore) averages
+setInterval(() => {
+  activeSwarmIds.forEach((swarmId) => {
+    const devices = deviceManager.getDevicesBySwarm(swarmId);
+    devices.forEach((d) => {
+      if (d.status !== "OFFLINE" && d.status !== "DISABLED") {
+        jobScheduler.registerDevice(d);
+      }
+    });
+  });
+}, 10000);
 console.log("🚀 Ostrich Swarm Coordinator [PHASE 2] Online");

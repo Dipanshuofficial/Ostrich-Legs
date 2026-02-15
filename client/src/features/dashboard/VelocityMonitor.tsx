@@ -20,12 +20,15 @@ export const VelocityMonitor = ({
     if (val < 70) return "#ff7d54";
     return "#ef4444";
   };
+  // 1. OPTIMIZATION: Frame Rate Throttling
+  const lastFrameTime = useRef<number>(0);
+  const FRAME_INTERVAL = 1000 / 30; // 30 FPS target
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext("2d", { alpha: false }); // Optimization: No alpha channel for faster clearing
+    const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
@@ -34,12 +37,21 @@ export const VelocityMonitor = ({
     canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
 
-    const animate = () => {
-      // Shift data and update with current velocity
+    // 2. UPDATED ANIMATION LOOP
+    const animate = (timestamp: number) => {
+      // Check if enough time has passed to render the next frame
+      if (timestamp - lastFrameTime.current < FRAME_INTERVAL) {
+        requestRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      lastFrameTime.current = timestamp;
+
+      // Update Data
       dataRef.current.shift();
       dataRef.current.push(velocity);
 
-      ctx.fillStyle = "#fcfcfd"; // Match surface-white
+      // Render logic (Preserved from original for design consistency)
+      ctx.fillStyle = "#fcfcfd";
       ctx.fillRect(0, 0, rect.width, rect.height);
 
       const activeColor = getColor(throttle);
@@ -79,22 +91,37 @@ export const VelocityMonitor = ({
       requestRef.current = requestAnimationFrame(animate);
     };
 
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        cancelAnimationFrame(requestRef.current);
-      } else {
-        requestRef.current = requestAnimationFrame(animate);
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
     requestRef.current = requestAnimationFrame(animate);
 
     return () => {
       cancelAnimationFrame(requestRef.current);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [velocity, throttle]);
+
+  // ... (rest of the component and resize logic)
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) return;
+
+    const resizeCanvas = () => {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+    };
+
+    resizeCanvas();
+
+    const resizeObserver = new ResizeObserver(resizeCanvas);
+    resizeObserver.observe(canvas.parentElement!);
+
+    return () => resizeObserver.disconnect();
+  }, []);
 
   return (
     <Card className="h-80 flex flex-col relative overflow-hidden bg-surface-white border border-border-soft shadow-soft-depth">

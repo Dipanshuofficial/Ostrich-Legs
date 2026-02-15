@@ -1,6 +1,14 @@
+// client/src/App.tsx
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Wifi, Share2, LogOut, RefreshCw } from "lucide-react";
-import { useSwarmEngine } from "./hooks/useSwarmEngine";
+import { Wifi, Share2, LogOut, RefreshCw, Terminal } from "lucide-react";
+
+// NEW HOOKS
+
+import { useSwarm } from "./contexts/SwarmContext";
+import { usePersistentIdentity } from "./hooks/usePersistentIdentity";
+import { useMediaQuery } from "./hooks/useMediaQuery";
+
+// COMPONENTS
 import { VelocityMonitor } from "./features/dashboard/VelocityMonitor";
 import { ActiveSwarm } from "./features/dashboard/ActiveSwarm";
 import { ResourceStats } from "./features/dashboard/ResourceStats";
@@ -9,76 +17,70 @@ import { ThrottleControl } from "./features/dashboard/ThrottleControl";
 import { LiveTerminal } from "./features/terminal/LiveTerminal";
 import { DeviceConnector } from "./features/connection/DeviceConnector";
 import { SwarmControls } from "./features/dashboard/SwarmControls";
-import { usePersistentIdentity } from "./hooks/usePersistentIdentity";
 
 export default function App() {
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const [showMobileTerminal, setShowMobileTerminal] = useState(false);
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const identity = usePersistentIdentity();
 
-  // Optimistic UI state for the slider
+  const { swarmToken } = usePersistentIdentity();
+  const { snapshot, devices, isConnected, logs, actions } = useSwarm();
+
+  const {
+    setRunState,
+    setThrottle: setGlobalThrottle,
+    runLocalBenchmark,
+    toggleDevice,
+    generateInviteToken,
+    leaveSwarm,
+    manualJoin,
+  } = actions;
+
   const [localThrottle, setLocalThrottle] = useState(40);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
-  const {
-    snapshot,
-    devices,
-    setRunState,
-    runLocalBenchmark,
-    isConnected,
-    toggleDevice,
-    setGlobalThrottle,
-    generateInviteToken,
-    logs,
-    leaveSwarm,
-    manualJoin,
-  } = useSwarmEngine(identity.id || "loading-identity");
-
-  // Derive resources from snapshot or default to empty
-  const totalResources = useMemo(() => {
-    if (snapshot?.resources) return snapshot.resources;
-    return {
-      totalCores: 0,
-      totalMemory: 0,
-      totalGPUs: 0,
-      onlineCount: 0,
-    };
-  }, [snapshot]);
-
-  const stats = useMemo(() => {
-    if (snapshot?.stats) return snapshot.stats;
-    return {
-      totalJobs: 0,
-      activeJobs: 0,
-      pendingJobs: 0,
-      completedJobs: 0,
-      globalVelocity: 0,
-      globalThrottle: 40,
-    };
-  }, [snapshot]);
+  const totalResources = useMemo(
+    () =>
+      snapshot?.resources || {
+        totalCores: 0,
+        totalMemory: 0,
+        totalGPUs: 0,
+        onlineCount: 0,
+      },
+    [snapshot],
+  );
+  const stats = useMemo(
+    () =>
+      snapshot?.stats || {
+        totalJobs: 0,
+        activeJobs: 0,
+        pendingJobs: 0,
+        completedJobs: 0,
+        globalVelocity: 0,
+        globalThrottle: 20,
+      },
+    [snapshot],
+  );
 
   const isRunning = snapshot?.runState === "RUNNING";
-  const isGuest = new URLSearchParams(window.location.search).has("invite");
+  const isGuest =
+    new URLSearchParams(window.location.search).has("invite") || !!swarmToken;
 
-  // Sync slider if someone else changes the global throttle
   useEffect(() => {
-    if (stats.globalThrottle !== undefined) {
+    if (stats.globalThrottle !== undefined)
       setLocalThrottle(stats.globalThrottle);
-    }
   }, [stats.globalThrottle]);
 
   const handleThrottleChange = (val: number) => {
     setLocalThrottle(val);
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => {
-      setGlobalThrottle(val);
-    }, 300);
+    debounceTimer.current = setTimeout(() => setGlobalThrottle(val), 300);
   };
 
   return (
     <div className="min-h-screen bg-surface-muted p-4 md:p-8 font-sans antialiased text-text-main">
-      <header className=" max-w-7xl mx-auto flex items-center mb-8 bg-surface-white/90 backdrop-blur-md px-6 py-4 rounded-[32px] border border-white shadow-lg sticky top-4 z-50 w-full">
-        {/* Left: Identity - Forced to grow from 0 to share space equally */}
+      <header className="max-w-7xl mx-auto flex items-center mb-8 bg-surface-white/90 backdrop-blur-md px-6 py-4 rounded-4xl border border-white shadow-lg sticky top-4 z-50 w-full">
         <div className="flex items-center gap-4 flex-1 basis-0">
           <div className="w-12 h-12 bg-surface-white rounded-2xl flex items-center justify-center shadow-soft-depth border border-white relative overflow-hidden group">
             <svg
@@ -114,9 +116,7 @@ export default function App() {
               Ostrich-Legs
             </span>
             <div
-              className={`flex items-center gap-1.5 text-[9px] font-bold transition-colors ${
-                isConnected ? "text-green-600" : "text-amber-500 animate-pulse"
-              }`}
+              className={`flex items-center gap-1.5 text-[9px] font-bold ${isConnected ? "text-green-600" : "text-amber-500 animate-pulse"}`}
             >
               {isConnected ? (
                 <Wifi size={10} />
@@ -126,48 +126,39 @@ export default function App() {
               {isConnected ? "CONNECTED" : "ESTABLISHING LINK..."}
             </div>
           </div>
-
-          {/* Center: Navigation - shrink-0 ensures it stays centered and doesn't compress */}
           <nav className="absolute left-1/2 -translate-x-1/2 hidden lg:flex items-center gap-1 bg-gray-100/80 p-1.5 rounded-2xl shadow-inner border border-gray-200/50">
             {["Dashboard", "Monitoring"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-6 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
-                  activeTab === tab
-                    ? "bg-white text-brand-orange shadow-sm border border-gray-100"
-                    : "text-text-muted hover:text-text-main"
-                }`}
+                className={`px-6 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === tab ? "bg-white text-brand-orange shadow-sm border border-gray-100" : "text-text-muted hover:text-text-main"}`}
               >
                 {tab}
               </button>
             ))}
           </nav>
-
-          {/* Right: Actions */}
-
           <div className="ml-auto flex items-center gap-3">
             {isConnected && (
               <button
                 onClick={leaveSwarm}
-                className="flex items-center gap-2.5 bg-red-50 text-red-600 px-5 py-2.5 rounded-2xl text-[11px] font-bold border border-red-100 hover:bg-red-500 hover:text-white transition-all uppercase tracking-wider shadow-sm active:scale-95"
+                className="flex items-center gap-2.5 bg-red-50 text-red-600 px-5 py-2.5 rounded-2xl text-[11px] font-bold border border-red-100 hover:bg-red-500 hover:text-white transition-all uppercase tracking-wider shadow-sm"
               >
-                <LogOut size={16} />
+                <LogOut size={16} />{" "}
                 <span className="hidden sm:inline">
                   {isGuest ? "Leave Swarm" : "Exit Session"}
                 </span>
               </button>
             )}
+
             <button
               onClick={() => setIsModalOpen(true)}
-              className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-xl"
             >
               <Share2 size={20} className="text-text-muted" />
             </button>
           </div>
         </div>
       </header>
-
       <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 pb-12">
         {activeTab === "Dashboard" ? (
           <>
@@ -177,7 +168,6 @@ export default function App() {
                 throttle={localThrottle}
               />
               <ResourceStats stats={stats} onlineCount={devices.length} />
-              {/* Tailwind 4 arbitrary value for minimum height constraint */}
               <div className="flex-1 min-h-100">
                 <ActiveSwarm
                   devices={devices}
@@ -185,8 +175,23 @@ export default function App() {
                   onToggle={toggleDevice}
                 />
               </div>
+              {isMobile && (
+                <div className="mt-6 border-t pt-6">
+                  <button
+                    onClick={() => setShowMobileTerminal(!showMobileTerminal)}
+                    className="w-full flex items-center justify-center gap-2.5 bg-gray-900 text-white py-3.5 rounded-2xl font-bold text-sm"
+                  >
+                    <Terminal size={18} />{" "}
+                    {showMobileTerminal ? "Hide System Logs" : "Show Live Logs"}
+                  </button>
+                  {showMobileTerminal && (
+                    <div className="mt-4 h-80 rounded-3xl overflow-hidden border border-border-soft shadow-inner">
+                      <LiveTerminal logs={logs} />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-
             <div className="lg:col-span-4 space-y-8">
               <JobGauge
                 total={stats.totalJobs}
@@ -212,10 +217,8 @@ export default function App() {
           </div>
         )}
       </main>
-
       <DeviceConnector
         isOpen={isModalOpen}
-        isConnected
         onClose={() => setIsModalOpen(false)}
         onRegenerateToken={generateInviteToken}
         onManualJoin={manualJoin}

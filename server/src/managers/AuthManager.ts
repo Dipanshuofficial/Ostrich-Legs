@@ -3,8 +3,8 @@ export class AuthManager {
     string,
     { swarmId: string; expiresAt: number }
   >();
-  private readonly TOKEN_TTL_MS = 15 * 60 * 1000; // Increased to 15m for better UX
-
+  private readonly TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+  private tokenGenerationLog = new Map<string, number[]>(); // swarmId -> timestamps
   constructor() {
     setInterval(() => this.cleanup(), 30000);
   }
@@ -12,9 +12,20 @@ export class AuthManager {
   /**
    * Generates a unique 6-digit alphanumeric token for a specific swarm.
    */
-  public generateToken(swarmId: string): string {
-    const token = Math.random().toString(36).substring(2, 8).toUpperCase();
+  public generateToken(swarmId: string): string | null {
+    const now = Date.now();
+    let generations = this.tokenGenerationLog.get(swarmId) || [];
+    const oneMinuteAgo = now - 60000;
+    generations = generations.filter((t) => t > oneMinuteAgo);
 
+    if (generations.length >= 5) {
+      return null; // Rate limited
+    }
+
+    generations.push(now);
+    this.tokenGenerationLog.set(swarmId, generations);
+
+    const token = Math.random().toString(36).substring(2, 8).toUpperCase();
     this.activeTokens.set(token, {
       swarmId,
       expiresAt: Date.now() + this.TOKEN_TTL_MS,

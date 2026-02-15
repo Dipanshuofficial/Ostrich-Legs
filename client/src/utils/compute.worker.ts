@@ -1,5 +1,7 @@
 /// <reference lib="webworker" />
 
+import { MAX_SAFE_THROTTLE_PERCENT } from "../core/constants";
+
 const TOTAL_CORES = navigator.hardwareConcurrency || 4;
 const RESERVED_CORES = TOTAL_CORES > 8 ? 2 : 1;
 const LOGICAL_CORES = Math.max(1, TOTAL_CORES - RESERVED_CORES);
@@ -75,6 +77,8 @@ const createSubWorker = (_wId: number) => {
           // Actual math execution
           result = runCpuStress(payload.data?.iterations || 100000);
           self.postMessage({ type: "JOB_COMPLETE", chunkId: payload.id, result, durationMs: performance.now() - start });
+          
+          
         } catch (err) {
           self.postMessage({ type: "JOB_ERROR", chunkId: payload.id, error: err.message });
         }
@@ -100,21 +104,27 @@ const createSubWorker = (_wId: number) => {
 };
 
 const applyConfig = () => {
-  const targetThreadCount = Math.max(
-    1,
-    Math.floor(LOGICAL_CORES * throttleLimit),
-  );
-  if (targetThreadCount > threadPool.size) {
-    for (let i = threadPool.size; i < targetThreadCount; i++) {
+  const safeThrottle = Math.min(throttleLimit, MAX_SAFE_THROTTLE_PERCENT / 100);
+  const target = Math.max(1, Math.floor(LOGICAL_CORES * safeThrottle));
+
+  if (target > threadPool.size) {
+    for (let i = threadPool.size; i < target; i++) {
       const wId = nextWorkerId++;
-      const { worker, objectUrl } = createSubWorker(wId);
+      const { worker } = createSubWorker(wId);
       worker.onmessage = (ev) => self.postMessage(ev.data);
-      threadPool.set(wId, { worker, objectUrl, busy: false });
+      threadPool.set(wId, { worker, busy: false });
     }
+  } else if (target < threadPool.size) {
+    const toRemove = Array.from(threadPool.entries())
+      .filter(([, data]) => !data.busy)
+      .slice(0, threadPool.size - target);
+
+    toRemove.forEach(([id, data]) => {
+      data.worker.terminate();
+      threadPool.delete(id);
+    });
   }
 };
-
-applyConfig();
 
 self.onmessage = (e) => {
   const { type, payload } = e.data;

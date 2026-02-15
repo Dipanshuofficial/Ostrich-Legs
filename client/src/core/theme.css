@@ -1,38 +1,76 @@
 @import "tailwindcss";
-
 @theme {
-  /* Neuronix Color Palette */
+  /* 1. DEFINE DESIGN TOKENS (One Source of Truth) */
   --color-brand-orange: #ff7d54;
   --color-brand-peach: #ffb09c;
-  --color-surface-white: #fcfcfd;
-  --color-surface-muted: #f3f4f6;
-  --color-text-main: #1a1a1e;
-  --color-text-muted: #6b7280;
-  --color-border-soft: rgba(0, 0, 0, 0.05);
 
-  /* Elevation (Neumorphism) */
-  --shadow-soft-depth:
-    0 10px 25px -5px rgba(0, 0, 0, 0.03), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
-  --shadow-card: 0 20px 40px -12px rgba(0, 0, 0, 0.05);
-  --shadow-inset: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+  /* Use variables for surface/text colors to allow easy switching */
+  --color-surface-white: var(--surface-white);
+  --color-surface-muted: var(--surface-muted);
+  --color-text-main: var(--text-main);
+  --color-text-muted: var(--text-muted);
+  --color-border-soft: var(--border-soft);
 
-  /* Radii */
-  --radius-xl: 24px;
-  --radius-2xl: 32px;
+  /* Elevation (Adapt for Dark Mode) */
+  --shadow-card: var(--card-shadow);
 }
 
-:root {
-  background-color: var(--color-surface-muted);
-  color: var(--color-text-main);
-  font-family: "Inter", sans-serif;
-}
-
-@layer components {
-  /* The Neuronix Soft Card */
-  .soft-card {
-    @apply bg-surface-white border border-border-soft shadow-card rounded-2xl p-6 transition-all;
+@layer base {
+  /* 2. LIGHT MODE (Default) */
+  :root {
+    --surface-white: #fcfcfd;
+    --surface-muted: #f3f4f6;
+    --text-main: #1a1a1e;
+    --text-muted: #6b7280;
+    --border-soft: rgba(0, 0, 0, 0.05);
+    --card-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.05);
   }
 
+  /* 3. DARK MODE (Override) */
+  .dark {
+    /* ELEVATED SURFACES (Not pure black) */
+    --surface-white: #1a1a1e; /* Card surface */
+    --surface-muted: #0f0f11; /* Background surface */
+
+    /* TEXT HIERARCHY */
+    --text-main: #fcfcfd;
+    --text-muted: #94a3b8;
+
+    /* BORDERS & DEPTH */
+    --border-soft: rgba(255, 255, 255, 0.06);
+
+    /* NEUMORPHIC GLOW (The secret sauce) */
+    --card-shadow:
+      0 10px 30px -5px rgba(0, 0, 0, 0.5),
+      0 0 15px -3px rgba(255, 125, 84, 0.05); /* Subtle brand glow */
+
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-surface-muted text-text-main transition-colors duration-300;
+  }
+}
+
+/* Ensure the dark variant is recognized by custom class logic */
+/* client/src/core/theme.css */
+
+@layer components {
+  .soft-card {
+    @apply bg-surface-white border border-border-soft shadow-card rounded-2xl p-6 transition-all;
+    /* Subtle inner-glow for dark mode depth */
+    background-image: linear-gradient(
+      to bottom right,
+      rgba(255, 255, 255, 0.02),
+      transparent
+    );
+  }
+
+  /* Fix for the Dashboard navigation and header glass effect */
+  .backdrop-blur-md {
+    @apply dark:bg-surface-white/80 dark:border-white/5;
+  }
+  
   /* Modern Scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
@@ -41,6 +79,7 @@
     @apply bg-gray-200 rounded-full hover:bg-gray-300;
   }
 }
+@custom-variant dark (&:where(.dark, .dark *));
 @keyframes scan {
   0% {
     top: 10%;
@@ -51,4 +90,19 @@
   100% {
     top: 10%;
   }
+}
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+.animate-shake {
+  animation: shake 0.2s ease-in-out 0s 2;
 }

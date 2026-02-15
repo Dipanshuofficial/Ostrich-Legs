@@ -17,11 +17,12 @@ export const JobGauge = ({ total, completed }: Props) => {
         {/* Rotated SVG container to start from 12 o'clock */}
         <svg className="w-full h-full -rotate-90" viewBox="0 0 128 128">
           {/* Background Track */}
+          {/* JobGauge.tsx line 24 */}
           <circle
             cx="64"
             cy="64"
             r={radius}
-            stroke="#f3f4f6"
+            stroke="var(--color-surface-muted)" // Dynamic color
             strokeWidth="12"
             fill="transparent"
             strokeLinecap="round"
