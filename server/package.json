@@ -1,21 +1,18 @@
 {
-  "name": "ostrich-server",
+  "name": "ostrich-swarm-worker",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "bun src/index.ts"
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
   },
   "dependencies": {
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
-    "http": "^0.0.1-security",
-    "socket.io": "^4.8.3"
+    "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.13",
-    "@types/express": "^4.17.17",
-    "@types/node": "^25.2.1",
-    "ts-node": "^10.9.1",
-    "typescript": "^5.1.6"
+    "@cloudflare/workers-types": "^4.20231218.0",
+    "typescript": "^5.3.3",
+    "wrangler": "^3.22.1"
   }
 }
