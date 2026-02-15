@@ -1,8 +1,3 @@
-// client/src/core/WebSocketManager.ts
-// Native WebSocket implementation for Cloudflare Workers compatibility
-
-import { SocketEvents } from "@shared/socket/events";
-
 type MessageHandler = (data: any) => void;
 
 class WebSocketManager {
@@ -17,27 +12,31 @@ class WebSocketManager {
 
   get(persistentId: string, token: string | null = null): WebSocketManager {
     const t = token || "";
-    
+
     // Return existing connection if still valid
-    if (this.ws?.readyState === WebSocket.OPEN && this.currentToken === t && this.currentPersistentId === persistentId) {
+    if (
+      this.ws?.readyState === WebSocket.OPEN &&
+      this.currentToken === t &&
+      this.currentPersistentId === persistentId
+    ) {
       return this;
     }
 
     // Close existing connection
     this.disconnect();
-    
+
     this.currentToken = t;
     this.currentPersistentId = persistentId;
     this.connect();
-    
+
     return this;
   }
 
   private connect(): void {
     if (this.isConnecting || !this.currentPersistentId) return;
-    
+
     this.isConnecting = true;
-    
+
     // Determine WebSocket URL
     // Production: Use VITE_WS_BASE_URL env var (set in Cloudflare Pages)
     // Development: Use current host (proxied via Vite to localhost:8787)
@@ -46,19 +45,19 @@ class WebSocketManager {
       `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`;
 
     const wsUrl = `${base}/ws?persistentId=${this.currentPersistentId}&token=${this.currentToken || ""}`;
-    
+
     console.log(`[WebSocket] Connecting to: ${wsUrl}`);
-    
+
     try {
       this.ws = new WebSocket(wsUrl);
-      
+
       this.ws.onopen = () => {
         console.log("[WebSocket] Connected");
         this.reconnectAttempts = 0;
         this.isConnecting = false;
         this.emit("connect", {});
       };
-      
+
       this.ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
@@ -67,14 +66,14 @@ class WebSocketManager {
           console.error("[WebSocket] Message parse error:", err);
         }
       };
-      
+
       this.ws.onclose = () => {
         console.log("[WebSocket] Disconnected");
         this.isConnecting = false;
         this.emit("disconnect", {});
         this.attemptReconnect();
       };
-      
+
       this.ws.onerror = (error) => {
         console.error("[WebSocket] Error:", error);
         this.isConnecting = false;
@@ -93,9 +92,11 @@ class WebSocketManager {
 
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * this.reconnectAttempts;
-    
-    console.log(`[WebSocket] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
-    
+
+    console.log(
+      `[WebSocket] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`,
+    );
+
     setTimeout(() => {
       this.connect();
     }, delay);
@@ -104,13 +105,13 @@ class WebSocketManager {
   private handleMessage(message: { event: string; data: any }): void {
     const handlers = this.messageHandlers.get(message.event);
     if (handlers) {
-      handlers.forEach(handler => handler(message.data));
+      handlers.forEach((handler) => handler(message.data));
     }
-    
+
     // Also emit to generic "message" handlers
     const genericHandlers = this.messageHandlers.get("message");
     if (genericHandlers) {
-      genericHandlers.forEach(handler => handler(message));
+      genericHandlers.forEach((handler) => handler(message));
     }
   }
 

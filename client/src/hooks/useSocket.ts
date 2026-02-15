@@ -1,6 +1,6 @@
 // client/src/hooks/useSocket.ts
 // Updated for Cloudflare Workers WebSocket compatibility
-import { useCallback, useEffect } from "react";
+import { useEffect } from "react";
 import { wsManager } from "../core/WebSocketManager";
 import { SocketEvents } from "@shared/socket/events";
 import { useSwarmStore } from "../core/swarmStore";
@@ -16,12 +16,12 @@ export const useSocket = (onJobReceived?: (job: Job) => void) => {
     if (!identity.id || identity.id === "loading-identity") return;
 
     // Initialize WebSocket connection
-    const manager = wsManager.get(identity.id, swarmToken);
+    // const manager = wsManager.get(identity.id, swarmToken);
 
     const handleConnect = () => {
       setConnected(true);
       addLog("NET", "Swarm Link Established");
-      
+
       // Register device
       wsManager.emit(SocketEvents.DEVICE_REGISTER, {
         name: localStorage.getItem("ostrich_device_name") || "Local Node",
@@ -31,7 +31,7 @@ export const useSocket = (onJobReceived?: (job: Job) => void) => {
           gpuAvailable: !!(navigator as any).gpu,
         },
       });
-      
+
       // Request initial jobs
       wsManager.emit(SocketEvents.JOB_REQUEST_BATCH, {});
     };
@@ -43,7 +43,7 @@ export const useSocket = (onJobReceived?: (job: Job) => void) => {
     const handleSnapshot = (data: any) => {
       const previousState = snapshot?.runState;
       setSnapshot(data);
-      
+
       // Kickstart pipeline if state changed to RUNNING
       if (previousState !== "RUNNING" && data.runState === "RUNNING") {
         wsManager.emit(SocketEvents.JOB_REQUEST_BATCH, {});
@@ -87,10 +87,10 @@ export const useSocket = (onJobReceived?: (job: Job) => void) => {
   // Orchestration Actions
   const setRunState = (s: SwarmStatus) =>
     wsManager.emit(SocketEvents.SWARM_SET_STATE, s);
-    
+
   const setThrottle = (v: number) =>
     wsManager.emit(SocketEvents.SWARM_SET_THROTTLE, v);
-    
+
   const toggleDevice = (id: string, enabled: boolean) =>
     wsManager.emit("cmd:toggle_device", { id, enabled });
 
@@ -98,14 +98,14 @@ export const useSocket = (onJobReceived?: (job: Job) => void) => {
     saveSwarmToken(code);
     return new Promise((res, rej) => {
       const timeout = setTimeout(() => rej(new Error("Join Timeout")), 5000);
-      
+
       const onConnect = () => {
         clearTimeout(timeout);
         res();
       };
-      
+
       wsManager.on("connect", onConnect);
-      
+
       // Reconnect with new token
       wsManager.get(identity.id, code);
     });
@@ -122,7 +122,7 @@ export const useSocket = (onJobReceived?: (job: Job) => void) => {
       const handler = (token: string) => {
         res(token);
       };
-      
+
       // One-time handler for token response
       wsManager.on("auth:token", handler);
       wsManager.emit("auth:generate_token", {});

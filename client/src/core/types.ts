@@ -4,7 +4,10 @@
 export type SwarmStatus = "IDLE" | "RUNNING" | "PAUSED" | "STOPPED";
 export type DeviceType = "DESKTOP" | "MOBILE" | "COLAB" | "SERVER";
 export type JobType = "MATH_STRESS" | "MAT_MUL" | "TEXT_TOKENIZE";
-
+export interface SwarmStats {
+  activeJobs: number;
+  pendingJobs: number;
+}
 export interface DeviceCapabilities {
   cpuCores: number;
   memoryGB: number;
