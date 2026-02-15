@@ -15,9 +15,10 @@ class SocketManager {
     this.socket?.disconnect();
     this.currentToken = t;
 
-    const url = window.location.hostname.includes("trycloudflare.com")
-      ? "/"
-      : `http://${window.location.hostname}:3000`;
+    // Replace the hardcoded URL logic
+    const url =
+      import.meta.env.VITE_SERVER_URL ||
+      `http://${window.location.hostname}:3000`;
 
     this.socket = io(url, {
       query: { persistentId, token: t },

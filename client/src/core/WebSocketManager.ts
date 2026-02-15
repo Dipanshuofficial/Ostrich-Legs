@@ -32,22 +32,24 @@ class WebSocketManager {
     return this;
   }
 
+  // Find the connect() method and update the wsUrl construction
   private connect(): void {
     if (this.isConnecting || !this.currentPersistentId) return;
 
     this.isConnecting = true;
 
-    // Determine WebSocket URL
-    // Production: Use VITE_WS_BASE_URL env var (set in Cloudflare Pages)
-    // Development: Use current host (proxied via Vite to localhost:8787)
-    const base =
-      import.meta.env.VITE_WS_BASE_URL ??
-      `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`;
+    // Render uses standard https/wss. Use an environment variable for the base URL.
+    const baseUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:3000";
 
-    const wsUrl = `${base}/ws?persistentId=${this.currentPersistentId}&token=${this.currentToken || ""}`;
+    // Convert http/https to ws/wss
+    const wsBase = baseUrl.replace(/^http/, "ws");
+
+    // Render usually doesn't need the Vite proxy path (/ws),
+    // check your server's listening route (usually just / or /socket.io)
+    const wsUrl = `${wsBase}/ws?persistentId=${this.currentPersistentId}&token=${this.currentToken || ""}`;
 
     console.log(`[WebSocket] Connecting to: ${wsUrl}`);
-
+    // ... rest of the method
     try {
       this.ws = new WebSocket(wsUrl);
 
