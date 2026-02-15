@@ -9,7 +9,8 @@ bindings = [
 
 [[migrations]]
 tag = "v1"
-new_classes = ["SwarmCoordinator"]
+new_sqlite_classes = ["SwarmCoordinator"]
+
 
 [vars]
 ENVIRONMENT = "production"
