@@ -56,7 +56,7 @@ Ostrich-Legs enables any device with a browser to join a compute swarm and contr
 | **Compute**   | Web Workers + WebGPU  | Browser-based parallel processing            |
 | **Types**     | Shared `/shared`      | Compile-time API contracts across boundaries |
 
-## Quick Start
+## Quick Start (Local Development)
 
 Prerequisites: [Bun](https://bun.sh) runtime
 
@@ -65,7 +65,7 @@ Prerequisites: [Bun](https://bun.sh) runtime
 cd ostrich-legs
 
 # 2. Start the server
-cd server && bun run dev
+cd server && bun src/index.ts
 
 # 3. In another terminal, start the client
 cd client && bun run dev
@@ -74,6 +74,21 @@ cd client && bun run dev
 ```
 
 The first browser becomes the swarm master. Click the share icon to generate QR codes for other devices to join.
+
+## Cloudflare Workers Deployment
+
+For production deployment, use the Cloudflare Workers implementation (see `CLOUDFLARE_DEPLOYMENT.md`):
+
+```bash
+# Deploy to Cloudflare
+cd server && wrangler deploy
+
+# Or run locally with Wrangler
+cd server && wrangler dev
+cd client && bun run dev  # In another terminal
+```
+
+**Architecture difference**: Workers use Durable Objects for persistent state and native WebSockets instead of Socket.io.
 
 ## Key Design Decisions
 

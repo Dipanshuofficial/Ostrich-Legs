@@ -1,6 +1,7 @@
 // client/src/hooks/useSocket.ts
+// Updated for Cloudflare Workers WebSocket compatibility
 import { useCallback, useEffect } from "react";
-import { socketManager } from "../core/SocketManager";
+import { wsManager } from "../core/WebSocketManager";
 import { SocketEvents } from "@shared/socket/events";
 import { useSwarmStore } from "../core/swarmStore";
 import { usePersistentIdentity } from "./usePersistentIdentity";
@@ -11,19 +12,18 @@ export const useSocket = (onJobReceived?: (job: Job) => void) => {
     usePersistentIdentity();
   const { setSnapshot, setConnected, addLog, snapshot } = useSwarmStore();
 
-  const getSocket = useCallback(() => {
-    return socketManager.get(identity.id, swarmToken);
-  }, [identity.id, swarmToken]);
-
   useEffect(() => {
     if (!identity.id || identity.id === "loading-identity") return;
 
-    const socket = getSocket();
+    // Initialize WebSocket connection
+    const manager = wsManager.get(identity.id, swarmToken);
 
-    socket.on(SocketEvents.CONNECT, () => {
+    const handleConnect = () => {
       setConnected(true);
       addLog("NET", "Swarm Link Established");
-      socket.emit(SocketEvents.DEVICE_REGISTER, {
+      
+      // Register device
+      wsManager.emit(SocketEvents.DEVICE_REGISTER, {
         name: localStorage.getItem("ostrich_device_name") || "Local Node",
         capabilities: {
           cpuCores: navigator.hardwareConcurrency || 4,
@@ -31,39 +31,52 @@ export const useSocket = (onJobReceived?: (job: Job) => void) => {
           gpuAvailable: !!(navigator as any).gpu,
         },
       });
-      // Immediately request work if the swarm is already running
-      socket.emit(SocketEvents.JOB_REQUEST_BATCH);
-    });
+      
+      // Request initial jobs
+      wsManager.emit(SocketEvents.JOB_REQUEST_BATCH, {});
+    };
 
-    socket.on("disconnect", () => setConnected(false));
+    const handleDisconnect = () => {
+      setConnected(false);
+    };
 
-    socket.on(SocketEvents.SWARM_SNAPSHOT, (data) => {
+    const handleSnapshot = (data: any) => {
       const previousState = snapshot?.runState;
       setSnapshot(data);
-      // If state just changed to RUNNING, kickstart the pipeline
+      
+      // Kickstart pipeline if state changed to RUNNING
       if (previousState !== "RUNNING" && data.runState === "RUNNING") {
-        socket.emit(SocketEvents.JOB_REQUEST_BATCH);
+        wsManager.emit(SocketEvents.JOB_REQUEST_BATCH, {});
       }
-    });
+    };
 
-    socket.on(SocketEvents.JOB_BATCH_DISPATCH, (jobs: Job[]) => {
+    const handleJobBatch = (jobs: Job[]) => {
       if (onJobReceived) {
         jobs.forEach((job) => onJobReceived(job));
       }
-    });
+    };
 
-    socket.on(SocketEvents.SYSTEM_LOG, (p) => addLog(p.level, p.message));
+    const handleSystemLog = (p: any) => {
+      addLog(p.level, p.message);
+    };
+
+    // Subscribe to events
+    wsManager.on("connect", handleConnect);
+    wsManager.on("disconnect", handleDisconnect);
+    wsManager.on(SocketEvents.SWARM_SNAPSHOT, handleSnapshot);
+    wsManager.on(SocketEvents.JOB_BATCH_DISPATCH, handleJobBatch);
+    wsManager.on(SocketEvents.SYSTEM_LOG, handleSystemLog);
 
     return () => {
-      socket.off(SocketEvents.CONNECT);
-      socket.off("disconnect");
-      socket.off(SocketEvents.SWARM_SNAPSHOT);
-      socket.off(SocketEvents.JOB_BATCH_DISPATCH);
-      socket.off(SocketEvents.SYSTEM_LOG);
+      wsManager.off("connect", handleConnect);
+      wsManager.off("disconnect", handleDisconnect);
+      wsManager.off(SocketEvents.SWARM_SNAPSHOT, handleSnapshot);
+      wsManager.off(SocketEvents.JOB_BATCH_DISPATCH, handleJobBatch);
+      wsManager.off(SocketEvents.SYSTEM_LOG, handleSystemLog);
     };
   }, [
     identity.id,
-    getSocket,
+    swarmToken,
     setConnected,
     setSnapshot,
     addLog,
@@ -73,30 +86,47 @@ export const useSocket = (onJobReceived?: (job: Job) => void) => {
 
   // Orchestration Actions
   const setRunState = (s: SwarmStatus) =>
-    getSocket().emit(SocketEvents.SWARM_SET_STATE, s);
+    wsManager.emit(SocketEvents.SWARM_SET_STATE, s);
+    
   const setThrottle = (v: number) =>
-    getSocket().emit(SocketEvents.SWARM_SET_THROTTLE, v);
+    wsManager.emit(SocketEvents.SWARM_SET_THROTTLE, v);
+    
   const toggleDevice = (id: string, enabled: boolean) =>
-    getSocket().emit("cmd:toggle_device", { id, enabled });
+    wsManager.emit("cmd:toggle_device", { id, enabled });
 
-  const manualJoin = async (code: string) => {
+  const manualJoin = async (code: string): Promise<void> => {
     saveSwarmToken(code);
-    const socket = socketManager.get(identity.id, code);
-    return new Promise<void>((res, rej) => {
-      socket.once("connect", () => res());
-      socket.once("connect_error", (err) => rej(err));
-      setTimeout(() => rej(new Error("Join Timeout")), 5000);
+    return new Promise((res, rej) => {
+      const timeout = setTimeout(() => rej(new Error("Join Timeout")), 5000);
+      
+      const onConnect = () => {
+        clearTimeout(timeout);
+        res();
+      };
+      
+      wsManager.on("connect", onConnect);
+      
+      // Reconnect with new token
+      wsManager.get(identity.id, code);
     });
   };
 
   const leaveSwarm = () => {
     clearSwarmToken();
-    socketManager.disconnect();
+    wsManager.disconnect();
     window.location.href = window.location.origin;
   };
 
-  const generateInviteToken = () =>
-    new Promise<string>((res) => getSocket().emit("auth:generate_token", res));
+  const generateInviteToken = (): Promise<string> =>
+    new Promise((res) => {
+      const handler = (token: string) => {
+        res(token);
+      };
+      
+      // One-time handler for token response
+      wsManager.on("auth:token", handler);
+      wsManager.emit("auth:generate_token", {});
+    });
 
   return {
     setRunState,

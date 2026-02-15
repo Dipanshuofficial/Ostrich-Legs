@@ -1,7 +1,8 @@
 // client/src/hooks/useWorker.ts
+// Updated for Cloudflare Workers WebSocket compatibility
 import { useEffect, useRef, useCallback } from "react";
 import { useSwarmStore } from "../core/swarmStore";
-import { socketManager } from "../core/SocketManager";
+import { wsManager } from "../core/WebSocketManager";
 import { SocketEvents } from "@shared/socket/events";
 import { usePersistentIdentity } from "./usePersistentIdentity";
 import { MAX_SAFE_THROTTLE_PERCENT } from "../core/constants";
@@ -25,36 +26,35 @@ export const useWorker = () => {
         level,
         durationMs,
       } = e.data;
-      const socket = socketManager.get(identity.id, swarmToken);
 
       switch (type) {
         case "WORKER_LOG":
           addLog(level || "SYS", message);
           break;
         case "BENCHMARK_COMPLETE":
-          socket.emit(SocketEvents.BENCHMARK_RESULT, { score });
+          wsManager.emit(SocketEvents.BENCHMARK_RESULT, { score });
           addLog("CPU", `Benchmark: ${score.toLocaleString()} OPS/s`);
           break;
         case "JOB_COMPLETE":
           if (durationMs) {
             metrics.record("job_execution_time", durationMs);
           }
-          socket.emit(SocketEvents.JOB_COMPLETE, {
+          wsManager.emit(SocketEvents.JOB_COMPLETE, {
             chunkId,
             result,
             workerId: identity.id,
             durationMs,
           });
-          socket.emit(SocketEvents.JOB_REQUEST_BATCH);
+          wsManager.emit(SocketEvents.JOB_REQUEST_BATCH, {});
           break;
         case "JOB_ERROR":
           addLog("ERR", `Job ${chunkId} failed: ${error}`);
-          socket.emit(SocketEvents.JOB_COMPLETE, {
+          wsManager.emit(SocketEvents.JOB_COMPLETE, {
             chunkId,
             error,
             workerId: identity.id,
           });
-          socket.emit(SocketEvents.JOB_REQUEST_BATCH);
+          wsManager.emit(SocketEvents.JOB_REQUEST_BATCH, {});
           break;
       }
     },
@@ -89,8 +89,7 @@ export const useWorker = () => {
   }, [snapshot?.stats.globalThrottle]);
 
   const runLocalBenchmark = useCallback(() => {
-    const socket = socketManager.get(identity.id, swarmToken);
-    socket.emit(SocketEvents.HEARTBEAT, { lastInteraction: Date.now() });
+    wsManager.emit(SocketEvents.HEARTBEAT, { lastInteraction: Date.now() });
     addLog("SYS", "Manual Benchmark Triggered");
     workerRef.current?.postMessage({ type: "BENCHMARK" });
   }, [identity.id, swarmToken, addLog]);
